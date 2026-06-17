@@ -2,9 +2,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using WMess.Api.Data;
 using WMess.Api.Services;
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
