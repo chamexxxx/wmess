@@ -1,0 +1,6 @@
+@WMess.Api_HostAddress = http://localhost:5241
+
+GET {{WMess.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
