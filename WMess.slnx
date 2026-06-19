@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="WMess.Api/WMess.Api.csproj" />
+  <Project Path="WMess.Web/WMess.Web.csproj" />
 </Solution>

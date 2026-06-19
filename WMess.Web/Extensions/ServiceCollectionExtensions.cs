@@ -1,0 +1,52 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
+using WMess.Web.Infrastructure;
+using WMess.Web.Services;
+
+namespace WMess.Web.Extensions;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddBff(this IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+            .AddCookie(options =>
+            {
+                options.Cookie.Name = "__Host-session";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SameSite = SameSiteMode.Strict;
+                options.Cookie.Path = "/";
+                options.SlidingExpiration = false;
+                options.Events.OnRedirectToLogin = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                };
+                options.Events.OnRedirectToAccessDenied = context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                };
+            });
+
+        services.AddAuthorization();
+
+        services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
+        {
+            client.BaseAddress = new Uri(configuration["Api:BaseUrl"]!);
+        });
+
+        services.AddScoped<ISessionManager, SessionManager>();
+
+        services
+            .AddReverseProxy()
+            .LoadFromConfig(configuration.GetSection("ReverseProxy"))
+            .AddTransforms<AccessTokenTransformProvider>();
+
+        services.AddExceptionHandler<UpstreamExceptionHandler>();
+        services.AddProblemDetails();
+
+        return services;
+    }
+}
