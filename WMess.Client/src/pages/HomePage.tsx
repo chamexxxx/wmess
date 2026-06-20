@@ -6,9 +6,8 @@ import type { ProjectResponse, TeamResponse } from '../api/generated/data-contra
 import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
-import { accent, c, colorFor, font, initials } from '../workspace/theme'
+import { colorFor, initials } from '../workspace/theme'
 import { FolderIcon, PencilIcon, PlusIcon, TrashIcon } from '../workspace/icons'
-import '../workspace/workspace.css'
 
 type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
@@ -54,6 +53,7 @@ export function HomePage() {
     () => projects.filter((p) => Number(p.teamId) === selectedTeamId),
     [projects, selectedTeamId],
   )
+
   // Fall back to the first project when the explicit selection isn't in the
   // active team (after switching teams or deleting the selected project).
   const selectedProject =
@@ -165,20 +165,7 @@ export function HomePage() {
   }
 
   return (
-    <div
-      className="wm-root"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        display: 'flex',
-        background: c.appBg,
-        color: c.text,
-        fontFamily: font.sans,
-        fontSize: 14,
-        textAlign: 'left',
-        WebkitFontSmoothing: 'antialiased',
-      }}
-    >
+    <div className="wm-scroll fixed inset-0 flex bg-app text-ink font-ui text-sm text-left antialiased">
       <TeamRail
         teams={teams}
         selectedTeamId={selectedTeamId}
@@ -201,37 +188,19 @@ export function HomePage() {
       />
 
       {/* MAIN */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: c.panelBg }}>
-        <div
-          style={{
-            height: 60,
-            flex: 'none',
-            borderBottom: `1px solid ${c.border}`,
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 22px',
-          }}
-        >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: font.mono, fontSize: 10.5, color: c.textFaintest, letterSpacing: '.02em' }}>
+      <div className="flex-1 min-w-0 flex flex-col bg-panel">
+        <div className="h-[60px] shrink-0 border-b border-line flex items-center px-[22px]">
+          <div className="min-w-0">
+            <div className="font-mono text-[10.5px] text-faintest tracking-[.02em]">
               {selectedTeam ? selectedTeam.name : 'WMess'}
             </div>
-            <div
-              style={{
-                fontSize: 16,
-                fontWeight: 700,
-                marginTop: 1,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
+            <div className="text-base font-bold mt-px truncate">
               {selectedProject ? selectedProject.name : selectedTeam ? 'Проекты' : 'Добро пожаловать'}
             </div>
           </div>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {loading ? (
             <EmptyState text="Загрузка…" />
           ) : teams.length === 0 ? (
@@ -329,21 +298,7 @@ export function HomePage() {
       {error && (
         <div
           onClick={() => setError(null)}
-          style={{
-            position: 'fixed',
-            bottom: 20,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: '#2a1215',
-            color: '#ff9d8a',
-            border: '1px solid #5c2b2e',
-            borderRadius: 10,
-            padding: '10px 16px',
-            fontSize: 13,
-            cursor: 'pointer',
-            zIndex: 200,
-            boxShadow: '0 10px 30px rgba(0,0,0,.2)',
-          }}
+          className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[#2a1215] text-[#ff9d8a] border border-[#5c2b2e] rounded-[10px] px-4 py-2.5 text-[13px] cursor-pointer z-[200] shadow-[0_10px_30px_rgba(0,0,0,.2)]"
         >
           {error}
         </div>
@@ -360,52 +315,16 @@ function EmptyState({
   action?: { label: string; onClick: () => void }
 }) {
   return (
-    <div
-      style={{
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 16,
-        padding: 32,
-        textAlign: 'center',
-      }}
-    >
-      <div
-        style={{
-          width: 52,
-          height: 52,
-          borderRadius: 14,
-          background: accent.soft,
-          color: accent.base,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+    <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="w-[52px] h-[52px] rounded-2xl bg-accent-soft text-accent flex items-center justify-center">
         <FolderIcon size={24} strokeWidth={1.6} />
       </div>
-      <div style={{ fontSize: 14, color: c.textMuted, maxWidth: 340, lineHeight: 1.55 }}>{text}</div>
+      <div className="text-sm text-muted max-w-[340px] leading-[1.55]">{text}</div>
       {action && (
         <button
           type="button"
           onClick={action.onClick}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            height: 38,
-            padding: '0 16px',
-            borderRadius: 9,
-            border: 'none',
-            background: accent.base,
-            color: c.white,
-            fontSize: 13.5,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: font.sans,
-          }}
+          className="inline-flex items-center gap-[7px] h-[38px] px-4 rounded-[9px] bg-accent text-white text-[13.5px] font-semibold cursor-pointer hover:bg-accent-deep font-ui"
         >
           <PlusIcon size={15} strokeWidth={2} />
           {action.label}
@@ -427,92 +346,40 @@ function ProjectDetail({
   onDelete: () => void
 }) {
   const created = project.createdAt ? new Date(project.createdAt).toLocaleDateString('ru-RU') : '—'
-
-  const metaBtn: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 7,
-    height: 34,
-    padding: '0 13px',
-    borderRadius: 9,
-    border: `1px solid ${c.border}`,
-    background: c.white,
-    color: c.textMuted,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: font.sans,
-  }
+  const metaBtn =
+    'inline-flex items-center gap-[7px] h-[34px] px-[13px] rounded-[9px] border border-line bg-white text-[13px] font-semibold cursor-pointer hover:bg-sidebar font-ui'
 
   return (
-    <div style={{ padding: '32px 32px 50px', maxWidth: 760, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+    <div className="px-8 pt-8 pb-[50px] max-w-[760px] mx-auto">
+      <div className="flex items-start gap-4">
         <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 12,
-            background: colorFor(Number(project.id)),
-            color: c.white,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 18,
-            fontWeight: 700,
-            flex: 'none',
-          }}
+          className="w-12 h-12 rounded-xl text-white flex items-center justify-center text-[18px] font-bold shrink-0"
+          style={{ background: colorFor(Number(project.id)) }}
         >
           {initials(project.name)}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: font.mono, fontSize: 11, color: c.textFaintest }}>
-            {teamName} / Проект
-          </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-.5px', margin: '6px 0 0' }}>
-            {project.name}
-          </h1>
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-[11px] text-faintest">{teamName} / Проект</div>
+          <h1 className="text-[28px] font-extrabold tracking-[-.5px] mt-1.5 mb-0">{project.name}</h1>
         </div>
-        <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
-          <button type="button" className="wm-btn-ghost" style={metaBtn} onClick={onEdit}>
+        <div className="flex gap-2 shrink-0">
+          <button type="button" className={metaBtn} onClick={onEdit}>
             <PencilIcon size={15} />
             Переименовать
           </button>
-          <button
-            type="button"
-            className="wm-btn-ghost"
-            style={{ ...metaBtn, color: c.danger }}
-            onClick={onDelete}
-          >
+          <button type="button" className={`${metaBtn} text-danger`} onClick={onDelete}>
             <TrashIcon size={15} />
             Удалить
           </button>
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 12,
-          margin: '28px 0',
-        }}
-      >
+      <div className="grid grid-cols-2 gap-3 my-7">
         <InfoCard label="Команда" value={teamName ?? '—'} />
         <InfoCard label="Создан" value={created} />
       </div>
 
-      <div
-        style={{
-          border: `1px solid ${c.border}`,
-          borderRadius: 14,
-          background: c.white,
-          padding: '28px 24px',
-          textAlign: 'center',
-          color: c.textFaint,
-          fontSize: 14,
-          lineHeight: 1.6,
-        }}
-      >
+      <div className="border border-line rounded-2xl bg-white px-6 py-7 text-center text-faint text-sm leading-[1.6]">
         Здесь появятся чат, документы и задачи проекта.
       </div>
     </div>
@@ -521,26 +388,9 @@ function ProjectDetail({
 
 function InfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        border: `1px solid ${c.border}`,
-        borderRadius: 12,
-        background: c.white,
-        padding: '14px 16px',
-      }}
-    >
-      <div
-        style={{
-          fontFamily: font.mono,
-          fontSize: 10.5,
-          letterSpacing: '.06em',
-          textTransform: 'uppercase',
-          color: c.textFaintest,
-        }}
-      >
-        {label}
-      </div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: c.text, marginTop: 5 }}>{value}</div>
+    <div className="border border-line rounded-xl bg-white px-4 py-3.5">
+      <div className="font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest">{label}</div>
+      <div className="text-[15px] font-semibold text-ink mt-[5px]">{value}</div>
     </div>
   )
 }

@@ -1,5 +1,70 @@
 @import "tailwindcss";
 
+/* Workspace design tokens (from the Claude Design export). Tailwind v4 turns
+   these into utilities: bg-app, text-faint, border-line, font-ui, etc. */
+@theme {
+  --color-app: #f7f6f2;
+  --color-panel: #fbfaf7;
+  --color-rail: #efede7;
+  --color-sidebar: #f2f1ec;
+  --color-line: #e4e2da;
+  --color-line-soft: #edebe3;
+  --color-ink: #2b2a26;
+  --color-ink-soft: #3a3833;
+  --color-muted: #6e6b62;
+  --color-faint: #9b978c;
+  --color-faintest: #a8a498;
+  --color-hovered: #e7e5dd;
+  --color-tile: #e2e0d8;
+  --color-danger: #b5466b;
+  --color-danger-deep: #9b3a58;
+  --color-accent: #4fa47a;
+  --color-accent-soft: #e6f4ec;
+  --color-accent-deep: #3c8a63;
+
+  --font-ui: "Hanken Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+@keyframes wmFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes wmPop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Scrollbars aren't expressible as Tailwind utilities; scope a thin one to the
+   workspace and its scrollable descendants. */
+.wm-scroll ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.wm-scroll ::-webkit-scrollbar-thumb {
+  background: #dad8cf;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.wm-scroll ::-webkit-scrollbar-thumb:hover {
+  background: #c9c6bb;
+  background-clip: content-box;
+}
+.wm-scroll ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;

@@ -1,69 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { accent, c, font } from '../workspace/theme'
 
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(43,42,38,.28)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 100,
-  fontFamily: font.sans,
-}
+const ghostBtn =
+  'h-[38px] px-4 rounded-[9px] border border-line bg-white text-muted font-semibold text-[13.5px] cursor-pointer hover:bg-sidebar font-ui'
 
-const cardStyle: React.CSSProperties = {
-  width: 380,
-  maxWidth: 'calc(100vw - 32px)',
-  background: c.white,
-  border: `1px solid ${c.border}`,
-  borderRadius: 16,
-  boxShadow: '0 24px 60px rgba(43,42,38,.24)',
-  padding: 22,
-  color: c.text,
-}
-
-const titleStyle: React.CSSProperties = {
-  fontSize: 17,
-  fontWeight: 700,
-  margin: 0,
-}
-
-const footerStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 10,
-  marginTop: 22,
-}
-
-const ghostBtn: React.CSSProperties = {
-  height: 38,
-  padding: '0 16px',
-  borderRadius: 9,
-  border: `1px solid ${c.border}`,
-  background: c.white,
-  color: c.textMuted,
-  fontWeight: 600,
-  fontSize: 13.5,
-  cursor: 'pointer',
-  fontFamily: font.sans,
-}
-
-function primaryBtn(background: string): React.CSSProperties {
-  return {
-    height: 38,
-    padding: '0 18px',
-    borderRadius: 9,
-    border: 'none',
-    background,
-    color: c.white,
-    fontWeight: 600,
-    fontSize: 13.5,
-    cursor: 'pointer',
-    fontFamily: font.sans,
-  }
-}
+const actionBtn =
+  'h-[38px] px-[18px] rounded-[9px] border-none text-white font-semibold text-[13.5px] cursor-pointer font-ui disabled:opacity-60'
 
 /** Overlay + centered card. Closes on Esc and on backdrop click. */
 function Modal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
@@ -76,8 +18,14 @@ function Modal({ onClose, children }: { onClose: () => void; children: ReactNode
   }, [onClose])
 
   return (
-    <div className="wm-overlay" style={overlayStyle} onMouseDown={onClose}>
-      <div className="wm-card" style={cardStyle} onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/30 font-ui animate-[wmFade_.12s_ease]"
+      onMouseDown={onClose}
+    >
+      <div
+        className="w-[380px] max-w-[calc(100vw-32px)] bg-white border border-line rounded-2xl p-[22px] text-ink shadow-[0_24px_60px_rgba(43,42,38,.24)] animate-[wmPop_.14s_ease]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         {children}
       </div>
     </div>
@@ -115,47 +63,25 @@ export function FormModal({
 
   return (
     <Modal onClose={onClose}>
-      <h2 style={titleStyle}>{title}</h2>
+      <h2 className="text-[17px] font-bold m-0">{title}</h2>
       <form onSubmit={submit}>
-        <label
-          style={{
-            display: 'block',
-            fontFamily: font.mono,
-            fontSize: 10.5,
-            letterSpacing: '.06em',
-            textTransform: 'uppercase',
-            color: c.textFaintest,
-            margin: '18px 0 7px',
-          }}
-        >
+        <label className="block font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest mt-[18px] mb-[7px]">
           {label}
         </label>
         <input
-          className="wm-input"
           autoFocus
           value={value}
           maxLength={100}
           onChange={(e) => setValue(e.target.value)}
-          style={{
-            width: '100%',
-            height: 40,
-            padding: '0 12px',
-            borderRadius: 9,
-            border: `1px solid ${c.border}`,
-            background: c.panelBg,
-            fontSize: 14,
-            color: c.text,
-            fontFamily: font.sans,
-          }}
+          className="w-full h-10 px-3 rounded-[9px] border border-line bg-panel text-sm text-ink font-ui focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/20"
         />
-        <div style={footerStyle}>
-          <button type="button" className="wm-btn-ghost" style={ghostBtn} onClick={onClose}>
+        <div className="flex justify-end gap-2.5 mt-[22px]">
+          <button type="button" className={ghostBtn} onClick={onClose}>
             Отмена
           </button>
           <button
             type="submit"
-            className="wm-btn-primary"
-            style={{ ...primaryBtn(accent.base), opacity: !trimmed || busy ? 0.6 : 1 }}
+            className={`${actionBtn} bg-accent hover:bg-accent-deep`}
             disabled={!trimmed || busy}
           >
             {submitLabel}
@@ -186,18 +112,15 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal onClose={onClose}>
-      <h2 style={titleStyle}>{title}</h2>
-      <p style={{ fontSize: 14, lineHeight: 1.55, color: c.textBody, margin: '14px 0 0' }}>
-        {message}
-      </p>
-      <div style={footerStyle}>
-        <button type="button" className="wm-btn-ghost" style={ghostBtn} onClick={onClose}>
+      <h2 className="text-[17px] font-bold m-0">{title}</h2>
+      <p className="text-sm leading-[1.55] text-ink-soft mt-3.5">{message}</p>
+      <div className="flex justify-end gap-2.5 mt-[22px]">
+        <button type="button" className={ghostBtn} onClick={onClose}>
           Отмена
         </button>
         <button
           type="button"
-          className="wm-btn-danger"
-          style={{ ...primaryBtn(c.danger), opacity: busy ? 0.6 : 1 }}
+          className={`${actionBtn} bg-danger hover:bg-danger-deep`}
           disabled={busy}
           onClick={onConfirm}
         >

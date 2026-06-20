@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProjectResponse, TeamResponse } from '../api/generated/data-contracts'
-import { accent, c, colorFor, font } from '../workspace/theme'
+import { colorFor } from '../workspace/theme'
 import { PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
 
 interface ProjectSidebarProps {
@@ -15,40 +15,9 @@ interface ProjectSidebarProps {
   onDeleteTeam: () => void
 }
 
-const sectionLabel: React.CSSProperties = {
-  fontFamily: font.mono,
-  fontSize: 10.5,
-  letterSpacing: '.06em',
-  textTransform: 'uppercase',
-  color: c.textFaintest,
-}
-
-const headerIconBtn: React.CSSProperties = {
-  width: 28,
-  height: 28,
-  borderRadius: 8,
-  border: 'none',
-  background: 'transparent',
-  color: c.textFaint,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
-
-const rowActionBtn: React.CSSProperties = {
-  width: 24,
-  height: 24,
-  borderRadius: 6,
-  border: 'none',
-  background: 'transparent',
-  color: c.textFaint,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flex: 'none',
-}
+const sectionLabel = 'font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest'
+const iconBtn =
+  'w-7 h-7 rounded-lg flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]'
 
 export function ProjectSidebar({
   team,
@@ -63,38 +32,13 @@ export function ProjectSidebar({
 }: ProjectSidebarProps) {
   const [query, setQuery] = useState('')
 
-  const shell = (children: React.ReactNode) => (
-    <div
-      style={{
-        width: 264,
-        flex: 'none',
-        background: c.sidebarBg,
-        borderRight: `1px solid ${c.border}`,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {children}
-    </div>
-  )
-
   if (!team) {
-    return shell(
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 24,
-          textAlign: 'center',
-          fontSize: 13,
-          color: c.textFaint,
-          lineHeight: 1.5,
-        }}
-      >
-        Создайте команду в левой панели, чтобы добавлять проекты.
-      </div>,
+    return (
+      <div className="w-[264px] shrink-0 bg-sidebar border-r border-line flex flex-col">
+        <div className="flex-1 flex items-center justify-center p-6 text-center text-[13px] text-faint leading-[1.5]">
+          Создайте команду в левой панели, чтобы добавлять проекты.
+        </div>
+      </div>
     )
   }
 
@@ -102,100 +46,41 @@ export function ProjectSidebar({
     (p.name ?? '').toLowerCase().includes(query.trim().toLowerCase()),
   )
 
-  return shell(
-    <>
+  return (
+    <div className="w-[264px] shrink-0 bg-sidebar border-r border-line flex flex-col">
       {/* Team header with edit/delete actions */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '16px 14px 12px',
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: c.text,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {team.name}
-          </div>
-          <div style={{ ...sectionLabel, textTransform: 'none', letterSpacing: 0, marginTop: 1 }}>
-            {projects.length} проект(ов)
-          </div>
+      <div className="flex items-center gap-2 px-[14px] pt-4 pb-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-ink truncate">{team.name}</div>
+          <div className="text-[10.5px] text-faintest mt-px">{projects.length} проект(ов)</div>
         </div>
-        <button
-          type="button"
-          className="wm-icon-btn"
-          style={headerIconBtn}
-          title="Переименовать команду"
-          onClick={onEditTeam}
-        >
+        <button type="button" className={iconBtn} title="Переименовать команду" onClick={onEditTeam}>
           <PencilIcon size={15} />
         </button>
-        <button
-          type="button"
-          className="wm-icon-btn"
-          style={headerIconBtn}
-          title="Удалить команду"
-          onClick={onDeleteTeam}
-        >
+        <button type="button" className={iconBtn} title="Удалить команду" onClick={onDeleteTeam}>
           <TrashIcon size={15} />
         </button>
       </div>
 
       {/* Search */}
-      <div style={{ padding: '0 12px 10px' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            background: c.panelBg,
-            border: `1px solid ${c.border}`,
-            borderRadius: 9,
-            padding: '7px 10px',
-          }}
-        >
-          <SearchIcon size={15} color={c.textFaint} strokeWidth={1.8} />
+      <div className="px-3 pb-2.5">
+        <div className="flex items-center gap-2 bg-panel border border-line rounded-[9px] px-2.5 py-[7px]">
+          <SearchIcon size={15} strokeWidth={1.8} className="text-faint" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск проектов"
-            style={{
-              flex: 1,
-              minWidth: 0,
-              border: 'none',
-              background: 'transparent',
-              outline: 'none',
-              fontSize: 13,
-              color: c.text,
-              fontFamily: font.sans,
-            }}
+            className="flex-1 min-w-0 border-none bg-transparent outline-none text-[13px] text-ink font-ui"
           />
         </div>
       </div>
 
       {/* Projects section header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 14px 4px',
-        }}
-      >
-        <span style={sectionLabel}>Проекты</span>
+      <div className="flex items-center justify-between px-[14px] pt-2.5 pb-1">
+        <span className={sectionLabel}>Проекты</span>
         <button
           type="button"
-          className="wm-icon-btn"
-          style={{ ...headerIconBtn, width: 24, height: 24 }}
+          className="w-6 h-6 rounded-lg flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
           title="Новый проект"
           onClick={onCreateProject}
         >
@@ -204,39 +89,17 @@ export function ProjectSidebar({
       </div>
 
       {/* Project list */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '4px 12px 12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-        }}
-      >
+      <div className="flex-1 overflow-y-auto px-3 pt-1 pb-3 flex flex-col gap-0.5">
         {filtered.length === 0 ? (
-          <div style={{ padding: '20px 8px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: c.textFaint, marginBottom: 12 }}>
+          <div className="px-2 py-5 text-center">
+            <div className="text-[13px] text-faint mb-3">
               {projects.length === 0 ? 'Пока нет проектов' : 'Ничего не найдено'}
             </div>
             {projects.length === 0 && (
               <button
                 type="button"
                 onClick={onCreateProject}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  padding: '7px 12px',
-                  borderRadius: 9,
-                  border: 'none',
-                  background: accent.base,
-                  color: c.white,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: font.sans,
-                }}
+                className="inline-flex items-center gap-[7px] px-3 py-[7px] rounded-[9px] bg-accent text-white text-[13px] font-semibold cursor-pointer hover:bg-accent-deep font-ui"
               >
                 <PlusIcon size={14} strokeWidth={2} />
                 Создать проект
@@ -250,47 +113,26 @@ export function ProjectSidebar({
             return (
               <div
                 key={id}
-                className="wm-proj-row wm-hover"
                 onClick={() => onSelectProject(id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  padding: '7px 8px',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  background: active ? accent.soft : 'transparent',
-                  color: active ? accent.hover : c.textMuted,
-                }}
+                className={`group flex items-center gap-[9px] px-2 py-[7px] rounded-lg cursor-pointer ${
+                  active ? 'bg-accent-soft' : 'hover:bg-hovered'
+                }`}
               >
                 <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 2,
-                    background: colorFor(id),
-                    flex: 'none',
-                  }}
+                  className="w-2 h-2 rounded-[2px] shrink-0"
+                  style={{ background: colorFor(id) }}
                 />
                 <span
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    fontSize: 13,
-                    fontWeight: active ? 600 : 500,
-                    color: active ? accent.hover : c.text,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
+                  className={`flex-1 min-w-0 text-[13px] truncate ${
+                    active ? 'font-semibold text-accent-deep' : 'font-medium text-ink'
+                  }`}
                 >
                   {project.name}
                 </span>
-                <div className="wm-row-actions" style={{ display: 'flex', gap: 2 }}>
+                <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
-                    className="wm-icon-btn"
-                    style={rowActionBtn}
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
                     title="Переименовать проект"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -301,8 +143,7 @@ export function ProjectSidebar({
                   </button>
                   <button
                     type="button"
-                    className="wm-icon-btn"
-                    style={rowActionBtn}
+                    className="w-6 h-6 rounded-md flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
                     title="Удалить проект"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -317,6 +158,6 @@ export function ProjectSidebar({
           })
         )}
       </div>
-    </>,
+    </div>
   )
 }

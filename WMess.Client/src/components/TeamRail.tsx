@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { TeamResponse } from '../api/generated/data-contracts'
-import { accent, c, font, initials } from '../workspace/theme'
+import { initials } from '../workspace/theme'
 import { LogoutIcon } from '../workspace/icons'
 
 interface TeamRailProps {
@@ -12,21 +12,8 @@ interface TeamRailProps {
   onLogout: () => void
 }
 
-const teamBtnBase: React.CSSProperties = {
-  width: 40,
-  height: 40,
-  borderRadius: 12,
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: 13,
-  fontWeight: 700,
-  color: c.textMuted,
-  background: '#E2E0D8',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontFamily: font.sans,
-}
+const teamBtn =
+  'w-10 h-10 rounded-[12px] flex items-center justify-center text-[13px] font-bold cursor-pointer font-ui transition hover:-translate-y-px'
 
 export function TeamRail({
   teams,
@@ -39,38 +26,11 @@ export function TeamRail({
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <div
-      style={{
-        width: 64,
-        flex: 'none',
-        background: c.railBg,
-        borderRight: `1px solid ${c.border}`,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '14px 0',
-        gap: 8,
-      }}
-    >
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          background: accent.base,
-          color: c.white,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 800,
-          fontSize: 18,
-          marginBottom: 8,
-          letterSpacing: '-.5px',
-        }}
-      >
+    <div className="w-16 shrink-0 bg-rail border-r border-line flex flex-col items-center py-[14px] gap-2">
+      <div className="w-9 h-9 rounded-[10px] bg-accent text-white flex items-center justify-center font-extrabold text-[18px] mb-2 tracking-[-.5px]">
         W
       </div>
-      <div style={{ width: 28, height: 1, background: '#E0DDD3', margin: '2px 0 6px' }} />
+      <div className="w-7 h-px bg-[#e0ddd3] mt-0.5 mb-1.5" />
 
       {teams.map((team) => {
         const id = Number(team.id)
@@ -79,19 +39,11 @@ export function TeamRail({
           <button
             key={id}
             type="button"
-            className="wm-team-btn"
             title={team.name}
             onClick={() => onSelect(id)}
-            style={
-              active
-                ? {
-                    ...teamBtnBase,
-                    background: c.white,
-                    color: accent.hover,
-                    boxShadow: `0 0 0 2px ${accent.base}`,
-                  }
-                : teamBtnBase
-            }
+            className={`${teamBtn} ${
+              active ? 'bg-white text-accent-deep ring-2 ring-accent' : 'bg-tile text-muted'
+            }`}
           >
             {initials(team.name)}
           </button>
@@ -102,109 +54,37 @@ export function TeamRail({
         type="button"
         title="Создать команду"
         onClick={onCreate}
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          border: '1px dashed #CFCCC2',
-          background: 'transparent',
-          color: c.textFaint,
-          fontSize: 20,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          lineHeight: 1,
-        }}
+        className="w-10 h-10 rounded-[12px] border border-dashed border-[#cfccc2] text-faint text-[20px] leading-none cursor-pointer flex items-center justify-center"
       >
         +
       </button>
 
-      <div style={{ marginTop: 'auto', position: 'relative' }}>
+      <div className="mt-auto relative">
         <button
           type="button"
           title={userEmail}
           onClick={() => setMenuOpen((v) => !v)}
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: '50%',
-            border: 'none',
-            background: '#3D6FC2',
-            color: c.white,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: font.sans,
-          }}
+          className="w-[34px] h-[34px] rounded-full bg-[#3d6fc2] text-white flex items-center justify-center text-xs font-semibold cursor-pointer font-ui"
         >
           {initials(userEmail)}
         </button>
 
         {menuOpen && (
           <>
-            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setMenuOpen(false)} />
-            <div
-              style={{
-                position: 'absolute',
-                left: 44,
-                bottom: 0,
-                width: 220,
-                background: c.white,
-                border: `1px solid ${c.border}`,
-                borderRadius: 12,
-                boxShadow: '0 14px 36px rgba(43,42,38,.16)',
-                padding: 8,
-                zIndex: 41,
-              }}
-            >
-              <div style={{ padding: '6px 8px 10px' }}>
-                <div
-                  style={{
-                    fontFamily: font.mono,
-                    fontSize: 10.5,
-                    letterSpacing: '.06em',
-                    textTransform: 'uppercase',
-                    color: c.textFaintest,
-                  }}
-                >
+            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+            <div className="absolute left-11 bottom-0 w-[220px] bg-white border border-line rounded-xl shadow-[0_14px_36px_rgba(43,42,38,.16)] p-2 z-[41]">
+              <div className="px-2 pt-1.5 pb-2.5">
+                <div className="font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest">
                   Аккаунт
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: c.text,
-                    marginTop: 3,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
+                <div className="text-[13px] font-semibold text-ink mt-[3px] truncate">
                   {userEmail}
                 </div>
               </div>
               <button
                 type="button"
-                className="wm-hover"
                 onClick={onLogout}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  padding: '9px 8px',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  color: c.danger,
-                  fontWeight: 600,
-                  fontFamily: font.sans,
-                }}
+                className="w-full flex items-center gap-[9px] px-2 py-[9px] rounded-lg text-[13px] text-danger font-semibold cursor-pointer hover:bg-hovered font-ui"
               >
                 <LogoutIcon size={16} />
                 Выйти

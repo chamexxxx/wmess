@@ -1,15 +1,17 @@
 // Minimal stroke icons matching the design (1.6–1.8 stroke, 24×24 viewBox).
+// Color comes from the parent's text color (stroke="currentColor"), so callers
+// tint them with Tailwind text-* utilities.
 
 interface IconProps {
   size?: number
-  color?: string
   strokeWidth?: number
+  className?: string
 }
 
 function Svg({
   size = 18,
-  color = 'currentColor',
   strokeWidth = 1.7,
+  className,
   children,
 }: IconProps & { children: React.ReactNode }) {
   return (
@@ -18,10 +20,11 @@ function Svg({
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={color}
+      stroke="currentColor"
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
+      className={className}
     >
       {children}
     </svg>
@@ -43,12 +46,6 @@ export const PencilIcon = (p: IconProps) => (
 export const TrashIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />
-  </Svg>
-)
-
-export const ChevronDownIcon = (p: IconProps) => (
-  <Svg {...p}>
-    <path d="M8 9l4 4 4-4" />
   </Svg>
 )
 
