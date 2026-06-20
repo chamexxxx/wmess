@@ -1,16 +1,86 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "WMess API",
-    "description": "API для системы управления сообщениями WMess",
-    "version": "v1"
+    "title": "WMess.Web | v1",
+    "version": "1.0.0"
   },
   "paths": {
-    "/api/auth/register": {
+    "/api/login": {
       "post": {
         "tags": [
-          "Auth"
+          "Bff"
         ],
+        "operationId": "Login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "tags": [
+          "Bff"
+        ],
+        "operationId": "Register",
         "requestBody": {
           "content": {
             "application/json": {
@@ -35,47 +105,80 @@
           "200": {
             "description": "OK"
           }
+        }
+      }
+    },
+    "/api/logout": {
+      "post": {
+        "tags": [
+          "Bff"
+        ],
+        "operationId": "Logout",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       }
     },
-    "/api/auth/login": {
-      "post": {
+    "/api/user": {
+      "get": {
         "tags": [
-          "Auth"
+          "Bff"
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
+        "operationId": "GetUser",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
               }
             }
           },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       }
@@ -118,7 +221,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       },
@@ -170,7 +274,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       }
@@ -219,7 +324,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       },
@@ -269,7 +375,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       },
@@ -299,7 +406,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       }
@@ -342,7 +450,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       },
@@ -394,7 +503,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       }
@@ -443,7 +553,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       },
@@ -493,7 +604,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       },
@@ -523,7 +635,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       }
@@ -540,7 +653,8 @@
         },
         "security": [
           {
-            "Bearer": [ ]
+            "csrf": [ ],
+            "cookieAuth": [ ]
           }
         ]
       }
@@ -593,6 +707,44 @@
           },
           "password": {
             "type": "string"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -692,29 +844,39 @@
             "type": "string"
           }
         }
+      },
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        }
       }
     },
     "securitySchemes": {
-      "Bearer": {
-        "type": "http",
-        "description": "Введите JWT токен для авторизации",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
+      "cookieAuth": {
+        "type": "apiKey",
+        "description": "Session cookie issued by the BFF after /bff/login.",
+        "name": "__Host-session",
+        "in": "cookie"
+      },
+      "csrf": {
+        "type": "apiKey",
+        "description": "Antiforgery header required on every BFF request.",
+        "name": "X-CSRF",
+        "in": "header"
       }
     }
   },
+  "security": [
+    {
+      "csrf": [ ]
+    }
+  ],
   "tags": [
     {
-      "name": "Auth"
-    },
-    {
-      "name": "Projects"
-    },
-    {
-      "name": "Teams"
-    },
-    {
-      "name": "User"
+      "name": "Bff"
     }
   ]
 }
