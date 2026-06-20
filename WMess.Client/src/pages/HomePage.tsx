@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
 import type { ProjectResponse, TeamResponse } from '../api/generated/data-contracts'
 import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
-import { colorFor, initials } from '../workspace/theme'
 import { FolderIcon, PencilIcon, PlusIcon, TrashIcon } from '../workspace/icons'
+import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
 
 type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
@@ -17,10 +17,13 @@ export function HomePage() {
   const { user, setUser } = useAuth()
   const navigate = useNavigate()
 
+  // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
+  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam } = useParams()
+  const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
+  const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
+
   const [teams, setTeams] = useState<TeamResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,10 +35,8 @@ export function HomePage() {
   useEffect(() => {
     Promise.all([apiClient.teams.teamsList(), apiClient.projects.projectsList()])
       .then(([teamRes, projectRes]) => {
-        const teamList = teamRes.data ?? []
-        setTeams(teamList)
+        setTeams(teamRes.data ?? [])
         setProjects(projectRes.data ?? [])
-        if (teamList.length > 0) setSelectedTeamId(Number(teamList[0].id))
       })
       .catch(() => setError('Не удалось загрузить данные'))
       .finally(() => setLoading(false))
@@ -53,12 +54,25 @@ export function HomePage() {
     () => projects.filter((p) => Number(p.teamId) === selectedTeamId),
     [projects, selectedTeamId],
   )
+  const selectedProject = teamProjects.find((p) => Number(p.id) === selectedProjectId)
+  const section = sectionById(sectionParam)
 
-  // Fall back to the first project when the explicit selection isn't in the
-  // active team (after switching teams or deleting the selected project).
-  const selectedProject =
-    teamProjects.find((p) => Number(p.id) === selectedProjectId) ?? teamProjects[0]
-  const activeProjectId = selectedProject ? Number(selectedProject.id) : null
+  // Keep the URL pointing at something real: land on the first team, default to
+  // the first section, and bounce off ids/sections that don't exist.
+  useEffect(() => {
+    if (loading) return
+    if (selectedTeamId != null && !teams.some((t) => Number(t.id) === selectedTeamId)) {
+      navigate('/', { replace: true })
+    } else if (selectedTeamId == null && teams.length > 0) {
+      navigate(`/teams/${Number(teams[0].id)}`, { replace: true })
+    } else if (selectedProjectId != null && !selectedProject) {
+      navigate(`/teams/${selectedTeamId}`, { replace: true })
+    } else if (selectedProject && !section) {
+      navigate(`/teams/${selectedTeamId}/projects/${selectedProjectId}/${DEFAULT_SECTION}`, {
+        replace: true,
+      })
+    }
+  }, [loading, selectedTeamId, selectedProjectId, selectedProject, section, teams, navigate])
 
   const handleLogout = async () => {
     try {
@@ -76,8 +90,8 @@ export function HomePage() {
     try {
       const res = await apiClient.teams.teamsCreate({ name })
       setTeams((prev) => [...prev, res.data])
-      setSelectedTeamId(Number(res.data.id))
       setTeamModal(null)
+      navigate(`/teams/${Number(res.data.id)}`)
     } catch {
       setError('Не удалось создать команду')
     } finally {
@@ -106,10 +120,8 @@ export function HomePage() {
       setProjects((prev) => prev.filter((p) => Number(p.teamId) !== id))
       const remaining = teams.filter((t) => Number(t.id) !== id)
       setTeams(remaining)
-      if (selectedTeamId === id) {
-        setSelectedTeamId(remaining.length ? Number(remaining[0].id) : null)
-      }
       setConfirm(null)
+      navigate(remaining.length ? `/teams/${Number(remaining[0].id)}` : '/', { replace: true })
     } catch {
       setError('Не удалось удалить команду')
     } finally {
@@ -124,8 +136,8 @@ export function HomePage() {
     try {
       const res = await apiClient.projects.projectsCreate({ name, teamId: selectedTeamId })
       setProjects((prev) => [...prev, res.data])
-      setSelectedProjectId(Number(res.data.id))
       setProjectModal(null)
+      navigate(`/teams/${selectedTeamId}/projects/${Number(res.data.id)}/${DEFAULT_SECTION}`)
     } catch {
       setError('Не удалось создать проект')
     } finally {
@@ -157,6 +169,7 @@ export function HomePage() {
       await apiClient.projects.projectsDelete(Number(project.id))
       setProjects((prev) => prev.filter((p) => Number(p.id) !== Number(project.id)))
       setConfirm(null)
+      if (Number(project.id) === selectedProjectId) navigate(`/teams/${selectedTeamId}`)
     } catch {
       setError('Не удалось удалить проект')
     } finally {
@@ -164,12 +177,23 @@ export function HomePage() {
     }
   }
 
+  const breadcrumb = selectedProject
+    ? `${selectedTeam?.name} / ${selectedProject.name}`
+    : (selectedTeam?.name ?? 'WMess')
+  const title = selectedProject
+    ? (section?.label ?? 'Проект')
+    : selectedTeam
+      ? 'Проекты'
+      : 'Добро пожаловать'
+  const headerBtn =
+    'w-9 h-9 rounded-[9px] border border-line bg-white flex items-center justify-center text-muted cursor-pointer hover:bg-sidebar'
+
   return (
     <div className="wm-scroll fixed inset-0 flex bg-app text-ink font-ui text-sm text-left antialiased">
       <TeamRail
         teams={teams}
         selectedTeamId={selectedTeamId}
-        onSelect={setSelectedTeamId}
+        onSelect={(id) => navigate(`/teams/${id}`)}
         onCreate={() => setTeamModal({ mode: 'create' })}
         userEmail={user?.email}
         onLogout={handleLogout}
@@ -178,8 +202,14 @@ export function HomePage() {
       <ProjectSidebar
         team={selectedTeam}
         projects={teamProjects}
-        selectedProjectId={activeProjectId}
-        onSelectProject={setSelectedProjectId}
+        selectedProjectId={selectedProjectId}
+        selectedSectionId={section?.id}
+        onSelectProject={(id) =>
+          navigate(`/teams/${selectedTeamId}/projects/${id}/${section?.id ?? DEFAULT_SECTION}`)
+        }
+        onSelectSection={(sectionId) =>
+          navigate(`/teams/${selectedTeamId}/projects/${selectedProjectId}/${sectionId}`)
+        }
         onCreateProject={() => setProjectModal({ mode: 'create' })}
         onEditProject={(project) => setProjectModal({ mode: 'edit', project })}
         onDeleteProject={(project) => setConfirm({ kind: 'project', project })}
@@ -189,15 +219,33 @@ export function HomePage() {
 
       {/* MAIN */}
       <div className="flex-1 min-w-0 flex flex-col bg-panel">
-        <div className="h-[60px] shrink-0 border-b border-line flex items-center px-[22px]">
+        <div className="h-[60px] shrink-0 border-b border-line flex items-center px-[22px] gap-4">
           <div className="min-w-0">
-            <div className="font-mono text-[10.5px] text-faintest tracking-[.02em]">
-              {selectedTeam ? selectedTeam.name : 'WMess'}
+            <div className="font-mono text-[10.5px] text-faintest tracking-[.02em] truncate">
+              {breadcrumb}
             </div>
-            <div className="text-base font-bold mt-px truncate">
-              {selectedProject ? selectedProject.name : selectedTeam ? 'Проекты' : 'Добро пожаловать'}
-            </div>
+            <div className="text-base font-bold mt-px truncate">{title}</div>
           </div>
+          {selectedProject && (
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                className={headerBtn}
+                title="Переименовать проект"
+                onClick={() => setProjectModal({ mode: 'edit', project: selectedProject })}
+              >
+                <PencilIcon size={16} />
+              </button>
+              <button
+                type="button"
+                className={`${headerBtn} text-danger`}
+                title="Удалить проект"
+                onClick={() => setConfirm({ kind: 'project', project: selectedProject })}
+              >
+                <TrashIcon size={16} />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
@@ -208,19 +256,14 @@ export function HomePage() {
               text="У вас пока нет команд. Создайте первую, чтобы начать работу."
               action={{ label: 'Создать команду', onClick: () => setTeamModal({ mode: 'create' }) }}
             />
-          ) : !selectedProject ? (
+          ) : !selectedTeam ? null : !selectedProject ? (
             <EmptyState
               text="Выберите проект слева или создайте новый в этой команде."
               action={{ label: 'Новый проект', onClick: () => setProjectModal({ mode: 'create' }) }}
             />
-          ) : (
-            <ProjectDetail
-              project={selectedProject}
-              teamName={selectedTeam?.name}
-              onEdit={() => setProjectModal({ mode: 'edit', project: selectedProject })}
-              onDelete={() => setConfirm({ kind: 'project', project: selectedProject })}
-            />
-          )}
+          ) : section ? (
+            <SectionPlaceholder section={section} />
+          ) : null}
         </div>
       </div>
 
@@ -334,63 +377,19 @@ function EmptyState({
   )
 }
 
-function ProjectDetail({
-  project,
-  teamName,
-  onEdit,
-  onDelete,
-}: {
-  project: ProjectResponse
-  teamName: string | undefined
-  onEdit: () => void
-  onDelete: () => void
-}) {
-  const created = project.createdAt ? new Date(project.createdAt).toLocaleDateString('ru-RU') : '—'
-  const metaBtn =
-    'inline-flex items-center gap-[7px] h-[34px] px-[13px] rounded-[9px] border border-line bg-white text-[13px] font-semibold cursor-pointer hover:bg-sidebar font-ui'
-
+function SectionPlaceholder({ section }: { section: Section }) {
+  const { Icon, label } = section
   return (
-    <div className="px-8 pt-8 pb-[50px] max-w-[760px] mx-auto">
-      <div className="flex items-start gap-4">
-        <div
-          className="w-12 h-12 rounded-xl text-white flex items-center justify-center text-[18px] font-bold shrink-0"
-          style={{ background: colorFor(Number(project.id)) }}
-        >
-          {initials(project.name)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-mono text-[11px] text-faintest">{teamName} / Проект</div>
-          <h1 className="text-[28px] font-extrabold tracking-[-.5px] mt-1.5 mb-0">{project.name}</h1>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button type="button" className={metaBtn} onClick={onEdit}>
-            <PencilIcon size={15} />
-            Переименовать
-          </button>
-          <button type="button" className={`${metaBtn} text-danger`} onClick={onDelete}>
-            <TrashIcon size={15} />
-            Удалить
-          </button>
+    <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="w-[56px] h-[56px] rounded-2xl bg-accent-soft text-accent flex items-center justify-center">
+        <Icon size={26} strokeWidth={1.6} />
+      </div>
+      <div>
+        <div className="text-[17px] font-bold text-ink">{label}</div>
+        <div className="text-sm text-faint mt-1.5 max-w-[360px] leading-[1.55]">
+          Раздел «{label}» в разработке — здесь появится его содержимое.
         </div>
       </div>
-
-      <div className="grid grid-cols-2 gap-3 my-7">
-        <InfoCard label="Команда" value={teamName ?? '—'} />
-        <InfoCard label="Создан" value={created} />
-      </div>
-
-      <div className="border border-line rounded-2xl bg-white px-6 py-7 text-center text-faint text-sm leading-[1.6]">
-        Здесь появятся чат, документы и задачи проекта.
-      </div>
-    </div>
-  )
-}
-
-function InfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border border-line rounded-xl bg-white px-4 py-3.5">
-      <div className="font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest">{label}</div>
-      <div className="text-[15px] font-semibold text-ink mt-[5px]">{value}</div>
     </div>
   )
 }
