@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { apiClient } from '../api'
+import { AuthLayout, authError, authField, authLink, authPrimaryBtn } from '../components/AuthLayout'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -21,33 +22,44 @@ export function RegisterPage() {
   }
 
   return (
-    <div>
-      <h1>Регистрация</h1>
-      <form onSubmit={handleSubmit}>
+    <AuthLayout
+      title="Регистрация"
+      subtitle="Создайте аккаунт, чтобы начать работу"
+      footer={
+        <>
+          Уже есть аккаунт?{' '}
+          <Link to="/login" className={authLink}>
+            Войти
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <input
+          type="email"
+          placeholder="Email"
+          className={authField}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
         <div>
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label>Пароль</label>
           <input
             type="password"
+            placeholder="Пароль"
+            className={authField}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            minLength={6}
             required
           />
+          <p className="text-[11.5px] text-faint mt-[6px]">Минимум 6 символов</p>
         </div>
-        {error && <p>{error}</p>}
-        <button type="submit">Зарегистрироваться</button>
+        {error && <div className={authError}>{error}</div>}
+        <button type="submit" className={authPrimaryBtn}>
+          Зарегистрироваться
+        </button>
       </form>
-      <p>
-        Уже есть аккаунт? <Link to="/login">Войти</Link>
-      </p>
-    </div>
+    </AuthLayout>
   )
 }

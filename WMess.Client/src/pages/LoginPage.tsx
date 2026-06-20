@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { AuthLayout, authError, authField, authLink, authPrimaryBtn } from '../components/AuthLayout'
 
 export function LoginPage() {
   const { setUser } = useAuth()
@@ -24,33 +25,40 @@ export function LoginPage() {
   }
 
   return (
-    <div>
-      <h1>Вход</h1>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label>Пароль</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error && <p>{error}</p>}
-        <button type="submit">Войти</button>
+    <AuthLayout
+      title="Вход"
+      subtitle="Войдите в свой аккаунт WMess"
+      footer={
+        <>
+          Нет аккаунта?{' '}
+          <Link to="/register" className={authLink}>
+            Зарегистрироваться
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <input
+          type="email"
+          placeholder="Email"
+          className={authField}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Пароль"
+          className={authField}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        {error && <div className={authError}>{error}</div>}
+        <button type="submit" className={authPrimaryBtn}>
+          Войти
+        </button>
       </form>
-      <p>
-        Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
-      </p>
-    </div>
+    </AuthLayout>
   )
 }
