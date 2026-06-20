@@ -14,9 +14,8 @@ public class AntiforgeryHeaderMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         var path = context.Request.Path;
-        var isProtected = path.StartsWithSegments("/bff") || path.StartsWithSegments("/api");
 
-        if (isProtected && !context.Request.Headers.ContainsKey(HeaderName))
+        if (path.StartsWithSegments("/api") && !context.Request.Headers.ContainsKey(HeaderName))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;

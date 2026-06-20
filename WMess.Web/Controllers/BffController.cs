@@ -6,7 +6,7 @@ using WMess.Web.Services;
 namespace WMess.Web.Controllers;
 
 [ApiController]
-[Route("bff")]
+[Route("api")]
 public class BffController : ControllerBase
 {
     private readonly IAuthApiClient _authApiClient;
@@ -19,6 +19,9 @@ public class BffController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EndpointName("Login")]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var auth = await _authApiClient.LoginAsync(request);
@@ -32,6 +35,7 @@ public class BffController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EndpointName("Register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var result = await _authApiClient.RegisterAsync(request);
@@ -44,6 +48,8 @@ public class BffController : ControllerBase
     }
 
     [HttpPost("logout")]
+    [EndpointName("Logout")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout()
     {
         await _sessionManager.SignOutAsync(HttpContext);
@@ -51,6 +57,9 @@ public class BffController : ControllerBase
     }
 
     [HttpGet("user")]
+    [EndpointName("GetUser")]
+    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult GetUser()
     {
         if (User.Identity?.IsAuthenticated != true)

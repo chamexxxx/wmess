@@ -22,6 +22,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.Map("/api/auth/{**rest}", () => Results.NotFound()).ExcludeFromDescription();
 app.MapReverseProxy();
 
 if (!app.Environment.IsDevelopment())
