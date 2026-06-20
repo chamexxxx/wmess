@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Scalar.AspNetCore;
 using System.Text;
 using WMess.Api.Data;
+using WMess.Api.Infrastructure;
 using WMess.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -66,7 +68,10 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<ITokenService, TokenService>();
 
 // Register Controllers
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Conventions.Add(new RouteTokenTransformerConvention(new LowercaseRouteTransformer()));
+});
 
 var app = builder.Build();
 // Configure the HTTP request pipeline.
