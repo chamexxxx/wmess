@@ -1,9 +1,25 @@
 import { createBrowserRouter } from 'react-router'
-import App from './App.tsx'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { HomePage } from './pages/HomePage'
+import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
 
 export const router = createBrowserRouter([
   {
-    path: '/',
-    element: <App />,
+    element: <ProtectedRoute />,
+    children: [
+      {
+        path: '/',
+        element: <HomePage />,
+      },
+    ],
+  },
+  {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
   },
 ])
