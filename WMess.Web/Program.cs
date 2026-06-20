@@ -5,6 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddBff(builder.Configuration);
 builder.Services.AddControllers();
+builder.Services.AddSpaYarp();
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<ApiProxyDocumentTransformer>();
@@ -34,6 +35,8 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 app.Map("/api/auth/{**rest}", () => Results.NotFound()).ExcludeFromDescription();
 app.MapReverseProxy();
+
+app.UseSpaYarp();
 
 if (!app.Environment.IsDevelopment())
 {
