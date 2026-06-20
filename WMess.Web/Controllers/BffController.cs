@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WMess.Web.Models.DTO;
 using WMess.Web.Services;
@@ -25,12 +26,14 @@ public class BffController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var auth = await _authApiClient.LoginAsync(request);
+
         if (auth is null || string.IsNullOrEmpty(auth.Token))
         {
             return Unauthorized();
         }
 
         await _sessionManager.SignInAsync(HttpContext, auth);
+
         return Ok(new UserResponse { Email = auth.Email });
     }
 
@@ -39,6 +42,7 @@ public class BffController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var result = await _authApiClient.RegisterAsync(request);
+
         return new ContentResult
         {
             Content = result.Body,
@@ -68,5 +72,23 @@ public class BffController : ControllerBase
         }
 
         return Ok(new UserResponse { Email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty });
+    }
+
+    [HttpPost("refresh")]
+    [Authorize]
+    [EndpointName("Refresh")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh()
+    {
+        var success = await _sessionManager.RefreshAsync(HttpContext);
+
+        if (!success)
+        {
+            await _sessionManager.SignOutAsync(HttpContext);
+            return Unauthorized();
+        }
+
+        return Ok();
     }
 }

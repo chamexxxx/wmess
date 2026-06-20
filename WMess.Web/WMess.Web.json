@@ -183,6 +183,45 @@
         ]
       }
     },
+    "/api/refresh": {
+      "post": {
+        "tags": [
+          "Bff"
+        ],
+        "operationId": "Refresh",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [

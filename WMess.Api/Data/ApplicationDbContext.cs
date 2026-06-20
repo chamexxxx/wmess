@@ -15,6 +15,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<Team> Teams { get; set; }
     public DbSet<Project> Projects { get; set; }
     public DbSet<TeamUser> TeamUsers { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

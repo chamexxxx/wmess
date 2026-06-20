@@ -1,23 +1,31 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using WMess.Api.Data;
+using WMess.Api.Models;
 
 namespace WMess.Api.Services;
 
 public interface ITokenService
 {
     string GenerateToken(IdentityUser user);
+    Task<string> GenerateRefreshTokenAsync(string userId);
+    Task<IdentityUser?> ValidateRefreshTokenAsync(string token);
 }
 
 public class TokenService : ITokenService
 {
     private readonly IConfiguration _configuration;
+    private readonly ApplicationDbContext _context;
 
-    public TokenService(IConfiguration configuration)
+    public TokenService(IConfiguration configuration, ApplicationDbContext context)
     {
         _configuration = configuration;
+        _context = context;
     }
 
     public string GenerateToken(IdentityUser user)
@@ -48,5 +56,40 @@ public class TokenService : ITokenService
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public async Task<string> GenerateRefreshTokenAsync(string userId)
+    {
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        var expirationDays = int.Parse(_configuration["JwtSettings:RefreshTokenExpirationDays"] ?? "30");
+
+        _context.RefreshTokens.Add(new RefreshToken
+        {
+            Token = token,
+            UserId = userId,
+            ExpiresAt = DateTime.UtcNow.AddDays(expirationDays)
+        });
+
+        await _context.SaveChangesAsync();
+
+        return token;
+    }
+
+    public async Task<IdentityUser?> ValidateRefreshTokenAsync(string token)
+    {
+        var refreshToken = await _context.RefreshTokens
+            .Include(rt => rt.User)
+            .FirstOrDefaultAsync(rt => rt.Token == token && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow);
+
+        if (refreshToken is null)
+        {
+            return null;
+        }
+
+        refreshToken.IsRevoked = true;
+
+        await _context.SaveChangesAsync();
+
+        return refreshToken.User;
     }
 }

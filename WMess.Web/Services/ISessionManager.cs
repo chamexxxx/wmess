@@ -6,4 +6,5 @@ public interface ISessionManager
 {
     Task SignInAsync(HttpContext context, ApiAuthResponse auth);
     Task SignOutAsync(HttpContext context);
+    Task<bool> RefreshAsync(HttpContext context);
 }

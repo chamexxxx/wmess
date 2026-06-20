@@ -32,4 +32,16 @@ public class AuthApiClient : IAuthApiClient
             Body = await response.Content.ReadAsStringAsync()
         };
     }
+
+    public async Task<ApiAuthResponse?> RefreshAsync(string refreshToken)
+    {
+        var response = await _httpClient.PostAsJsonAsync("api/auth/refresh", new { refreshToken });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ApiAuthResponse>();
+    }
 }

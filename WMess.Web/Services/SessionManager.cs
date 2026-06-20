@@ -9,11 +9,17 @@ namespace WMess.Web.Services;
 public class SessionManager : ISessionManager
 {
     public const string AccessTokenName = "access_token";
+    public const string RefreshTokenName = "refresh_token";
+
+    private readonly IAuthApiClient _authApiClient;
+
+    public SessionManager(IAuthApiClient authApiClient)
+    {
+        _authApiClient = authApiClient;
+    }
 
     public async Task SignInAsync(HttpContext context, ApiAuthResponse auth)
     {
-        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(auth.Token);
-
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, auth.Email),
@@ -24,10 +30,13 @@ public class SessionManager : ISessionManager
 
         var properties = new AuthenticationProperties
         {
-            ExpiresUtc = jwt.ValidTo,
-            IsPersistent = false
+            ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30),
+            IsPersistent = true
         };
-        properties.StoreTokens([new AuthenticationToken { Name = AccessTokenName, Value = auth.Token }]);
+        properties.StoreTokens([
+            new AuthenticationToken { Name = AccessTokenName, Value = auth.Token },
+            new AuthenticationToken { Name = RefreshTokenName, Value = auth.RefreshToken }
+        ]);
 
         await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, properties);
     }
@@ -35,5 +44,33 @@ public class SessionManager : ISessionManager
     public Task SignOutAsync(HttpContext context)
     {
         return context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    }
+
+    public async Task<bool> RefreshAsync(HttpContext context)
+    {
+        var result = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        if (!result.Succeeded) {
+            return false;
+        }
+
+        var refreshToken = result.Properties!.GetTokenValue(RefreshTokenName);
+
+        if (string.IsNullOrEmpty(refreshToken)) {
+            return false;
+        }
+
+        var auth = await _authApiClient.RefreshAsync(refreshToken);
+
+        if (auth is null) {
+            return false;
+        }
+
+        result.Properties!.UpdateTokenValue(AccessTokenName, auth.Token);
+        result.Properties!.UpdateTokenValue(RefreshTokenName, auth.RefreshToken);
+
+        await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, result.Principal!, result.Properties!);
+
+        return true;
     }
 }

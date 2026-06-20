@@ -1,6 +1,5 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
 using WMess.Api.Models.DTO;
 using WMess.Api.Services;
 
@@ -23,6 +22,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var existingUser = await _userManager.FindByEmailAsync(request.Email);
+
         if (existingUser != null)
         {
             return Conflict(new { message = "User with this email already exists" });
@@ -35,6 +35,7 @@ public class AuthController : ControllerBase
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
+
         if (!result.Succeeded)
         {
             return BadRequest(new { message = "Failed to create user", errors = result.Errors.Select(e => e.Description) });
@@ -47,21 +48,49 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
+
         if (user == null)
         {
             return Unauthorized();
         }
 
         var isPasswordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+
         if (!isPasswordValid)
         {
             return Unauthorized();
         }
 
         var token = _tokenService.GenerateToken(user);
+        var refreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
+
         var response = new AuthResponse
         {
             Token = token,
+            RefreshToken = refreshToken,
+            Email = user.Email!
+        };
+
+        return Ok(response);
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
+    {
+        var user = await _tokenService.ValidateRefreshTokenAsync(request.RefreshToken);
+
+        if (user is null)
+        {
+            return Unauthorized();
+        }
+
+        var token = _tokenService.GenerateToken(user);
+        var newRefreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
+
+        var response = new AuthResponse
+        {
+            Token = token,
+            RefreshToken = newRefreshToken,
             Email = user.Email!
         };
 
