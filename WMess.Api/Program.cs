@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -8,9 +9,9 @@ using System.Text;
 using WMess.Api.Data;
 using WMess.Api.Infrastructure;
 using WMess.Api.Services;
+using WMess.Api.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
-
 // Add services to the container.
 builder.Services.AddOpenApi(options =>
 {
@@ -62,10 +63,27 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-builder.Services.AddAuthorization();
+// Configure resource-based authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(Policies.TeamMember, p => p.AddRequirements(new TeamMemberRequirement()));
+    options.AddPolicy(Policies.TeamManage, p => p.AddRequirements(new TeamManageRequirement()));
+    options.AddPolicy(Policies.TeamDelete, p => p.AddRequirements(new TeamDeleteRequirement()));
+    options.AddPolicy(Policies.TeamChangeRole, p => p.AddRequirements(new TeamChangeRoleRequirement()));
+    options.AddPolicy(Policies.ProjectAccess, p => p.AddRequirements(new ProjectAccessRequirement()));
+    options.AddPolicy(Policies.ProjectManage, p => p.AddRequirements(new ProjectManageRequirement()));
+});
 
 // Register Token Service
 builder.Services.AddScoped<ITokenService, TokenService>();
+
+// Register Authorization Handlers
+builder.Services.AddScoped<IAuthorizationHandler, TeamMemberHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, TeamManageHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, TeamDeleteHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, TeamChangeRoleHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, ProjectAccessHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, ProjectManageHandler>();
 
 // Register Controllers
 builder.Services.AddControllers(options =>
