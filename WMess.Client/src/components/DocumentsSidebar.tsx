@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
+import { ContextMenu } from './ContextMenu'
+import type { ContextMenuItem } from './ContextMenu'
 import { DocsIcon, FolderIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
 
 interface Folder {
@@ -44,6 +46,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<{ kind: 'folder' | 'root'; id: number | null } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   const loadData = async () => {
     try {
@@ -266,6 +269,84 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
   // выровненная под шеврон родителя. Один бордер на уровень — одинаково на любой глубине.
   const childrenWrap = 'ml-[12px] pl-[8px] border-l-2 border-tile'
 
+  // Контекстное меню (правая кнопка) — действия вместо иконок при наведении.
+  const openFolderMenu = (e: React.MouseEvent, folder: Folder) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Создать документ',
+          icon: <DocsIcon size={15} />,
+          onClick: () => {
+            setCreateInFolder(folder.id)
+            setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Переименовать',
+          icon: <PencilIcon size={15} />,
+          onClick: () => setRenameFolder({ id: folder.id, name: folder.name }),
+        },
+        {
+          label: 'Удалить',
+          icon: <TrashIcon size={15} />,
+          danger: true,
+          onClick: () => setDeleteTarget({ kind: 'folder', id: folder.id, name: folder.name }),
+        },
+      ],
+    })
+  }
+
+  const openDocMenu = (e: React.MouseEvent, doc: Doc) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Переименовать',
+          icon: <PencilIcon size={15} />,
+          onClick: () => setRenameDoc({ id: doc.id, title: doc.title }),
+        },
+        {
+          label: 'Удалить',
+          icon: <TrashIcon size={15} />,
+          danger: true,
+          onClick: () => setDeleteTarget({ kind: 'doc', id: doc.id, name: doc.title }),
+        },
+      ],
+    })
+  }
+
+  // Меню для пустой области дерева — создание в корне проекта.
+  const openRootMenu = (e: React.MouseEvent) => {
+    if (searchQuery) return
+    e.preventDefault()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Создать документ',
+          icon: <DocsIcon size={15} />,
+          onClick: () => {
+            setCreateInFolder(null)
+            setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Создать папку',
+          icon: <FolderIcon size={15} />,
+          onClick: () => setCreateKind('folder'),
+        },
+      ],
+    })
+  }
+
   const renderDoc = (doc: Doc) => {
     const isSelected = doc.id === selectedId
     return (
@@ -273,6 +354,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
         key={`doc-${doc.id}`}
         className={`${rowBase} ${isSelected ? 'bg-accent-soft' : ''}`}
         onClick={() => onSelect(doc.id, doc.title)}
+        onContextMenu={(e) => openDocMenu(e, doc)}
         draggable
         onDragStart={(e) => {
           e.dataTransfer.effectAllowed = 'move'
@@ -290,30 +372,6 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
             {doc.title}
           </span>
         </span>
-        <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            className="opacity-0 group-hover:opacity-100 text-faint hover:text-accent p-0.5 cursor-pointer"
-            title="Переименовать документ"
-            onClick={(e) => {
-              e.stopPropagation()
-              setRenameDoc({ id: doc.id, title: doc.title })
-            }}
-          >
-            <PencilIcon size={14} />
-          </button>
-          <button
-            type="button"
-            className="opacity-0 group-hover:opacity-100 text-faint hover:text-danger p-0.5 cursor-pointer"
-            title="Удалить документ"
-            onClick={(e) => {
-              e.stopPropagation()
-              setDeleteTarget({ kind: 'doc', id: doc.id, name: doc.title })
-            }}
-          >
-            <TrashIcon size={14} />
-          </button>
-        </div>
       </div>
     )
   }
@@ -327,6 +385,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
         <div
           className={`${rowBase} ${isDragOver ? 'bg-hovered' : ''} ${isDragging ? 'opacity-50' : ''}`}
           onClick={() => toggleFolder(folder.id)}
+          onContextMenu={(e) => openFolderMenu(e, folder)}
           draggable
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = 'move'
@@ -371,42 +430,6 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
             <FolderIcon size={15} className="text-folder" />
             <span className="text-[13px] text-ink-soft truncate">{folder.name}</span>
           </span>
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              className="opacity-0 group-hover:opacity-100 text-faint hover:text-accent p-0.5 cursor-pointer"
-              title="Создать документ в папке"
-              onClick={(e) => {
-                e.stopPropagation()
-                setCreateInFolder(folder.id)
-                setCreateKind('doc')
-              }}
-            >
-              <PlusIcon size={14} />
-            </button>
-            <button
-              type="button"
-              className="opacity-0 group-hover:opacity-100 text-faint hover:text-accent p-0.5 cursor-pointer"
-              title="Переименовать папку"
-              onClick={(e) => {
-                e.stopPropagation()
-                setRenameFolder({ id: folder.id, name: folder.name })
-              }}
-            >
-              <PencilIcon size={14} />
-            </button>
-            <button
-              type="button"
-              className="opacity-0 group-hover:opacity-100 text-faint hover:text-danger p-0.5 cursor-pointer"
-              title="Удалить папку"
-              onClick={(e) => {
-                e.stopPropagation()
-                setDeleteTarget({ kind: 'folder', id: folder.id, name: folder.name })
-              }}
-            >
-              <TrashIcon size={14} />
-            </button>
-          </div>
         </div>
         <div
           className={`grid transition-[grid-template-rows] duration-200 ease-out ${
@@ -456,6 +479,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
 
       <div
         className="flex-1 min-h-0 overflow-y-auto wm-scroll p-2"
+        onContextMenu={openRootMenu}
         onDragOver={(e) => {
           e.preventDefault()
           if (dragItem) {
@@ -588,6 +612,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
           onClose={() => setDeleteTarget(null)}
         />
       )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 }

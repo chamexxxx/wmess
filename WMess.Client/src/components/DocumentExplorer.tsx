@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
+import { ContextMenu } from './ContextMenu'
+import type { ContextMenuItem } from './ContextMenu'
 import { DocsIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
 
 interface FolderItem {
@@ -44,11 +46,14 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
   const searching = query.trim().length > 0
 
   const [createKind, setCreateKind] = useState<'folder' | 'doc' | null>(null)
+  // Папка, в которой создаётся документ (через контекстное меню папки); null — текущая папка.
+  const [createDocFolderId, setCreateDocFolderId] = useState<number | null>(null)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [busy, setBusy] = useState(false)
   const [dragItem, setDragItem] = useState<{ kind: 'folder' | 'doc'; id: number } | null>(null)
   const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   const loadContents = async () => {
     setLoading(true)
@@ -110,8 +115,9 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
   const createDocument = async (title: string) => {
     setBusy(true)
     try {
-      const res = await apiClient.documents.createDocument({ projectId, folderId, title })
+      const res = await apiClient.documents.createDocument({ projectId, folderId: createDocFolderId, title })
       setCreateKind(null)
+      setCreateDocFolderId(null)
       if (res.data?.id != null) {
         onOpenDocument(Number(res.data.id), res.data.title ?? title)
       }
@@ -178,10 +184,87 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
   }
 
   const rowBase =
-    'group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-hovered'
-  const actionBtn = 'opacity-0 group-hover:opacity-100 text-faint p-1 cursor-pointer rounded hover:bg-tile'
+    'flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-hovered'
   const iconBtn =
     'h-8 w-8 rounded-[9px] flex items-center justify-center text-muted cursor-pointer hover:bg-hovered'
+
+  // Контекстное меню (правая кнопка) — действия вместо иконок при наведении.
+  const openFolderMenu = (e: React.MouseEvent, f: FolderItem) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Создать документ',
+          icon: <DocsIcon size={15} />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Переименовать',
+          icon: <PencilIcon size={15} />,
+          onClick: () => setRenameTarget({ kind: 'folder', id: f.id, name: f.name }),
+        },
+        {
+          label: 'Удалить',
+          icon: <TrashIcon size={15} />,
+          danger: true,
+          onClick: () => setDeleteTarget({ kind: 'folder', id: f.id, name: f.name }),
+        },
+      ],
+    })
+  }
+
+  const openDocMenu = (e: React.MouseEvent, d: DocItem) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Переименовать',
+          icon: <PencilIcon size={15} />,
+          onClick: () => setRenameTarget({ kind: 'doc', id: d.id, name: d.title }),
+        },
+        {
+          label: 'Удалить',
+          icon: <TrashIcon size={15} />,
+          danger: true,
+          onClick: () => setDeleteTarget({ kind: 'doc', id: d.id, name: d.title }),
+        },
+      ],
+    })
+  }
+
+  // Меню для пустой области списка — создание в текущей папке (folderId).
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if (searching) return
+    e.preventDefault()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Создать документ',
+          icon: <DocsIcon size={15} />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Создать папку',
+          icon: <FolderIcon size={15} />,
+          onClick: () => setCreateKind('folder'),
+        },
+      ],
+    })
+  }
 
   // Перетаскивание включаем только в обычном просмотре (withMeta), не в результатах поиска,
   // где элементы лежат плоским списком из разных папок.
@@ -194,6 +277,7 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
       key={`f-${f.id}`}
       className={`${rowBase} ${isDragOver ? 'bg-accent-soft ring-1 ring-inset ring-accent/40' : ''} ${isDragging ? 'opacity-50' : ''}`}
       onClick={() => onNavigateFolder(f.id)}
+      onContextMenu={(e) => openFolderMenu(e, f)}
       draggable={withMeta}
       onDragStart={
         withMeta
@@ -247,30 +331,6 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
       <FolderIcon size={18} className="text-folder shrink-0" />
       <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{f.name}</span>
       {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(f.updatedAt)}</span>}
-      <div className="shrink-0 flex items-center gap-0.5">
-        <button
-          type="button"
-          className={`${actionBtn} hover:text-accent`}
-          title="Переименовать папку"
-          onClick={(e) => {
-            e.stopPropagation()
-            setRenameTarget({ kind: 'folder', id: f.id, name: f.name })
-          }}
-        >
-          <PencilIcon size={15} />
-        </button>
-        <button
-          type="button"
-          className={`${actionBtn} hover:text-danger`}
-          title="Удалить папку"
-          onClick={(e) => {
-            e.stopPropagation()
-            setDeleteTarget({ kind: 'folder', id: f.id, name: f.name })
-          }}
-        >
-          <TrashIcon size={15} />
-        </button>
-      </div>
     </div>
     )
   }
@@ -282,6 +342,7 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
       key={`d-${d.id}`}
       className={`${rowBase} ${isDragging ? 'opacity-50' : ''}`}
       onClick={() => onOpenDocument(d.id, d.title)}
+      onContextMenu={(e) => openDocMenu(e, d)}
       draggable={withMeta}
       onDragStart={
         withMeta
@@ -303,30 +364,6 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
       <DocsIcon size={18} className="text-doc shrink-0" />
       <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{d.title}</span>
       {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(d.updatedAt)}</span>}
-      <div className="shrink-0 flex items-center gap-0.5">
-        <button
-          type="button"
-          className={`${actionBtn} hover:text-accent`}
-          title="Переименовать документ"
-          onClick={(e) => {
-            e.stopPropagation()
-            setRenameTarget({ kind: 'doc', id: d.id, name: d.title })
-          }}
-        >
-          <PencilIcon size={15} />
-        </button>
-        <button
-          type="button"
-          className={`${actionBtn} hover:text-danger`}
-          title="Удалить документ"
-          onClick={(e) => {
-            e.stopPropagation()
-            setDeleteTarget({ kind: 'doc', id: d.id, name: d.title })
-          }}
-        >
-          <TrashIcon size={15} />
-        </button>
-      </div>
     </div>
     )
   }
@@ -406,7 +443,10 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
           <button
             type="button"
             className="h-8 px-3 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer flex items-center gap-1.5"
-            onClick={() => setCreateKind('doc')}
+            onClick={() => {
+              setCreateDocFolderId(folderId)
+              setCreateKind('doc')
+            }}
           >
             <PlusIcon size={15} strokeWidth={2} />
             Документ
@@ -414,7 +454,7 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 pt-4 pb-2">
+      <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 pt-4 pb-2" onContextMenu={openEmptyMenu}>
         {loading ? (
           <div className="px-3 py-4 text-[13px] text-faint">Загрузка…</div>
         ) : searching ? (
@@ -460,7 +500,10 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
           submitLabel="Создать"
           busy={busy}
           onSubmit={createDocument}
-          onClose={() => setCreateKind(null)}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
         />
       )}
       {renameTarget && (
@@ -490,6 +533,7 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
           onClose={() => setDeleteTarget(null)}
         />
       )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 }
