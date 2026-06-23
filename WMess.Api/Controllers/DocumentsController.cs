@@ -191,7 +191,62 @@ public class DocumentsController : ControllerBase
             return Forbid();
         }
 
+        // Только переименование. Перемещение — отдельный эндпоинт MoveFolder,
+        // чтобы переименование случайно не сбрасывало родителя.
         folder.Name = request.Name;
+        folder.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    [HttpPut("folders/{id}/move")]
+    [EndpointName("MoveFolder")]
+    public async Task<IActionResult> MoveFolder(int id, MoveFolderRequest request)
+    {
+        var folder = await _context.DocumentFolders
+            .Include(f => f.Project)
+            .FirstOrDefaultAsync(f => f.Id == id);
+
+        if (folder == null)
+        {
+            return NotFound();
+        }
+
+        var result = await _authorizationService.AuthorizeAsync(User, folder.Project, Policies.ProjectManage);
+        if (!result.Succeeded)
+        {
+            return Forbid();
+        }
+
+        if (request.ParentFolderId.HasValue)
+        {
+            if (request.ParentFolderId.Value == folder.Id)
+            {
+                return BadRequest(new { message = "Папка не может быть родителем самой себя" });
+            }
+
+            var parentFolder = await _context.DocumentFolders.FindAsync(request.ParentFolderId.Value);
+            if (parentFolder == null || parentFolder.ProjectId != folder.ProjectId)
+            {
+                return BadRequest(new { message = "Родительская папка не найдена или не принадлежит этому проекту" });
+            }
+
+            // Новая родительская папка не должна быть потомком перемещаемой (защита от цикла).
+            var currentParentId = parentFolder.ParentFolderId;
+            while (currentParentId.HasValue)
+            {
+                if (currentParentId.Value == folder.Id)
+                {
+                    return BadRequest(new { message = "Нельзя переместить папку в её потомка" });
+                }
+                var ancestor = await _context.DocumentFolders.FindAsync(currentParentId.Value);
+                currentParentId = ancestor?.ParentFolderId;
+            }
+        }
+
+        folder.ParentFolderId = request.ParentFolderId;
         folder.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -402,6 +457,34 @@ public class DocumentsController : ControllerBase
             return Forbid();
         }
 
+        // Только переименование. Перемещение — отдельный эндпоинт MoveDocument.
+        document.Title = request.Title;
+        document.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    [HttpPut("{id}/move")]
+    [EndpointName("MoveDocument")]
+    public async Task<IActionResult> MoveDocument(int id, MoveDocumentRequest request)
+    {
+        var document = await _context.Documents
+            .Include(d => d.Project)
+            .FirstOrDefaultAsync(d => d.Id == id);
+
+        if (document == null)
+        {
+            return NotFound();
+        }
+
+        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        if (!rights.CanManage)
+        {
+            return Forbid();
+        }
+
         if (request.FolderId.HasValue)
         {
             var folder = await _context.DocumentFolders.FindAsync(request.FolderId.Value);
@@ -411,7 +494,6 @@ public class DocumentsController : ControllerBase
             }
         }
 
-        document.Title = request.Title;
         document.FolderId = request.FolderId;
         document.UpdatedAt = DateTime.UtcNow;
 
