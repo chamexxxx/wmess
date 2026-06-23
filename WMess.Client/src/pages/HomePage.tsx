@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import type { ProjectResponse, TeamResponse } from '../api/generated/data-contracts'
 import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
+import { DocumentsSection } from '../components/DocumentsSection'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
 import { FolderIcon, PencilIcon, PlusIcon, TrashIcon } from '../workspace/icons'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
@@ -261,6 +262,8 @@ export function HomePage() {
               text="Выберите проект слева или создайте новый в этой команде."
               action={{ label: 'Новый проект', onClick: () => setProjectModal({ mode: 'create' }) }}
             />
+          ) : section?.id === 'docs' ? (
+            <DocumentsSection projectId={selectedProjectId!} />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}
