@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { DocumentProvider, useDocument } from '../providers/DocumentProvider'
 import { DocumentEditor } from './DocumentEditor'
 import { DocumentsSidebar } from './DocumentsSidebar'
@@ -11,6 +11,8 @@ import { ArrowLeftIcon, PencilIcon } from '../workspace/icons'
 interface SelectedDoc {
   id: number
   title: string
+  // Папка документа — чтобы при «назад» вернуться к ней в файловом менеджере.
+  folderId?: number | null
 }
 
 function ConnectedUsers() {
@@ -164,27 +166,37 @@ function DocumentWorkspace({
 }
 
 export function DocumentsSection({ projectId }: { projectId: number }) {
-  const [params, setParams] = useSearchParams()
-  const docParam = params.get('doc')
+  // Документ — в пути (/docs/:docId), папка файлового менеджера — в ?folder.
+  const { teamId, docId: docIdParam } = useParams()
+  const [params] = useSearchParams()
+  const navigate = useNavigate()
+  const docId = docIdParam ? Number(docIdParam) : null
   const folderParam = params.get('folder')
-  const docId = docParam ? Number(docParam) : null
   const folderId = folderParam ? Number(folderParam) : null
+
+  const docsBase = `/teams/${teamId}/projects/${projectId}/docs`
 
   const [openDoc, setOpenDoc] = useState<SelectedDoc | null>(null)
   const [docsRefresh, setDocsRefresh] = useState(0)
 
-  // Резолвим заголовок при прямой загрузке/обновлении (?doc в URL, заголовок ещё не известен).
+  // Резолвим документ при прямой загрузке/обновлении (id в пути; заголовок и папка ещё не известны).
   useEffect(() => {
     if (docId == null) {
       setOpenDoc(null)
       return
     }
-    if (openDoc?.id === docId) return
+    if (openDoc?.id === docId && openDoc.folderId !== undefined) return
     let cancelled = false
     apiClient.documents
       .getDocument(docId)
       .then((res) => {
-        if (!cancelled && res.data) setOpenDoc({ id: docId, title: res.data.title ?? 'Без названия' })
+        if (!cancelled && res.data) {
+          setOpenDoc({
+            id: docId,
+            title: res.data.title ?? 'Без названия',
+            folderId: res.data.folderId == null ? null : Number(res.data.folderId),
+          })
+        }
       })
       .catch(() => {})
     return () => {
@@ -193,28 +205,16 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId])
 
-  const updateParams = (mutate: (p: URLSearchParams) => void) => {
-    setParams((prev) => {
-      const next = new URLSearchParams(prev)
-      mutate(next)
-      return next
-    })
-  }
+  const folderPath = (id: number | null) => (id == null ? docsBase : `${docsBase}?folder=${id}`)
 
   const openDocument = (id: number, title: string) => {
     setOpenDoc({ id, title })
-    updateParams((p) => p.set('doc', String(id)))
+    navigate(`${docsBase}/${id}`)
   }
 
-  const navigateFolder = (id: number | null) => {
-    updateParams((p) => {
-      p.delete('doc')
-      if (id == null) p.delete('folder')
-      else p.set('folder', String(id))
-    })
-  }
+  const navigateFolder = (id: number | null) => navigate(folderPath(id))
 
-  const backToFiles = () => updateParams((p) => p.delete('doc'))
+  const backToFiles = () => navigate(folderPath(openDoc?.folderId ?? null))
 
   if (docId != null) {
     const doc = openDoc ?? { id: docId, title: 'Документ' }
@@ -226,7 +226,7 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
               doc={doc}
               onBack={backToFiles}
               onTitleUpdate={(title) => {
-                setOpenDoc({ id: doc.id, title })
+                setOpenDoc((prev) => (prev ? { ...prev, title } : { id: doc.id, title }))
                 setDocsRefresh((n) => n + 1)
               }}
             />
@@ -241,7 +241,7 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
             if (id === doc.id) backToFiles()
           }}
           onTitleUpdated={(id, title) => {
-            if (id === doc.id) setOpenDoc({ id, title })
+            if (id === doc.id) setOpenDoc((prev) => (prev ? { ...prev, title } : { id, title }))
           }}
           refreshSignal={docsRefresh}
         />

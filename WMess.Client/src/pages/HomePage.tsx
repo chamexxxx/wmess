@@ -20,9 +20,12 @@ export function HomePage() {
   const navigate = useNavigate()
 
   // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
-  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam } = useParams()
+  // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/docs/:docId
+  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, docId: docIdParam } = useParams()
   const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
+  // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Документы».
+  const sectionKey = docIdParam != null ? 'docs' : sectionParam
 
   const [teams, setTeams] = useState<TeamResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])
@@ -57,8 +60,8 @@ export function HomePage() {
     [projects, selectedTeamId],
   )
   const selectedProject = teamProjects.find((p) => Number(p.id) === selectedProjectId)
-  const section = sectionById(sectionParam)
-  const isSettings = sectionParam === 'settings'
+  const section = sectionById(sectionKey)
+  const isSettings = sectionKey === 'settings'
 
   // Keep the URL pointing at something real: land on the first team, default to
   // the first section, and bounce off ids/sections that don't exist.
