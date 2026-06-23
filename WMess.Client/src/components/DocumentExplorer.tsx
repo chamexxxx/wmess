@@ -183,9 +183,68 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
   const iconBtn =
     'h-8 w-8 rounded-[9px] flex items-center justify-center text-muted cursor-pointer hover:bg-hovered'
 
-  const folderRow = (f: FolderItem, withMeta: boolean) => (
-    <div key={`f-${f.id}`} className={rowBase} onClick={() => onNavigateFolder(f.id)}>
-      <FolderIcon size={18} className="text-faint shrink-0" />
+  // Перетаскивание включаем только в обычном просмотре (withMeta), не в результатах поиска,
+  // где элементы лежат плоским списком из разных папок.
+  const folderRow = (f: FolderItem, withMeta: boolean) => {
+    const isDragOver = dropTarget === f.id
+    const isDragging = dragItem?.kind === 'folder' && dragItem.id === f.id
+    const canDrop = withMeta && !!dragItem && !(dragItem.kind === 'folder' && dragItem.id === f.id)
+    return (
+    <div
+      key={`f-${f.id}`}
+      className={`${rowBase} ${isDragOver ? 'bg-accent-soft ring-1 ring-inset ring-accent/40' : ''} ${isDragging ? 'opacity-50' : ''}`}
+      onClick={() => onNavigateFolder(f.id)}
+      draggable={withMeta}
+      onDragStart={
+        withMeta
+          ? (e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              setDragItem({ kind: 'folder', id: f.id })
+            }
+          : undefined
+      }
+      onDragEnd={
+        withMeta
+          ? () => {
+              setDragItem(null)
+              setDropTarget(null)
+            }
+          : undefined
+      }
+      onDragOver={
+        withMeta
+          ? (e) => {
+              if (!dragItem) return
+              e.stopPropagation()
+              if (!canDrop) {
+                e.dataTransfer.dropEffect = 'none'
+                if (dropTarget === f.id) setDropTarget(null)
+                return
+              }
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              if (dropTarget !== f.id) setDropTarget(f.id)
+            }
+          : undefined
+      }
+      onDragLeave={
+        withMeta
+          ? () => {
+              if (dropTarget === f.id) setDropTarget(null)
+            }
+          : undefined
+      }
+      onDrop={
+        withMeta
+          ? (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (canDrop) moveInto(f.id)
+            }
+          : undefined
+      }
+    >
+      <FolderIcon size={18} className="text-folder shrink-0" />
       <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{f.name}</span>
       {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(f.updatedAt)}</span>}
       <div className="shrink-0 flex items-center gap-0.5">
@@ -213,11 +272,35 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
         </button>
       </div>
     </div>
-  )
+    )
+  }
 
-  const docRow = (d: DocItem, withMeta: boolean) => (
-    <div key={`d-${d.id}`} className={rowBase} onClick={() => onOpenDocument(d.id, d.title)}>
-      <DocsIcon size={18} className="text-faint shrink-0" />
+  const docRow = (d: DocItem, withMeta: boolean) => {
+    const isDragging = dragItem?.kind === 'doc' && dragItem.id === d.id
+    return (
+    <div
+      key={`d-${d.id}`}
+      className={`${rowBase} ${isDragging ? 'opacity-50' : ''}`}
+      onClick={() => onOpenDocument(d.id, d.title)}
+      draggable={withMeta}
+      onDragStart={
+        withMeta
+          ? (e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              setDragItem({ kind: 'doc', id: d.id })
+            }
+          : undefined
+      }
+      onDragEnd={
+        withMeta
+          ? () => {
+              setDragItem(null)
+              setDropTarget(null)
+            }
+          : undefined
+      }
+    >
+      <DocsIcon size={18} className="text-doc shrink-0" />
       <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{d.title}</span>
       {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(d.updatedAt)}</span>}
       <div className="shrink-0 flex items-center gap-0.5">
@@ -245,20 +328,45 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
         </button>
       </div>
     </div>
-  )
+    )
+  }
 
   const isEmpty = !searching && folders.length === 0 && documents.length === 0
   const noResults = searching && searchFolders.length === 0 && searchDocs.length === 0
 
+  // Крошки как зоны сброса: перенос в предка (c.id) или в корень (Home → null).
+  const breadcrumbDnd = (target: number | 'root') => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!dragItem) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      if (dropTarget !== target) setDropTarget(target)
+    },
+    onDragLeave: () => {
+      if (dropTarget === target) setDropTarget(null)
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      moveInto(target === 'root' ? null : target)
+    },
+  })
+
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="h-[52px] shrink-0 flex items-center gap-3 px-5 border-b border-line">
+      <div className="h-[52px] shrink-0 flex items-center gap-3 px-5">
         <nav className="flex items-center gap-1.5 text-[14px] min-w-0">
           <button
             type="button"
-            className="shrink-0 w-7 h-7 -ml-1 rounded-md flex items-center justify-center text-muted hover:bg-hovered hover:text-accent transition-colors cursor-pointer"
+            className={`shrink-0 w-7 h-7 -ml-1 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+              dropTarget === 'root'
+                ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/40'
+                : 'text-muted hover:bg-hovered hover:text-accent'
+            }`}
             title="Все документы"
             onClick={() => onNavigateFolder(null)}
+            {...breadcrumbDnd('root')}
           >
             <HomeIcon size={16} />
           </button>
@@ -267,8 +375,13 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
               <span className="text-faintest shrink-0">/</span>
               <button
                 type="button"
-                className="text-muted hover:text-accent transition-colors truncate cursor-pointer"
+                className={`transition-colors truncate cursor-pointer rounded px-1 -mx-1 ${
+                  dropTarget === c.id
+                    ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/40'
+                    : 'text-muted hover:text-accent'
+                }`}
                 onClick={() => onNavigateFolder(c.id)}
+                {...breadcrumbDnd(c.id)}
               >
                 {c.name}
               </button>
@@ -301,7 +414,7 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 py-2">
+      <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 pt-4 pb-2">
         {loading ? (
           <div className="px-3 py-4 text-[13px] text-faint">Загрузка…</div>
         ) : searching ? (

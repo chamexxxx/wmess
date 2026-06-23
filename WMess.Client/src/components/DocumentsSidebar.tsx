@@ -285,7 +285,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
       >
         <span className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 w-3" aria-hidden="true" />
-          <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-faint'} />
+          <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-doc'} />
           <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
             {doc.title}
           </span>
@@ -368,7 +368,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
         >
           <span className="flex items-center gap-2 min-w-0">
             <span className={`shrink-0 w-3 text-center text-faintest text-[9px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
-            <FolderIcon size={15} className="text-faint" />
+            <FolderIcon size={15} className="text-folder" />
             <span className="text-[13px] text-ink-soft truncate">{folder.name}</span>
           </span>
           <div className="flex items-center gap-0.5">
@@ -489,7 +489,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
                   onClick={() => revealFolder(f.id)}
                 >
                   <span className="flex items-center gap-2 min-w-0">
-                    <FolderIcon size={15} className="text-faint" />
+                    <FolderIcon size={15} className="text-folder" />
                     <span className="text-[13px] text-ink-soft truncate">{f.name}</span>
                   </span>
                 </div>
@@ -503,7 +503,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
                     onClick={() => onSelect(d.id, d.title)}
                   >
                     <span className="flex items-center gap-2 min-w-0">
-                      <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-faint'} />
+                      <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-doc'} />
                       <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
                         {d.title}
                       </span>
