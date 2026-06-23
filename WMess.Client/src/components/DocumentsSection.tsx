@@ -81,13 +81,6 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
 
   return (
     <div className="flex h-full min-h-0">
-      <DocumentsSidebar
-        projectId={projectId}
-        selectedId={selected?.id ?? null}
-        onSelect={(id, title) => setSelected({ id, title })}
-        onDeleted={(id) => setSelected((prev) => (prev?.id === id ? null : prev))}
-      />
-
       <div className="flex-1 min-w-0 bg-panel">
         {selected ? (
           <DocumentProvider key={selected.id} documentId={selected.id}>
@@ -99,11 +92,18 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
               <DocsIcon size={24} strokeWidth={1.6} />
             </div>
             <div className="text-sm text-muted max-w-[340px] leading-[1.55]">
-              Выберите документ слева или создайте новый, чтобы начать совместное редактирование.
+              Выберите документ справа или создайте новый, чтобы начать совместное редактирование.
             </div>
           </div>
         )}
       </div>
+
+      <DocumentsSidebar
+        projectId={projectId}
+        selectedId={selected?.id ?? null}
+        onSelect={(id, title) => setSelected({ id, title })}
+        onDeleted={(id) => setSelected((prev) => (prev?.id === id ? null : prev))}
+      />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
-import { DocsIcon, FolderIcon, PencilIcon, PlusIcon, TrashIcon } from '../workspace/icons'
+import { DocsIcon, FolderIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
 
 interface Folder {
   id: number
@@ -39,6 +39,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
   const [busy, setBusy] = useState(false)
   const [dragItem, setDragItem] = useState<DragItem | null>(null)
   const [dropTarget, setDropTarget] = useState<{ kind: 'folder' | 'root'; id: number | null } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const loadData = async () => {
     try {
@@ -172,6 +173,21 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
     })
   }
 
+  // Из результатов поиска: сбрасываем запрос и раскрываем папку вместе с предками,
+  // чтобы она стала видна в дереве.
+  const revealFolder = (folderId: number) => {
+    setSearchQuery('')
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      let id: number | null = folderId
+      while (id !== null) {
+        next.add(id)
+        id = folders.find((f) => f.id === id)?.parentFolderId ?? null
+      }
+      return next
+    })
+  }
+
   const moveFolder = async (folderId: number, targetFolderId: number | null) => {
     try {
       await apiClient.documents.moveFolder(folderId, { parentFolderId: targetFolderId })
@@ -198,6 +214,15 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
 
   const subFolders = (parentId: number | null) => folders.filter((f) => f.parentFolderId === parentId)
   const folderDocs = (folderId: number | null) => documents.filter((d) => d.folderId === folderId)
+
+  const filteredFolders = searchQuery
+    ? folders.filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : folders
+  const filteredDocuments = searchQuery
+    ? documents.filter((d) => d.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : documents
+
+  const hasSearchResults = searchQuery && (filteredFolders.length > 0 || filteredDocuments.length > 0)
 
   // true, если folderId находится внутри (является потомком) ancestorId.
   const isDescendantOf = (folderId: number, ancestorId: number): boolean => {
@@ -378,7 +403,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
     'h-7 w-7 rounded-md border border-line bg-white flex items-center justify-center text-muted cursor-pointer hover:bg-sidebar'
 
   return (
-    <div className="w-64 shrink-0 border-r border-line bg-sidebar flex flex-col h-full min-h-0">
+    <div className="w-64 shrink-0 border-l border-line bg-sidebar flex flex-col h-full min-h-0">
       <div className="h-[46px] shrink-0 flex items-center justify-between px-3 border-b border-line">
         <span className="font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest">Документы</span>
         <div className="flex gap-1.5">
@@ -388,6 +413,19 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
           <button type="button" className={iconBtn} title="Новый документ" onClick={() => setCreateKind('doc')}>
             <PlusIcon size={15} />
           </button>
+        </div>
+      </div>
+
+      <div className="shrink-0 px-2 py-2 border-b border-line">
+        <div className="relative">
+          <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
+          <input
+            type="text"
+            placeholder="Поиск..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-8 pl-8 pr-2 text-[13px] bg-panel border border-line rounded-md text-ink placeholder:text-faint focus:outline-none focus:border-accent"
+          />
         </div>
       </div>
 
@@ -415,6 +453,43 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
       >
         {loading ? (
           <div className="text-[13px] text-faint px-2 py-3">Загрузка…</div>
+        ) : searchQuery ? (
+          hasSearchResults ? (
+            <div className="space-y-0.5">
+              {filteredFolders.map((f) => (
+                <div
+                  key={`search-folder-${f.id}`}
+                  className={`${rowBase} pl-3`}
+                  title="Показать папку в дереве"
+                  onClick={() => revealFolder(f.id)}
+                >
+                  <span className="flex items-center gap-2 min-w-0">
+                    <FolderIcon size={15} className="text-faint" />
+                    <span className="text-[13px] text-ink-soft truncate">{f.name}</span>
+                  </span>
+                </div>
+              ))}
+              {filteredDocuments.map((d) => {
+                const isSelected = selectedId === d.id
+                return (
+                  <div
+                    key={`search-doc-${d.id}`}
+                    className={`${rowBase} pl-3 ${isSelected ? 'bg-accent-soft' : ''}`}
+                    onClick={() => onSelect(d.id, d.title)}
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-faint'} />
+                      <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
+                        {d.title}
+                      </span>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-[13px] text-faint px-2 py-3">Ничего не найдено</div>
+          )
         ) : folders.length === 0 && documents.length === 0 ? (
           <div className="text-[13px] text-faint px-2 py-3 leading-relaxed">
             Пока нет документов. Создайте первый.
