@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { DocsIcon, FolderIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
@@ -23,9 +23,13 @@ interface DocumentsSidebarProps {
   selectedId: number | null
   onSelect: (id: number, title: string) => void
   onDeleted: (id: number) => void
+  onTitleUpdated?: (id: number, title: string) => void
+  // Меняется, когда заголовок документа правят вне сайдбара (в шапке редактора) —
+  // сигнал тихо перезагрузить список.
+  refreshSignal?: number
 }
 
-export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }: DocumentsSidebarProps) {
+export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal }: DocumentsSidebarProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [documents, setDocuments] = useState<Doc[]>([])
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -74,6 +78,17 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
 
+  // Тихий перезапрос при внешнем изменении заголовка (без спиннера, пропускаем первый рендер).
+  const skipFirstRefresh = useRef(true)
+  useEffect(() => {
+    if (skipFirstRefresh.current) {
+      skipFirstRefresh.current = false
+      return
+    }
+    loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal])
+
   const createFolder = async (name: string) => {
     setBusy(true)
     try {
@@ -113,6 +128,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted }:
       // иначе rename не должен переключать редактор на другой документ.
       if (selectedId === renamedId) {
         onSelect(renamedId, title)
+        onTitleUpdated?.(renamedId, title)
       }
     } catch (error) {
       console.error('Failed to rename document:', error)
