@@ -6,8 +6,9 @@ import type { ProjectResponse, TeamResponse } from '../api/generated/data-contra
 import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { DocumentsSection } from '../components/DocumentsSection'
+import { ProjectSettings } from '../components/ProjectSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
-import { FolderIcon, PencilIcon, PlusIcon, TrashIcon } from '../workspace/icons'
+import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
 
 type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
@@ -57,6 +58,7 @@ export function HomePage() {
   )
   const selectedProject = teamProjects.find((p) => Number(p.id) === selectedProjectId)
   const section = sectionById(sectionParam)
+  const isSettings = sectionParam === 'settings'
 
   // Keep the URL pointing at something real: land on the first team, default to
   // the first section, and bounce off ids/sections that don't exist.
@@ -68,12 +70,12 @@ export function HomePage() {
       navigate(`/teams/${Number(teams[0].id)}`, { replace: true })
     } else if (selectedProjectId != null && !selectedProject) {
       navigate(`/teams/${selectedTeamId}`, { replace: true })
-    } else if (selectedProject && !section) {
+    } else if (selectedProject && !section && !isSettings) {
       navigate(`/teams/${selectedTeamId}/projects/${selectedProjectId}/${DEFAULT_SECTION}`, {
         replace: true,
       })
     }
-  }, [loading, selectedTeamId, selectedProjectId, selectedProject, section, teams, navigate])
+  }, [loading, selectedTeamId, selectedProjectId, selectedProject, section, isSettings, teams, navigate])
 
   const handleLogout = async () => {
     try {
@@ -178,16 +180,7 @@ export function HomePage() {
     }
   }
 
-  const breadcrumb = selectedProject
-    ? `${selectedTeam?.name} / ${selectedProject.name}`
-    : (selectedTeam?.name ?? 'WMess')
-  const title = selectedProject
-    ? (section?.label ?? 'Проект')
-    : selectedTeam
-      ? 'Проекты'
-      : 'Добро пожаловать'
-  const headerBtn =
-    'w-9 h-9 rounded-[9px] border border-line bg-white flex items-center justify-center text-muted cursor-pointer hover:bg-sidebar'
+  const title = selectedTeam ? 'Проекты' : 'Добро пожаловать'
 
   return (
     <div className="wm-scroll fixed inset-0 flex bg-app text-ink font-ui text-sm text-left antialiased">
@@ -204,7 +197,7 @@ export function HomePage() {
         team={selectedTeam}
         projects={teamProjects}
         selectedProjectId={selectedProjectId}
-        selectedSectionId={section?.id}
+        selectedSectionId={isSettings ? 'settings' : section?.id}
         onSelectProject={(id) =>
           navigate(`/teams/${selectedTeamId}/projects/${id}/${section?.id ?? DEFAULT_SECTION}`)
         }
@@ -220,32 +213,41 @@ export function HomePage() {
 
       {/* MAIN */}
       <div className="flex-1 min-w-0 flex flex-col bg-panel">
-        <div className="h-[60px] shrink-0 border-b border-line flex items-center px-[22px] gap-4">
-          <div className="min-w-0">
-            <div className="font-mono text-[10.5px] text-faintest tracking-[.02em] truncate">
-              {breadcrumb}
-            </div>
-            <div className="text-base font-bold mt-px truncate">{title}</div>
-          </div>
-          {selectedProject && (
-            <div className="ml-auto flex items-center gap-2">
+        <div className="h-[60px] shrink-0 border-b border-line flex items-center px-[22px] gap-3">
+          {selectedProject ? (
+            <>
+              <nav className="flex items-center gap-2 min-w-0 text-[14px]">
+                <button
+                  type="button"
+                  className="font-semibold text-ink truncate hover:text-accent transition-colors cursor-pointer"
+                  onClick={() =>
+                    navigate(`/teams/${selectedTeamId}/projects/${selectedProjectId}/${DEFAULT_SECTION}`)
+                  }
+                >
+                  {selectedProject.name}
+                </button>
+                <span className="text-faintest shrink-0">/</span>
+                <span className="text-muted truncate">
+                  {isSettings ? 'Настройки' : (section?.label ?? 'Проект')}
+                </span>
+              </nav>
               <button
                 type="button"
-                className={headerBtn}
-                title="Переименовать проект"
-                onClick={() => setProjectModal({ mode: 'edit', project: selectedProject })}
+                className={`ml-auto w-9 h-9 rounded-[9px] flex items-center justify-center cursor-pointer transition-colors ${
+                  isSettings
+                    ? 'text-accent-deep bg-accent-soft'
+                    : 'text-muted hover:bg-hovered'
+                }`}
+                title="Настройки проекта"
+                onClick={() =>
+                  navigate(`/teams/${selectedTeamId}/projects/${selectedProjectId}/settings`)
+                }
               >
-                <PencilIcon size={16} />
+                <SettingsIcon size={17} />
               </button>
-              <button
-                type="button"
-                className={`${headerBtn} text-danger`}
-                title="Удалить проект"
-                onClick={() => setConfirm({ kind: 'project', project: selectedProject })}
-              >
-                <TrashIcon size={16} />
-              </button>
-            </div>
+            </>
+          ) : (
+            <div className="text-base font-bold truncate">{title}</div>
           )}
         </div>
 
@@ -261,6 +263,13 @@ export function HomePage() {
             <EmptyState
               text="Выберите проект слева или создайте новый в этой команде."
               action={{ label: 'Новый проект', onClick: () => setProjectModal({ mode: 'create' }) }}
+            />
+          ) : isSettings ? (
+            <ProjectSettings
+              project={selectedProject}
+              busy={busy}
+              onRename={(name) => updateProject(selectedProject, name)}
+              onDelete={() => setConfirm({ kind: 'project', project: selectedProject })}
             />
           ) : section?.id === 'docs' ? (
             <DocumentsSection projectId={selectedProjectId!} />
