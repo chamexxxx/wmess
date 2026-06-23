@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { DocumentProvider, useDocument } from '../providers/DocumentProvider'
 import { DocumentEditor } from './DocumentEditor'
 import { DocumentsSidebar } from './DocumentsSidebar'
+import { DocumentExplorer } from './DocumentExplorer'
 import { PermissionsPanel } from './PermissionsPanel'
 import { apiClient } from '../api'
-import { DocsIcon, PencilIcon } from '../workspace/icons'
+import { ArrowLeftIcon, PencilIcon } from '../workspace/icons'
 
 interface SelectedDoc {
   id: number
@@ -46,7 +48,15 @@ function StatusBadge() {
   return <span className="px-2 py-1 rounded-md bg-accent-soft text-accent text-[11.5px] font-medium">● Онлайн</span>
 }
 
-function DocumentWorkspace({ doc, onTitleUpdate }: { doc: SelectedDoc; onTitleUpdate: (title: string) => void }) {
+function DocumentWorkspace({
+  doc,
+  onBack,
+  onTitleUpdate,
+}: {
+  doc: SelectedDoc
+  onBack: () => void
+  onTitleUpdate: (title: string) => void
+}) {
   const [showPermissions, setShowPermissions] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(doc.title)
@@ -95,7 +105,16 @@ function DocumentWorkspace({ doc, onTitleUpdate }: { doc: SelectedDoc; onTitleUp
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="h-[46px] shrink-0 flex items-center justify-between gap-3 px-4 border-b border-line">
+      <div className="h-[46px] shrink-0 flex items-center gap-2 px-3 border-b border-line">
+        <button
+          type="button"
+          onClick={onBack}
+          title="К списку документов"
+          className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-muted hover:bg-hovered cursor-pointer"
+        >
+          <ArrowLeftIcon size={18} />
+        </button>
+
         {editingTitle ? (
           <input
             ref={inputRef}
@@ -112,17 +131,15 @@ function DocumentWorkspace({ doc, onTitleUpdate }: { doc: SelectedDoc; onTitleUp
           <button
             type="button"
             onClick={handleTitleClick}
-            className="group flex items-center gap-1.5 min-w-0 -ml-2 px-2 py-1 rounded-md text-[14px] font-semibold text-ink hover:bg-hovered transition-colors cursor-text"
+            className="group flex items-center gap-1.5 min-w-0 px-2 py-1 rounded-md text-[14px] font-semibold text-ink hover:bg-hovered transition-colors cursor-text"
             title="Нажмите, чтобы переименовать"
           >
             <span className="truncate">{doc.title}</span>
-            <PencilIcon
-              size={13}
-              className="shrink-0 text-faint group-hover:text-accent transition-colors"
-            />
+            <PencilIcon size={13} className="shrink-0 text-faint group-hover:text-accent transition-colors" />
           </button>
         )}
-        <div className="flex items-center gap-3">
+
+        <div className="ml-auto flex items-center gap-3">
           <ConnectedUsers />
           <StatusBadge />
           <button
@@ -147,43 +164,97 @@ function DocumentWorkspace({ doc, onTitleUpdate }: { doc: SelectedDoc; onTitleUp
 }
 
 export function DocumentsSection({ projectId }: { projectId: number }) {
-  const [selected, setSelected] = useState<SelectedDoc | null>(null)
+  const [params, setParams] = useSearchParams()
+  const docParam = params.get('doc')
+  const folderParam = params.get('folder')
+  const docId = docParam ? Number(docParam) : null
+  const folderId = folderParam ? Number(folderParam) : null
+
+  const [openDoc, setOpenDoc] = useState<SelectedDoc | null>(null)
   const [docsRefresh, setDocsRefresh] = useState(0)
 
-  return (
-    <div className="flex h-full min-h-0">
-      <div className="flex-1 min-w-0 bg-panel">
-        {selected ? (
-          <DocumentProvider key={selected.id} documentId={selected.id}>
+  // Резолвим заголовок при прямой загрузке/обновлении (?doc в URL, заголовок ещё не известен).
+  useEffect(() => {
+    if (docId == null) {
+      setOpenDoc(null)
+      return
+    }
+    if (openDoc?.id === docId) return
+    let cancelled = false
+    apiClient.documents
+      .getDocument(docId)
+      .then((res) => {
+        if (!cancelled && res.data) setOpenDoc({ id: docId, title: res.data.title ?? 'Без названия' })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docId])
+
+  const updateParams = (mutate: (p: URLSearchParams) => void) => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      mutate(next)
+      return next
+    })
+  }
+
+  const openDocument = (id: number, title: string) => {
+    setOpenDoc({ id, title })
+    updateParams((p) => p.set('doc', String(id)))
+  }
+
+  const navigateFolder = (id: number | null) => {
+    updateParams((p) => {
+      p.delete('doc')
+      if (id == null) p.delete('folder')
+      else p.set('folder', String(id))
+    })
+  }
+
+  const backToFiles = () => updateParams((p) => p.delete('doc'))
+
+  if (docId != null) {
+    const doc = openDoc ?? { id: docId, title: 'Документ' }
+    return (
+      <div className="flex h-full min-h-0">
+        <div className="flex-1 min-w-0 bg-panel">
+          <DocumentProvider key={doc.id} documentId={doc.id}>
             <DocumentWorkspace
-              doc={selected}
+              doc={doc}
+              onBack={backToFiles}
               onTitleUpdate={(title) => {
-                setSelected({ id: selected.id, title })
-                // Заголовок изменён в шапке — просим сайдбар обновить список.
+                setOpenDoc({ id: doc.id, title })
                 setDocsRefresh((n) => n + 1)
               }}
             />
           </DocumentProvider>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
-            <div className="w-[52px] h-[52px] rounded-2xl bg-accent-soft text-accent flex items-center justify-center">
-              <DocsIcon size={24} strokeWidth={1.6} />
-            </div>
-            <div className="text-sm text-muted max-w-[340px] leading-[1.55]">
-              Выберите документ справа или создайте новый, чтобы начать совместное редактирование.
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
 
-      <DocumentsSidebar
-        projectId={projectId}
-        selectedId={selected?.id ?? null}
-        onSelect={(id, title) => setSelected({ id, title })}
-        onDeleted={(id) => setSelected((prev) => (prev?.id === id ? null : prev))}
-        onTitleUpdated={(id, title) => setSelected((prev) => (prev?.id === id ? { id, title } : prev))}
-        refreshSignal={docsRefresh}
-      />
-    </div>
+        <DocumentsSidebar
+          projectId={projectId}
+          selectedId={doc.id}
+          onSelect={(id, title) => openDocument(id, title)}
+          onDeleted={(id) => {
+            if (id === doc.id) backToFiles()
+          }}
+          onTitleUpdated={(id, title) => {
+            if (id === doc.id) setOpenDoc({ id, title })
+          }}
+          refreshSignal={docsRefresh}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <DocumentExplorer
+      projectId={projectId}
+      folderId={folderId}
+      onNavigateFolder={navigateFolder}
+      onOpenDocument={openDocument}
+    />
   )
 }

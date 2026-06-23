@@ -111,6 +111,18 @@ export const TablesIcon = (p: IconProps) => (
   </Svg>
 )
 
+export const HomeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 10.5 12 5l7 5.5V19a1 1 0 0 1-1 1h-3v-5h-6v5H6a1 1 0 0 1-1-1z" />
+  </Svg>
+)
+
+export const ArrowLeftIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 6l-6 6 6 6" />
+  </Svg>
+)
+
 export const SettingsIcon = (p: IconProps) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="3" />

@@ -1,0 +1,382 @@
+import { useEffect, useState } from 'react'
+import { apiClient } from '../api'
+import { FormModal, ConfirmDialog } from './WorkspaceModals'
+import { DocsIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
+
+interface FolderItem {
+  id: number
+  name: string
+  updatedAt?: string
+}
+
+interface DocItem {
+  id: number
+  title: string
+  updatedAt?: string
+}
+
+type RenameTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
+type DeleteTarget = RenameTarget
+
+interface DocumentExplorerProps {
+  projectId: number
+  folderId: number | null
+  onNavigateFolder: (id: number | null) => void
+  onOpenDocument: (id: number, title: string) => void
+}
+
+function formatDate(value?: string): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpenDocument }: DocumentExplorerProps) {
+  const [folders, setFolders] = useState<FolderItem[]>([])
+  const [documents, setDocuments] = useState<DocItem[]>([])
+  const [path, setPath] = useState<{ id: number; name: string }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [query, setQuery] = useState('')
+  const [searchFolders, setSearchFolders] = useState<FolderItem[]>([])
+  const [searchDocs, setSearchDocs] = useState<DocItem[]>([])
+  const searching = query.trim().length > 0
+
+  const [createKind, setCreateKind] = useState<'folder' | 'doc' | null>(null)
+  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [dragItem, setDragItem] = useState<{ kind: 'folder' | 'doc'; id: number } | null>(null)
+  const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null)
+
+  const loadContents = async () => {
+    setLoading(true)
+    try {
+      const res = await apiClient.documents.getFolderContents(projectId, {
+        folderId: folderId ?? undefined,
+      })
+      const data = res.data
+      setFolders((data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '', updatedAt: f.updatedAt })))
+      setDocuments(
+        (data?.documents ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', updatedAt: d.updatedAt })),
+      )
+      setPath((data?.path ?? []).map((p) => ({ id: Number(p.id), name: p.name ?? '' })))
+    } catch (error) {
+      console.error('Failed to load folder contents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadContents()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, folderId])
+
+  // Поиск по проекту с дебаунсом (серверный).
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) {
+      setSearchFolders([])
+      setSearchDocs([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient.documents.searchDocuments(projectId, { query: q })
+        setSearchFolders((res.data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '' })))
+        setSearchDocs((res.data?.documents ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия' })))
+      } catch (error) {
+        console.error('Failed to search:', error)
+      }
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [query, projectId])
+
+  const createFolder = async (name: string) => {
+    setBusy(true)
+    try {
+      await apiClient.documents.createFolder({ projectId, parentFolderId: folderId, name })
+      setCreateKind(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createDocument = async (title: string) => {
+    setBusy(true)
+    try {
+      const res = await apiClient.documents.createDocument({ projectId, folderId, title })
+      setCreateKind(null)
+      if (res.data?.id != null) {
+        onOpenDocument(Number(res.data.id), res.data.title ?? title)
+      }
+    } catch (error) {
+      console.error('Failed to create document:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rename = async (name: string) => {
+    if (!renameTarget) return
+    setBusy(true)
+    try {
+      if (renameTarget.kind === 'folder') {
+        await apiClient.documents.updateFolder(renameTarget.id, { name })
+      } else {
+        await apiClient.documents.updateDocument(renameTarget.id, { title: name })
+      }
+      setRenameTarget(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to rename:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setBusy(true)
+    try {
+      if (deleteTarget.kind === 'folder') {
+        await apiClient.documents.deleteFolder(deleteTarget.id)
+      } else {
+        await apiClient.documents.deleteDocument(deleteTarget.id)
+      }
+      setDeleteTarget(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to delete:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Перемещение перетаскиванием: в папку (target=id) или в предка через крошки (target=id|null).
+  const moveInto = async (target: number | null) => {
+    const item = dragItem
+    setDragItem(null)
+    setDropTarget(null)
+    if (!item) return
+    if (item.kind === 'folder' && item.id === target) return
+    try {
+      if (item.kind === 'folder') {
+        await apiClient.documents.moveFolder(item.id, { parentFolderId: target })
+      } else {
+        await apiClient.documents.moveDocument(item.id, { folderId: target })
+      }
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to move:', error)
+    }
+  }
+
+  const rowBase =
+    'group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-hovered'
+  const actionBtn = 'opacity-0 group-hover:opacity-100 text-faint p-1 cursor-pointer rounded hover:bg-tile'
+  const iconBtn =
+    'h-8 w-8 rounded-[9px] flex items-center justify-center text-muted cursor-pointer hover:bg-hovered'
+
+  const folderRow = (f: FolderItem, withMeta: boolean) => (
+    <div key={`f-${f.id}`} className={rowBase} onClick={() => onNavigateFolder(f.id)}>
+      <FolderIcon size={18} className="text-faint shrink-0" />
+      <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{f.name}</span>
+      {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(f.updatedAt)}</span>}
+      <div className="shrink-0 flex items-center gap-0.5">
+        <button
+          type="button"
+          className={`${actionBtn} hover:text-accent`}
+          title="Переименовать папку"
+          onClick={(e) => {
+            e.stopPropagation()
+            setRenameTarget({ kind: 'folder', id: f.id, name: f.name })
+          }}
+        >
+          <PencilIcon size={15} />
+        </button>
+        <button
+          type="button"
+          className={`${actionBtn} hover:text-danger`}
+          title="Удалить папку"
+          onClick={(e) => {
+            e.stopPropagation()
+            setDeleteTarget({ kind: 'folder', id: f.id, name: f.name })
+          }}
+        >
+          <TrashIcon size={15} />
+        </button>
+      </div>
+    </div>
+  )
+
+  const docRow = (d: DocItem, withMeta: boolean) => (
+    <div key={`d-${d.id}`} className={rowBase} onClick={() => onOpenDocument(d.id, d.title)}>
+      <DocsIcon size={18} className="text-faint shrink-0" />
+      <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{d.title}</span>
+      {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(d.updatedAt)}</span>}
+      <div className="shrink-0 flex items-center gap-0.5">
+        <button
+          type="button"
+          className={`${actionBtn} hover:text-accent`}
+          title="Переименовать документ"
+          onClick={(e) => {
+            e.stopPropagation()
+            setRenameTarget({ kind: 'doc', id: d.id, name: d.title })
+          }}
+        >
+          <PencilIcon size={15} />
+        </button>
+        <button
+          type="button"
+          className={`${actionBtn} hover:text-danger`}
+          title="Удалить документ"
+          onClick={(e) => {
+            e.stopPropagation()
+            setDeleteTarget({ kind: 'doc', id: d.id, name: d.title })
+          }}
+        >
+          <TrashIcon size={15} />
+        </button>
+      </div>
+    </div>
+  )
+
+  const isEmpty = !searching && folders.length === 0 && documents.length === 0
+  const noResults = searching && searchFolders.length === 0 && searchDocs.length === 0
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="h-[52px] shrink-0 flex items-center gap-3 px-5 border-b border-line">
+        <nav className="flex items-center gap-1.5 text-[14px] min-w-0">
+          <button
+            type="button"
+            className="shrink-0 w-7 h-7 -ml-1 rounded-md flex items-center justify-center text-muted hover:bg-hovered hover:text-accent transition-colors cursor-pointer"
+            title="Все документы"
+            onClick={() => onNavigateFolder(null)}
+          >
+            <HomeIcon size={16} />
+          </button>
+          {path.map((c) => (
+            <span key={c.id} className="flex items-center gap-1.5 min-w-0">
+              <span className="text-faintest shrink-0">/</span>
+              <button
+                type="button"
+                className="text-muted hover:text-accent transition-colors truncate cursor-pointer"
+                onClick={() => onNavigateFolder(c.id)}
+              >
+                {c.name}
+              </button>
+            </span>
+          ))}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-2">
+          <div className="relative">
+            <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск по проекту"
+              className="h-8 w-52 pl-8 pr-2 text-[13px] bg-white border border-line rounded-[9px] text-ink placeholder:text-faint focus:outline-none focus:border-accent"
+            />
+          </div>
+          <button type="button" className={iconBtn} title="Новая папка" onClick={() => setCreateKind('folder')}>
+            <FolderIcon size={16} />
+          </button>
+          <button
+            type="button"
+            className="h-8 px-3 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer flex items-center gap-1.5"
+            onClick={() => setCreateKind('doc')}
+          >
+            <PlusIcon size={15} strokeWidth={2} />
+            Документ
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 py-2">
+        {loading ? (
+          <div className="px-3 py-4 text-[13px] text-faint">Загрузка…</div>
+        ) : searching ? (
+          noResults ? (
+            <div className="px-3 py-4 text-[13px] text-faint">Ничего не найдено</div>
+          ) : (
+            <>
+              {searchFolders.map((f) => folderRow(f, false))}
+              {searchDocs.map((d) => docRow(d, false))}
+            </>
+          )
+        ) : isEmpty ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-8">
+            <div className="w-[48px] h-[48px] rounded-2xl bg-accent-soft text-accent flex items-center justify-center">
+              <FolderIcon size={22} strokeWidth={1.6} />
+            </div>
+            <div className="text-[13.5px] text-muted max-w-[320px] leading-[1.5]">
+              {path.length > 0 ? 'Папка пуста.' : 'Здесь пока ничего нет.'} Создайте документ или папку.
+            </div>
+          </div>
+        ) : (
+          <>
+            {folders.map((f) => folderRow(f, true))}
+            {documents.map((d) => docRow(d, true))}
+          </>
+        )}
+      </div>
+
+      {createKind === 'folder' && (
+        <FormModal
+          title="Новая папка"
+          label="Название папки"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createFolder}
+          onClose={() => setCreateKind(null)}
+        />
+      )}
+      {createKind === 'doc' && (
+        <FormModal
+          title="Новый документ"
+          label="Название документа"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createDocument}
+          onClose={() => setCreateKind(null)}
+        />
+      )}
+      {renameTarget && (
+        <FormModal
+          title={renameTarget.kind === 'folder' ? 'Переименовать папку' : 'Переименовать документ'}
+          label={renameTarget.kind === 'folder' ? 'Название папки' : 'Название документа'}
+          submitLabel="Сохранить"
+          busy={busy}
+          initialValue={renameTarget.name}
+          onSubmit={rename}
+          onClose={() => setRenameTarget(null)}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title={deleteTarget.kind === 'folder' ? 'Удалить папку?' : 'Удалить документ?'}
+          message={
+            deleteTarget.kind === 'folder' ? (
+              <>Папка «{deleteTarget.name}» будет удалена. Вложенные документы останутся без папки.</>
+            ) : (
+              <>Документ «{deleteTarget.name}» будет удалён без возможности восстановления.</>
+            )
+          }
+          confirmLabel="Удалить"
+          busy={busy}
+          onConfirm={confirmDelete}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
+    </div>
+  )
+}

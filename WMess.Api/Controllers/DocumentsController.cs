@@ -316,6 +316,144 @@ public class DocumentsController : ControllerBase
         return Ok(documents);
     }
 
+    [HttpGet("project/{projectId}/contents")]
+    [EndpointName("GetFolderContents")]
+    public async Task<ActionResult<FolderContentsResponse>> GetFolderContents(int projectId, [FromQuery] int? folderId)
+    {
+        var project = await _context.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            return NotFound();
+        }
+
+        var result = await _authorizationService.AuthorizeAsync(User, project, Policies.ProjectAccess);
+        if (!result.Succeeded)
+        {
+            return Forbid();
+        }
+
+        // Папок в проекте обычно немного — грузим все для построения дочернего списка и пути.
+        var allFolders = await _context.DocumentFolders
+            .Where(f => f.ProjectId == projectId)
+            .Select(f => new { f.Id, f.ParentFolderId, f.Name, f.CreatedAt, f.UpdatedAt })
+            .ToListAsync();
+
+        if (folderId.HasValue && allFolders.All(f => f.Id != folderId.Value))
+        {
+            return NotFound();
+        }
+
+        var folders = allFolders
+            .Where(f => f.ParentFolderId == folderId)
+            .OrderBy(f => f.Name)
+            .Select(f => new FolderResponse
+            {
+                Id = f.Id,
+                ProjectId = projectId,
+                ParentFolderId = f.ParentFolderId,
+                Name = f.Name,
+                CreatedAt = f.CreatedAt,
+                UpdatedAt = f.UpdatedAt
+            })
+            .ToList();
+
+        // Документы — только непосредственно в этой папке (основной объём фильтруется на сервере).
+        // Сравнение с null выносим явно, чтобы EF гарантированно сгенерировал IS NULL для корня.
+        var documentsQuery = _context.Documents.Where(d => d.ProjectId == projectId);
+        documentsQuery = folderId.HasValue
+            ? documentsQuery.Where(d => d.FolderId == folderId.Value)
+            : documentsQuery.Where(d => d.FolderId == null);
+
+        var documents = await documentsQuery
+            .OrderBy(d => d.Title)
+            .Select(d => new DocumentResponse
+            {
+                Id = d.Id,
+                ProjectId = d.ProjectId,
+                FolderId = d.FolderId,
+                Title = d.Title,
+                CreatedBy = d.CreatedBy,
+                CreatedAt = d.CreatedAt,
+                UpdatedAt = d.UpdatedAt
+            })
+            .ToListAsync();
+
+        // Путь от корня к текущей папке.
+        var byId = allFolders.ToDictionary(f => f.Id);
+        var path = new List<BreadcrumbItem>();
+        var cursor = folderId;
+        while (cursor.HasValue && byId.TryGetValue(cursor.Value, out var node))
+        {
+            path.Insert(0, new BreadcrumbItem { Id = node.Id, Name = node.Name });
+            cursor = node.ParentFolderId;
+        }
+
+        return Ok(new FolderContentsResponse
+        {
+            FolderId = folderId,
+            FolderName = folderId.HasValue && byId.TryGetValue(folderId.Value, out var current) ? current.Name : null,
+            Path = path,
+            Folders = folders,
+            Documents = documents
+        });
+    }
+
+    [HttpGet("project/{projectId}/search")]
+    [EndpointName("SearchDocuments")]
+    public async Task<ActionResult<DocumentSearchResponse>> SearchDocuments(int projectId, [FromQuery] string query)
+    {
+        var project = await _context.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            return NotFound();
+        }
+
+        var result = await _authorizationService.AuthorizeAsync(User, project, Policies.ProjectAccess);
+        if (!result.Succeeded)
+        {
+            return Forbid();
+        }
+
+        var term = (query ?? string.Empty).Trim();
+        if (term.Length == 0)
+        {
+            return Ok(new DocumentSearchResponse());
+        }
+
+        var folders = await _context.DocumentFolders
+            .Where(f => f.ProjectId == projectId && f.Name.Contains(term))
+            .OrderBy(f => f.Name)
+            .Take(50)
+            .Select(f => new FolderResponse
+            {
+                Id = f.Id,
+                ProjectId = f.ProjectId,
+                ParentFolderId = f.ParentFolderId,
+                Name = f.Name,
+                CreatedAt = f.CreatedAt,
+                UpdatedAt = f.UpdatedAt
+            })
+            .ToListAsync();
+
+        var documents = await _context.Documents
+            .Where(d => d.ProjectId == projectId && d.Title.Contains(term))
+            .OrderBy(d => d.Title)
+            .Take(50)
+            .Select(d => new DocumentResponse
+            {
+                Id = d.Id,
+                ProjectId = d.ProjectId,
+                FolderId = d.FolderId,
+                Title = d.Title,
+                CreatedBy = d.CreatedBy,
+                CreatedAt = d.CreatedAt,
+                UpdatedAt = d.UpdatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new DocumentSearchResponse { Folders = folders, Documents = documents });
+    }
+
     [HttpGet("{id}")]
     [EndpointName("GetDocument")]
     public async Task<ActionResult<DocumentResponse>> GetDocument(int id)
