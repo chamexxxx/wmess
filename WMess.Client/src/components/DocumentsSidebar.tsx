@@ -260,15 +260,18 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
   }
 
   const rowBase =
-    'group flex items-center justify-between gap-1 pr-2 py-1.5 rounded-md cursor-pointer hover:bg-hovered'
+    'group flex items-center justify-between gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-hovered'
 
-  const renderDoc = (doc: Doc, level: number) => {
+  // Контейнер вложенности: непрерывная вертикальная направляющая (border-left),
+  // выровненная под шеврон родителя. Один бордер на уровень — одинаково на любой глубине.
+  const childrenWrap = 'ml-[12px] pl-[8px] border-l-2 border-tile'
+
+  const renderDoc = (doc: Doc) => {
     const isSelected = doc.id === selectedId
     return (
       <div
         key={`doc-${doc.id}`}
         className={`${rowBase} ${isSelected ? 'bg-accent-soft' : ''}`}
-        style={{ paddingLeft: `${level * 14 + 10}px` }}
         onClick={() => onSelect(doc.id, doc.title)}
         draggable
         onDragStart={(e) => {
@@ -281,6 +284,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
         }}
       >
         <span className="flex items-center gap-2 min-w-0">
+          <span className="shrink-0 w-3" aria-hidden="true" />
           <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-faint'} />
           <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
             {doc.title}
@@ -314,7 +318,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
     )
   }
 
-  const renderFolder = (folder: Folder, level: number) => {
+  const renderFolder = (folder: Folder) => {
     const isOpen = expanded.has(folder.id)
     const isDragOver = dropTarget?.kind === 'folder' && dropTarget.id === folder.id
     const isDragging = dragItem?.kind === 'folder' && dragItem.id === folder.id
@@ -322,7 +326,6 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
       <div key={`folder-${folder.id}`}>
         <div
           className={`${rowBase} ${isDragOver ? 'bg-hovered' : ''} ${isDragging ? 'opacity-50' : ''}`}
-          style={{ paddingLeft: `${level * 14 + 10}px` }}
           onClick={() => toggleFolder(folder.id)}
           draggable
           onDragStart={(e) => {
@@ -364,7 +367,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
           }}
         >
           <span className="flex items-center gap-2 min-w-0">
-            <span className={`text-faintest text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+            <span className={`shrink-0 w-3 text-center text-faintest text-[9px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
             <FolderIcon size={15} className="text-faint" />
             <span className="text-[13px] text-ink-soft truncate">{folder.name}</span>
           </span>
@@ -405,12 +408,18 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
             </button>
           </div>
         </div>
-        {isOpen && (
-          <div>
-            {subFolders(folder.id).map((f) => renderFolder(f, level + 1))}
-            {folderDocs(folder.id).map((d) => renderDoc(d, level + 1))}
+        <div
+          className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+            isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className={childrenWrap}>
+              {subFolders(folder.id).map((f) => renderFolder(f))}
+              {folderDocs(folder.id).map((d) => renderDoc(d))}
+            </div>
           </div>
-        )}
+        </div>
       </div>
     )
   }
@@ -512,8 +521,8 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
           </div>
         ) : (
           <div className={`${dropTarget?.kind === 'root' ? 'bg-hovered rounded-md' : ''}`}>
-            {subFolders(null).map((f) => renderFolder(f, 0))}
-            {folderDocs(null).map((d) => renderDoc(d, 0))}
+            {subFolders(null).map((f) => renderFolder(f))}
+            {folderDocs(null).map((d) => renderDoc(d))}
           </div>
         )}
       </div>
