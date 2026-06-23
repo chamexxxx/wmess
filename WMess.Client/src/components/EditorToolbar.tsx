@@ -13,6 +13,7 @@ import { INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from '@lex
 import { TOGGLE_LINK_COMMAND } from '@lexical/link'
 import { mergeRegister } from '@lexical/utils'
 import { useCallback, useEffect, useState } from 'react'
+import { BulletListIcon, CodeIcon, LinkIcon, NumberedListIcon, QuoteIcon } from '../workspace/icons'
 
 type TextFormat = 'bold' | 'italic' | 'underline'
 
@@ -167,16 +168,16 @@ export function EditorToolbar() {
         <div className={divider} />
 
         <button type="button" onMouseDown={keepSelection} onClick={insertBulletList} className={btn} title="Маркированный список">
-          • —
+          <BulletListIcon size={17} />
         </button>
         <button type="button" onMouseDown={keepSelection} onClick={insertNumberedList} className={btn} title="Нумерованный список">
-          1. —
+          <NumberedListIcon size={17} />
         </button>
         <button type="button" onMouseDown={keepSelection} onClick={formatQuote} className={btn} title="Цитата">
-          ❝
+          <QuoteIcon size={17} />
         </button>
-        <button type="button" onMouseDown={keepSelection} onClick={formatCode} className={`${btn} font-mono`} title="Блок кода">
-          {'</>'}
+        <button type="button" onMouseDown={keepSelection} onClick={formatCode} className={btn} title="Блок кода">
+          <CodeIcon size={17} />
         </button>
 
         <div className={divider} />
@@ -188,7 +189,7 @@ export function EditorToolbar() {
           className={`${btn} ${showLinkInput ? btnActive : ''}`}
           title="Ссылка"
         >
-          🔗
+          <LinkIcon size={17} />
         </button>
       </div>
 

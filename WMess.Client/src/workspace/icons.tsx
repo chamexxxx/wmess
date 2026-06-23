@@ -110,3 +110,38 @@ export const TablesIcon = (p: IconProps) => (
     <path d="M4 10h16M4 15h16M10 5.2v13.6" />
   </Svg>
 )
+
+export const BulletListIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+  </Svg>
+)
+
+export const NumberedListIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M10 6h10M10 12h10M10 18h10" />
+    <path d="M4 6h1v4M4 10h2" />
+    <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+  </Svg>
+)
+
+export const QuoteIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 7h3v3c0 2-1 3.4-3 4" />
+    <path d="M14 7h3v3c0 2-1 3.4-3 4" />
+  </Svg>
+)
+
+export const CodeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" />
+  </Svg>
+)
+
+export const LinkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </Svg>
+)
