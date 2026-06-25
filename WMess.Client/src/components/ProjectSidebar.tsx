@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ProjectResponse, TeamResponse } from '../api/generated/data-contracts'
 import { colorFor } from '../workspace/theme'
-import { PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
+import { PencilIcon, PlusIcon, SearchIcon, TrashIcon, UsersIcon } from '../workspace/icons'
 import { sections } from '../workspace/sections'
 
 interface ProjectSidebarProps {
@@ -16,6 +16,7 @@ interface ProjectSidebarProps {
   onDeleteProject: (project: ProjectResponse) => void
   onEditTeam: () => void
   onDeleteTeam: () => void
+  onManageMembers: () => void
 }
 
 const sectionLabel = 'font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest'
@@ -34,6 +35,7 @@ export function ProjectSidebar({
   onDeleteProject,
   onEditTeam,
   onDeleteTeam,
+  onManageMembers,
 }: ProjectSidebarProps) {
   const [query, setQuery] = useState('')
 
@@ -59,6 +61,9 @@ export function ProjectSidebar({
           <div className="text-sm font-bold text-ink truncate">{team.name}</div>
           <div className="text-[10.5px] text-faintest mt-px">{projects.length} проект(ов)</div>
         </div>
+        <button type="button" className={iconBtn} title="Управление участниками" onClick={onManageMembers}>
+          <UsersIcon size={15} />
+        </button>
         <button type="button" className={iconBtn} title="Переименовать команду" onClick={onEditTeam}>
           <PencilIcon size={15} />
         </button>

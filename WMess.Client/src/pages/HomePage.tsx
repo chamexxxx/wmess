@@ -8,12 +8,14 @@ import { ProjectSidebar } from '../components/ProjectSidebar'
 import { DocumentsSection } from '../components/DocumentsSection'
 import { ProjectSettings } from '../components/ProjectSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
+import { TeamMembersModal } from '../components/TeamMembersModal'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
 
 type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
 type Confirm = { kind: 'team'; team: TeamResponse } | { kind: 'project'; project: ProjectResponse }
+type MembersModal = { teamId: number }
 
 export function HomePage() {
   const { user, setUser } = useAuth()
@@ -35,6 +37,7 @@ export function HomePage() {
   const [teamModal, setTeamModal] = useState<TeamModal | null>(null)
   const [projectModal, setProjectModal] = useState<ProjectModal | null>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
+  const [membersModal, setMembersModal] = useState<MembersModal | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -212,6 +215,7 @@ export function HomePage() {
         onDeleteProject={(project) => setConfirm({ kind: 'project', project })}
         onEditTeam={() => selectedTeam && setTeamModal({ mode: 'edit', team: selectedTeam })}
         onDeleteTeam={() => selectedTeam && setConfirm({ kind: 'team', team: selectedTeam })}
+        onManageMembers={() => selectedTeamId && setMembersModal({ teamId: selectedTeamId })}
       />
 
       {/* MAIN */}
@@ -283,6 +287,13 @@ export function HomePage() {
       </div>
 
       {/* MODALS */}
+      {membersModal && (
+        <TeamMembersModal
+          teamId={membersModal.teamId}
+          onClose={() => setMembersModal(null)}
+        />
+      )}
+
       {teamModal &&
         (teamModal.mode === 'create' ? (
           <FormModal
