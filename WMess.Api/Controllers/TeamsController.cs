@@ -56,8 +56,7 @@ public class TeamsController : ControllerBase
             {
                 Id = tu.Team.Id,
                 Name = tu.Team.Name,
-                CreatedAt = tu.Team.CreatedAt,
-                Role = tu.Role
+                CreatedAt = tu.Team.CreatedAt
             })
             .ToListAsync();
 
@@ -65,7 +64,7 @@ public class TeamsController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<TeamResponse>> GetTeam(int id)
+    public async Task<ActionResult<TeamDetailResponse>> GetTeam(int id)
     {
         var team = await _context.Teams.FindAsync(id);
         if (team == null)
@@ -82,15 +81,23 @@ public class TeamsController : ControllerBase
         // Политика TeamMember пройдена — значит запись о членстве существует.
         var role = await _context.TeamUsers
             .Where(tu => tu.TeamId == team.Id && tu.UserId == GetCurrentUserId())
-            .Select(tu => tu.Role)
+            .Select(tu => (TeamRole?)tu.Role)
             .FirstOrDefaultAsync();
 
-        return Ok(new TeamResponse
+        return Ok(new TeamDetailResponse
         {
             Id = team.Id,
             Name = team.Name,
             CreatedAt = team.CreatedAt,
-            Role = role
+            Permissions = new TeamPermissions
+            {
+                CanManage = TeamRoleRules.CanManage(role),
+                CanDelete = TeamRoleRules.CanDelete(role),
+                CanChangeRoles = TeamRoleRules.CanChangeRoles(role),
+                CanRemoveMembers = TeamRoleRules.CanRemoveMember(role, TeamRole.Member),
+                CanRemoveAdmins = TeamRoleRules.CanRemoveMember(role, TeamRole.Admin),
+                CanRemoveOwners = TeamRoleRules.CanRemoveMember(role, TeamRole.Owner)
+            }
         });
     }
 
@@ -117,8 +124,7 @@ public class TeamsController : ControllerBase
         {
             Id = team.Id,
             Name = team.Name,
-            CreatedAt = team.CreatedAt,
-            Role = TeamRole.Owner
+            CreatedAt = team.CreatedAt
         };
 
         return CreatedAtAction(nameof(GetTeam), new { id = team.Id }, response);

@@ -54,7 +54,7 @@ public class ProjectAccessHandler : ProjectAuthorizationHandler<ProjectAccessReq
 {
     public ProjectAccessHandler(ApplicationDbContext context) : base(context) { }
 
-    protected override bool IsAuthorized(TeamRole? role) => role is not null;
+    protected override bool IsAuthorized(TeamRole? role) => TeamRoleRules.IsMember(role);
 }
 
 /// <summary>Handler: управление проектом (Owner или Admin в команде).</summary>
@@ -62,6 +62,5 @@ public class ProjectManageHandler : ProjectAuthorizationHandler<ProjectManageReq
 {
     public ProjectManageHandler(ApplicationDbContext context) : base(context) { }
 
-    protected override bool IsAuthorized(TeamRole? role)
-        => role is TeamRole.Owner or TeamRole.Admin;
+    protected override bool IsAuthorized(TeamRole? role) => TeamRoleRules.CanManage(role);
 }

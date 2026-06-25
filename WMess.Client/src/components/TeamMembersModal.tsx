@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
-import type { TeamMemberResponse, TeamRole } from '../api/generated/data-contracts'
+import type { TeamMemberResponse, TeamPermissions } from '../api/generated/data-contracts'
 import { TrashIcon } from '../workspace/icons'
-import { ROLE_LABELS, TeamRoleValue, canManageTeam, isTeamOwner } from '../workspace/roles'
+import { ROLE_LABELS } from '../workspace/roles'
 
 const ghostBtn =
   'h-[38px] px-4 rounded-[9px] border border-line bg-white text-muted font-semibold text-[13.5px] cursor-pointer hover:bg-sidebar font-ui'
@@ -41,21 +41,6 @@ function getInitials(email: string): string {
   return part.slice(0, 2).toUpperCase()
 }
 
-// Кого текущий пользователь может удалить: себя (выйти) — всегда; Owner — любого;
-// Admin — только обычных участников. Бэкенд проверяет то же + «последнего владельца».
-function canRemoveMember(
-  myRole: TeamRole | undefined,
-  targetRole: TeamRole | undefined,
-  isSelf: boolean,
-): boolean {
-  if (isSelf) return true
-  if (isTeamOwner(myRole)) return true
-  if (myRole === TeamRoleValue.Admin) {
-    return (targetRole ?? TeamRoleValue.Member) === TeamRoleValue.Member
-  }
-  return false
-}
-
 function getErrorMessage(err: unknown, fallback: string): string {
   if (isAxiosError(err)) {
     const data = err.response?.data as { message?: string; detail?: string } | undefined
@@ -66,12 +51,12 @@ function getErrorMessage(err: unknown, fallback: string): string {
 
 interface TeamMembersModalProps {
   teamId: number
-  // Роль текущего пользователя в этой команде — определяет доступные действия.
-  currentUserRole?: TeamRole
+  // Готовые права текущего пользователя в команде (считает сервер).
+  permissions?: TeamPermissions
   onClose: () => void
 }
 
-export function TeamMembersModal({ teamId, currentUserRole, onClose }: TeamMembersModalProps) {
+export function TeamMembersModal({ teamId, permissions, onClose }: TeamMembersModalProps) {
   const { user } = useAuth()
   const [members, setMembers] = useState<TeamMemberResponse[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,9 +66,15 @@ export function TeamMembersModal({ teamId, currentUserRole, onClose }: TeamMembe
   const [updating, setUpdating] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
 
-  // Admin/Owner могут добавлять участников; только Owner — менять роли.
-  const canManage = canManageTeam(currentUserRole)
-  const canChangeRoles = isTeamOwner(currentUserRole)
+  const canManage = permissions?.canManage ?? false
+  const canChangeRoles = permissions?.canChangeRoles ?? false
+
+  // Какое право нужно, чтобы удалить участника с данной ролью (0/1/2).
+  function canRemoveRole(role: number): boolean {
+    if (role === 2) return permissions?.canRemoveOwners ?? false
+    if (role === 1) return permissions?.canRemoveAdmins ?? false
+    return permissions?.canRemoveMembers ?? false
+  }
 
   useEffect(() => {
     loadMembers()
@@ -186,7 +177,8 @@ export function TeamMembersModal({ teamId, currentUserRole, onClose }: TeamMembe
           <div className="space-y-2">
             {members.map((member) => {
               const isSelf = !!user?.email && member.email === user.email
-              const removable = canRemoveMember(currentUserRole, member.role, isSelf)
+              // Себя (выход) — всегда; иначе по праву для роли участника.
+              const removable = isSelf || canRemoveRole(member.role ?? 0)
               return (
               <div
                 key={member.userId}

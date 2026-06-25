@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
-import type { ProjectResponse, TeamResponse } from '../api/generated/data-contracts'
+import type { ProjectResponse, TeamResponse, TeamDetailResponse } from '../api/generated/data-contracts'
 import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { DocumentsSection } from '../components/DocumentsSection'
@@ -11,7 +11,6 @@ import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
 import { TeamMembersModal } from '../components/TeamMembersModal'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
-import { canManageTeam, isTeamOwner } from '../workspace/roles'
 
 type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
@@ -40,6 +39,9 @@ export function HomePage() {
   const [confirm, setConfirm] = useState<Confirm | null>(null)
   const [membersModal, setMembersModal] = useState<MembersModal | null>(null)
   const [busy, setBusy] = useState(false)
+  // Детали выбранной команды (включая права). Грузятся только на странице команды.
+  const [teamDetail, setTeamDetail] = useState<TeamDetailResponse | null>(null)
+  const [teamDetailRefresh, setTeamDetailRefresh] = useState(0)
 
   useEffect(() => {
     Promise.all([apiClient.teams.teamsList(), apiClient.projects.projectsList()])
@@ -58,6 +60,24 @@ export function HomePage() {
     return () => clearTimeout(t)
   }, [error])
 
+  // Детали команды (с правами текущего пользователя) — только когда выбрана команда.
+  // teamDetail не сбрасываем синхронно: ниже права берутся только при совпадении id.
+  useEffect(() => {
+    if (selectedTeamId == null) return
+    let cancelled = false
+    apiClient.teams
+      .teamsDetail(selectedTeamId)
+      .then((res) => {
+        if (!cancelled) setTeamDetail(res.data)
+      })
+      .catch(() => {
+        if (!cancelled) setTeamDetail(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedTeamId, teamDetailRefresh])
+
   const selectedTeam = teams.find((t) => Number(t.id) === selectedTeamId)
   const teamProjects = useMemo(
     () => projects.filter((p) => Number(p.teamId) === selectedTeamId),
@@ -67,9 +87,10 @@ export function HomePage() {
   const section = sectionById(sectionKey)
   const isSettings = sectionKey === 'settings'
 
-  // Права текущего пользователя в выбранной команде — для скрытия управляющих действий.
-  const canManage = canManageTeam(selectedTeam?.role)
-  const canDelete = isTeamOwner(selectedTeam?.role)
+  // Права берём только из деталей текущей команды; до их загрузки действия скрыты (fail-safe).
+  const perms = Number(teamDetail?.id) === selectedTeamId ? teamDetail?.permissions : undefined
+  const canManage = perms?.canManage ?? false
+  const canDelete = perms?.canDelete ?? false
 
   // Keep the URL pointing at something real: land on the first team, default to
   // the first section, and bounce off ids/sections that don't exist.
@@ -300,8 +321,12 @@ export function HomePage() {
       {membersModal && (
         <TeamMembersModal
           teamId={membersModal.teamId}
-          currentUserRole={selectedTeam?.role}
-          onClose={() => setMembersModal(null)}
+          permissions={perms}
+          onClose={() => {
+            setMembersModal(null)
+            // Роли могли поменяться внутри модалки — перечитать свои права.
+            setTeamDetailRefresh((n) => n + 1)
+          }}
         />
       )}
 

@@ -54,7 +54,7 @@ public class TeamMemberHandler : TeamAuthorizationHandler<TeamMemberRequirement>
 {
     public TeamMemberHandler(ApplicationDbContext context) : base(context) { }
 
-    protected override bool IsAuthorized(TeamRole? role) => role is not null;
+    protected override bool IsAuthorized(TeamRole? role) => TeamRoleRules.IsMember(role);
 }
 
 /// <summary>Handler: управление командой (Owner или Admin).</summary>
@@ -62,8 +62,7 @@ public class TeamManageHandler : TeamAuthorizationHandler<TeamManageRequirement>
 {
     public TeamManageHandler(ApplicationDbContext context) : base(context) { }
 
-    protected override bool IsAuthorized(TeamRole? role)
-        => role is TeamRole.Owner or TeamRole.Admin;
+    protected override bool IsAuthorized(TeamRole? role) => TeamRoleRules.CanManage(role);
 }
 
 /// <summary>Handler: удаление команды (только Owner).</summary>
@@ -71,7 +70,7 @@ public class TeamDeleteHandler : TeamAuthorizationHandler<TeamDeleteRequirement>
 {
     public TeamDeleteHandler(ApplicationDbContext context) : base(context) { }
 
-    protected override bool IsAuthorized(TeamRole? role) => role is TeamRole.Owner;
+    protected override bool IsAuthorized(TeamRole? role) => TeamRoleRules.CanDelete(role);
 }
 
 /// <summary>Handler: смена ролей участников (только Owner).</summary>
@@ -79,5 +78,5 @@ public class TeamChangeRoleHandler : TeamAuthorizationHandler<TeamChangeRoleRequ
 {
     public TeamChangeRoleHandler(ApplicationDbContext context) : base(context) { }
 
-    protected override bool IsAuthorized(TeamRole? role) => role is TeamRole.Owner;
+    protected override bool IsAuthorized(TeamRole? role) => TeamRoleRules.CanChangeRoles(role);
 }
