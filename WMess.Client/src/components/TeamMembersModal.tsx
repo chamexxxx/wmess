@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { apiClient } from '../api'
-import type { TeamMemberResponse } from '../api/generated/data-contracts'
+import { useAuth } from '../context/AuthContext'
+import type { TeamMemberResponse, TeamRole } from '../api/generated/data-contracts'
 import { TrashIcon } from '../workspace/icons'
+import { ROLE_LABELS, TeamRoleValue, canManageTeam, isTeamOwner } from '../workspace/roles'
 
 const ghostBtn =
   'h-[38px] px-4 rounded-[9px] border border-line bg-white text-muted font-semibold text-[13.5px] cursor-pointer hover:bg-sidebar font-ui'
@@ -34,15 +36,24 @@ function Modal({ onClose, children }: { onClose: () => void; children: React.Rea
   )
 }
 
-const ROLE_LABELS: Record<number, string> = {
-  0: 'Участник',
-  1: 'Админ',
-  2: 'Владелец',
-}
-
 function getInitials(email: string): string {
   const part = email.split('@')[0]
   return part.slice(0, 2).toUpperCase()
+}
+
+// Кого текущий пользователь может удалить: себя (выйти) — всегда; Owner — любого;
+// Admin — только обычных участников. Бэкенд проверяет то же + «последнего владельца».
+function canRemoveMember(
+  myRole: TeamRole | undefined,
+  targetRole: TeamRole | undefined,
+  isSelf: boolean,
+): boolean {
+  if (isSelf) return true
+  if (isTeamOwner(myRole)) return true
+  if (myRole === TeamRoleValue.Admin) {
+    return (targetRole ?? TeamRoleValue.Member) === TeamRoleValue.Member
+  }
+  return false
 }
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -55,10 +66,13 @@ function getErrorMessage(err: unknown, fallback: string): string {
 
 interface TeamMembersModalProps {
   teamId: number
+  // Роль текущего пользователя в этой команде — определяет доступные действия.
+  currentUserRole?: TeamRole
   onClose: () => void
 }
 
-export function TeamMembersModal({ teamId, onClose }: TeamMembersModalProps) {
+export function TeamMembersModal({ teamId, currentUserRole, onClose }: TeamMembersModalProps) {
+  const { user } = useAuth()
   const [members, setMembers] = useState<TeamMemberResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -66,6 +80,10 @@ export function TeamMembersModal({ teamId, onClose }: TeamMembersModalProps) {
   const [adding, setAdding] = useState(false)
   const [updating, setUpdating] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+
+  // Admin/Owner могут добавлять участников; только Owner — менять роли.
+  const canManage = canManageTeam(currentUserRole)
+  const canChangeRoles = isTeamOwner(currentUserRole)
 
   useEffect(() => {
     loadMembers()
@@ -133,23 +151,25 @@ export function TeamMembersModal({ teamId, onClose }: TeamMembersModalProps) {
     <Modal onClose={onClose}>
       <h2 className="text-[17px] font-bold m-0 mb-4">Участники команды</h2>
 
-      <form onSubmit={handleAdd} className="flex gap-2 mb-4">
-        <input
-          type="email"
-          placeholder="Email участника"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="flex-1 h-10 px-3 rounded-[9px] border border-line bg-panel text-sm text-ink font-ui focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/20"
-          disabled={adding}
-        />
-        <button
-          type="submit"
-          className={`${actionBtn} bg-accent hover:bg-accent-deep`}
-          disabled={!email.trim() || adding}
-        >
-          {adding ? 'Добавление...' : 'Добавить'}
-        </button>
-      </form>
+      {canManage && (
+        <form onSubmit={handleAdd} className="flex gap-2 mb-4">
+          <input
+            type="email"
+            placeholder="Email участника"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="flex-1 h-10 px-3 rounded-[9px] border border-line bg-panel text-sm text-ink font-ui focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/20"
+            disabled={adding}
+          />
+          <button
+            type="submit"
+            className={`${actionBtn} bg-accent hover:bg-accent-deep`}
+            disabled={!email.trim() || adding}
+          >
+            {adding ? 'Добавление...' : 'Добавить'}
+          </button>
+        </form>
+      )}
 
       {error && (
         <div className="mb-3 px-3 py-2 rounded-lg bg-danger/10 text-danger text-sm">
@@ -164,7 +184,10 @@ export function TeamMembersModal({ teamId, onClose }: TeamMembersModalProps) {
           <div className="text-center py-8 text-muted">Нет участников</div>
         ) : (
           <div className="space-y-2">
-            {members.map((member) => (
+            {members.map((member) => {
+              const isSelf = !!user?.email && member.email === user.email
+              const removable = canRemoveMember(currentUserRole, member.role, isSelf)
+              return (
               <div
                 key={member.userId}
                 className="flex items-center gap-3 p-2.5 rounded-lg bg-panel border border-line"
@@ -175,31 +198,40 @@ export function TeamMembersModal({ teamId, onClose }: TeamMembersModalProps) {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{member.email}</div>
                 </div>
-                <select
-                  value={member.role ?? 0}
-                  onChange={(e) => handleRoleChange(member.userId!, Number(e.target.value))}
-                  className="h-8 px-2 rounded-[6px] border border-line bg-white text-sm font-ui cursor-pointer focus:outline-none focus:border-accent"
-                  disabled={updating === member.userId || deleting === member.userId}
-                >
-                  <option value={0}>{ROLE_LABELS[0]}</option>
-                  <option value={1}>{ROLE_LABELS[1]}</option>
-                  <option value={2}>{ROLE_LABELS[2]}</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(member.userId!)}
-                  className="p-1.5 rounded-[6px] text-muted hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
-                  disabled={updating === member.userId || deleting === member.userId}
-                  title="Удалить из команды"
-                >
-                  {deleting === member.userId ? (
-                    <span className="text-xs">...</span>
-                  ) : (
-                    <TrashIcon size={16} />
-                  )}
-                </button>
+                {canChangeRoles ? (
+                  <select
+                    value={member.role ?? 0}
+                    onChange={(e) => handleRoleChange(member.userId!, Number(e.target.value))}
+                    className="h-8 px-2 rounded-[6px] border border-line bg-white text-sm font-ui cursor-pointer focus:outline-none focus:border-accent"
+                    disabled={updating === member.userId || deleting === member.userId}
+                  >
+                    <option value={0}>{ROLE_LABELS[0]}</option>
+                    <option value={1}>{ROLE_LABELS[1]}</option>
+                    <option value={2}>{ROLE_LABELS[2]}</option>
+                  </select>
+                ) : (
+                  <span className="h-8 px-2 inline-flex items-center text-sm text-muted">
+                    {ROLE_LABELS[member.role ?? 0]}
+                  </span>
+                )}
+                {removable && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(member.userId!)}
+                    className="p-1.5 rounded-[6px] text-muted hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
+                    disabled={updating === member.userId || deleting === member.userId}
+                    title={isSelf ? 'Покинуть команду' : 'Удалить из команды'}
+                  >
+                    {deleting === member.userId ? (
+                      <span className="text-xs">...</span>
+                    ) : (
+                      <TrashIcon size={16} />
+                    )}
+                  </button>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

@@ -2283,6 +2283,10 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "role": {
+            "description": "Роль текущего пользователя в этой команде — чтобы клиент мог скрывать\r\nуправляющие действия, на которые у пользователя нет прав.",
+            "$ref": "#/components/schemas/TeamRole"
           }
         }
       },

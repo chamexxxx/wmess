@@ -56,7 +56,8 @@ public class TeamsController : ControllerBase
             {
                 Id = tu.Team.Id,
                 Name = tu.Team.Name,
-                CreatedAt = tu.Team.CreatedAt
+                CreatedAt = tu.Team.CreatedAt,
+                Role = tu.Role
             })
             .ToListAsync();
 
@@ -78,11 +79,18 @@ public class TeamsController : ControllerBase
             return Forbid();
         }
 
+        // Политика TeamMember пройдена — значит запись о членстве существует.
+        var role = await _context.TeamUsers
+            .Where(tu => tu.TeamId == team.Id && tu.UserId == GetCurrentUserId())
+            .Select(tu => tu.Role)
+            .FirstOrDefaultAsync();
+
         return Ok(new TeamResponse
         {
             Id = team.Id,
             Name = team.Name,
-            CreatedAt = team.CreatedAt
+            CreatedAt = team.CreatedAt,
+            Role = role
         });
     }
 
@@ -109,7 +117,8 @@ public class TeamsController : ControllerBase
         {
             Id = team.Id,
             Name = team.Name,
-            CreatedAt = team.CreatedAt
+            CreatedAt = team.CreatedAt,
+            Role = TeamRole.Owner
         };
 
         return CreatedAtAction(nameof(GetTeam), new { id = team.Id }, response);

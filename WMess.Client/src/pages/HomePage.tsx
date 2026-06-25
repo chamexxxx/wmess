@@ -11,6 +11,7 @@ import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
 import { TeamMembersModal } from '../components/TeamMembersModal'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
+import { canManageTeam, isTeamOwner } from '../workspace/roles'
 
 type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
@@ -65,6 +66,10 @@ export function HomePage() {
   const selectedProject = teamProjects.find((p) => Number(p.id) === selectedProjectId)
   const section = sectionById(sectionKey)
   const isSettings = sectionKey === 'settings'
+
+  // Права текущего пользователя в выбранной команде — для скрытия управляющих действий.
+  const canManage = canManageTeam(selectedTeam?.role)
+  const canDelete = isTeamOwner(selectedTeam?.role)
 
   // Keep the URL pointing at something real: land on the first team, default to
   // the first section, and bounce off ids/sections that don't exist.
@@ -216,6 +221,8 @@ export function HomePage() {
         onEditTeam={() => selectedTeam && setTeamModal({ mode: 'edit', team: selectedTeam })}
         onDeleteTeam={() => selectedTeam && setConfirm({ kind: 'team', team: selectedTeam })}
         onManageMembers={() => selectedTeamId && setMembersModal({ teamId: selectedTeamId })}
+        canManage={canManage}
+        canDelete={canDelete}
       />
 
       {/* MAIN */}
@@ -238,20 +245,22 @@ export function HomePage() {
                   {isSettings ? 'Настройки' : (section?.label ?? 'Проект')}
                 </span>
               </nav>
-              <button
-                type="button"
-                className={`ml-auto w-9 h-9 rounded-[9px] flex items-center justify-center cursor-pointer transition-colors ${
-                  isSettings
-                    ? 'text-accent-deep bg-accent-soft'
-                    : 'text-muted hover:bg-hovered'
-                }`}
-                title="Настройки проекта"
-                onClick={() =>
-                  navigate(`/teams/${selectedTeamId}/projects/${selectedProjectId}/settings`)
-                }
-              >
-                <SettingsIcon size={17} />
-              </button>
+              {canManage && (
+                <button
+                  type="button"
+                  className={`ml-auto w-9 h-9 rounded-[9px] flex items-center justify-center cursor-pointer transition-colors ${
+                    isSettings
+                      ? 'text-accent-deep bg-accent-soft'
+                      : 'text-muted hover:bg-hovered'
+                  }`}
+                  title="Настройки проекта"
+                  onClick={() =>
+                    navigate(`/teams/${selectedTeamId}/projects/${selectedProjectId}/settings`)
+                  }
+                >
+                  <SettingsIcon size={17} />
+                </button>
+              )}
             </>
           ) : (
             <div className="text-base font-bold truncate">{title}</div>
@@ -275,6 +284,7 @@ export function HomePage() {
             <ProjectSettings
               project={selectedProject}
               busy={busy}
+              canManage={canManage}
               onRename={(name) => updateProject(selectedProject, name)}
               onDelete={() => setConfirm({ kind: 'project', project: selectedProject })}
             />
@@ -290,6 +300,7 @@ export function HomePage() {
       {membersModal && (
         <TeamMembersModal
           teamId={membersModal.teamId}
+          currentUserRole={selectedTeam?.role}
           onClose={() => setMembersModal(null)}
         />
       )}

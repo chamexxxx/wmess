@@ -17,6 +17,9 @@ interface ProjectSidebarProps {
   onEditTeam: () => void
   onDeleteTeam: () => void
   onManageMembers: () => void
+  // Owner/Admin — управление командой и проектами; Owner — ещё и удаление команды.
+  canManage: boolean
+  canDelete: boolean
 }
 
 const sectionLabel = 'font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest'
@@ -36,6 +39,8 @@ export function ProjectSidebar({
   onEditTeam,
   onDeleteTeam,
   onManageMembers,
+  canManage,
+  canDelete,
 }: ProjectSidebarProps) {
   const [query, setQuery] = useState('')
 
@@ -61,15 +66,19 @@ export function ProjectSidebar({
           <div className="text-sm font-bold text-ink truncate">{team.name}</div>
           <div className="text-[10.5px] text-faintest mt-px">{projects.length} проект(ов)</div>
         </div>
-        <button type="button" className={iconBtn} title="Управление участниками" onClick={onManageMembers}>
+        <button type="button" className={iconBtn} title="Участники команды" onClick={onManageMembers}>
           <UsersIcon size={15} />
         </button>
-        <button type="button" className={iconBtn} title="Переименовать команду" onClick={onEditTeam}>
-          <PencilIcon size={15} />
-        </button>
-        <button type="button" className={iconBtn} title="Удалить команду" onClick={onDeleteTeam}>
-          <TrashIcon size={15} />
-        </button>
+        {canManage && (
+          <button type="button" className={iconBtn} title="Переименовать команду" onClick={onEditTeam}>
+            <PencilIcon size={15} />
+          </button>
+        )}
+        {canDelete && (
+          <button type="button" className={iconBtn} title="Удалить команду" onClick={onDeleteTeam}>
+            <TrashIcon size={15} />
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -88,14 +97,16 @@ export function ProjectSidebar({
       {/* Projects section header */}
       <div className="flex items-center justify-between px-[14px] pt-2.5 pb-1">
         <span className={sectionLabel}>Проекты</span>
-        <button
-          type="button"
-          className="w-6 h-6 rounded-lg flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
-          title="Новый проект"
-          onClick={onCreateProject}
-        >
-          <PlusIcon size={15} strokeWidth={1.8} />
-        </button>
+        {canManage && (
+          <button
+            type="button"
+            className="w-6 h-6 rounded-lg flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
+            title="Новый проект"
+            onClick={onCreateProject}
+          >
+            <PlusIcon size={15} strokeWidth={1.8} />
+          </button>
+        )}
       </div>
 
       {/* Project list — the active project expands into its sections */}
@@ -105,7 +116,7 @@ export function ProjectSidebar({
             <div className="text-[13px] text-faint mb-3">
               {projects.length === 0 ? 'Пока нет проектов' : 'Ничего не найдено'}
             </div>
-            {projects.length === 0 && (
+            {projects.length === 0 && canManage && (
               <button
                 type="button"
                 onClick={onCreateProject}
@@ -139,30 +150,32 @@ export function ProjectSidebar({
                   >
                     {project.name}
                   </span>
-                  <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      className="w-6 h-6 rounded-md flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
-                      title="Переименовать проект"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onEditProject(project)
-                      }}
-                    >
-                      <PencilIcon size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="w-6 h-6 rounded-md flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
-                      title="Удалить проект"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDeleteProject(project)
-                      }}
-                    >
-                      <TrashIcon size={14} />
-                    </button>
-                  </div>
+                  {canManage && (
+                    <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
+                        title="Переименовать проект"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onEditProject(project)
+                        }}
+                      >
+                        <PencilIcon size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]"
+                        title="Удалить проект"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDeleteProject(project)
+                        }}
+                      >
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {active && (

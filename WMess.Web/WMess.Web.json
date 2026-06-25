@@ -2461,6 +2461,9 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "role": {
+            "$ref": "#/components/schemas/TeamRole"
           }
         }
       },
