@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import type { TeamMemberResponse, TeamPermissions } from '../api/generated/data-contracts'
 import { TrashIcon } from '../workspace/icons'
 import { ROLE_LABELS } from '../workspace/roles'
+import { RoleSelect } from './RoleSelect'
 
 const ghostBtn =
   'h-[38px] px-4 rounded-[9px] border border-line bg-white text-muted font-semibold text-[13.5px] cursor-pointer hover:bg-sidebar font-ui'
@@ -191,16 +192,11 @@ export function TeamMembersModal({ teamId, permissions, onClose }: TeamMembersMo
                   <div className="text-sm font-medium truncate">{member.email}</div>
                 </div>
                 {canChangeRoles ? (
-                  <select
+                  <RoleSelect
                     value={member.role ?? 0}
-                    onChange={(e) => handleRoleChange(member.userId!, Number(e.target.value))}
-                    className="h-8 px-2 rounded-[6px] border border-line bg-white text-sm font-ui cursor-pointer focus:outline-none focus:border-accent"
                     disabled={updating === member.userId || deleting === member.userId}
-                  >
-                    <option value={0}>{ROLE_LABELS[0]}</option>
-                    <option value={1}>{ROLE_LABELS[1]}</option>
-                    <option value={2}>{ROLE_LABELS[2]}</option>
-                  </select>
+                    onChange={(role) => handleRoleChange(member.userId!, role)}
+                  />
                 ) : (
                   <span className="h-8 px-2 inline-flex items-center text-sm text-muted">
                     {ROLE_LABELS[member.role ?? 0]}
