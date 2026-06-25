@@ -74,7 +74,7 @@ export function TeamRail({
             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
             <div className="absolute left-11 bottom-0 w-[220px] bg-white border border-line rounded-xl shadow-[0_14px_36px_rgba(43,42,38,.16)] p-2 z-[41]">
               <div className="px-2 pt-1.5 pb-2.5">
-                <div className="font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest">
+                <div className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">
                   Аккаунт
                 </div>
                 <div className="text-[13px] font-semibold text-ink mt-[3px] truncate">

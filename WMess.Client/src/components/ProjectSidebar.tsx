@@ -22,7 +22,7 @@ interface ProjectSidebarProps {
   canDelete: boolean
 }
 
-const sectionLabel = 'font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest'
+const sectionLabel = 'font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest'
 const iconBtn =
   'w-7 h-7 rounded-lg flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]'
 

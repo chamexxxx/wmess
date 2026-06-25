@@ -10,7 +10,7 @@ interface ProjectSettingsProps {
   onDelete: () => void
 }
 
-const sectionLabel = 'font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest'
+const sectionLabel = 'font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest'
 
 export function ProjectSettings({ project, busy, canManage, onRename, onDelete }: ProjectSettingsProps) {
   const [name, setName] = useState(project.name ?? '')

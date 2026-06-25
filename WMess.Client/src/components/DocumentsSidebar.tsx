@@ -453,7 +453,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
   return (
     <div className="w-64 shrink-0 border-l border-line bg-sidebar flex flex-col h-full min-h-0">
       <div className="h-[46px] shrink-0 flex items-center justify-between px-3 border-b border-line">
-        <span className="font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest">Документы</span>
+        <span className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">Документы</span>
         <div className="flex gap-1.5">
           <button type="button" className={iconBtn} title="Новая папка" onClick={() => setCreateKind('folder')}>
             <FolderIcon size={14} />

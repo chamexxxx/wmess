@@ -65,7 +65,7 @@ export function FormModal({
     <Modal onClose={onClose}>
       <h2 className="text-[17px] font-bold m-0">{title}</h2>
       <form onSubmit={submit}>
-        <label className="block font-mono text-[10.5px] tracking-[.06em] uppercase text-faintest mt-[18px] mb-[7px]">
+        <label className="block font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest mt-[18px] mb-[7px]">
           {label}
         </label>
         <input

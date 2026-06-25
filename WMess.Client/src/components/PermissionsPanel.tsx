@@ -162,7 +162,7 @@ export function PermissionsPanel({ documentId, onClose }: PermissionsPanelProps)
               <div key={p.id} className="flex items-center justify-between gap-2 p-2.5 rounded-[9px] bg-panel border border-line-soft">
                 <div className="min-w-0">
                   <div className="text-[13.5px] text-ink truncate">{p.userEmail}</div>
-                  <div className="font-mono text-[10.5px] tracking-[.04em] uppercase text-faintest mt-0.5">
+                  <div className="font-ui font-semibold text-[10.5px] tracking-[.04em] uppercase text-faintest mt-0.5">
                     {levelLabel(p)}
                   </div>
                 </div>
