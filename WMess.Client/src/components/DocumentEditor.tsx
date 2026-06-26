@@ -15,8 +15,9 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { ListNode, ListItemNode } from '@lexical/list'
 import { LinkNode } from '@lexical/link'
 import { CodeNode, CodeHighlightNode } from '@lexical/code'
-import { registerCodeHighlighting } from '@lexical/code-prism'
+import { registerCodeHighlighting, PrismTokenizer } from '@lexical/code-prism'
 import { EditorToolbar } from './EditorToolbar'
+import { CodeBlockControlsPlugin } from './CodeBlockControlsPlugin'
 import { useDocument } from '../providers/DocumentProvider'
 
 function onError(error: Error) {
@@ -27,7 +28,7 @@ function onError(error: Error) {
 // Без registerCodeHighlighting CodeNode ведёт себя некорректно — ломается перенос строк.
 function CodeHighlightPlugin() {
   const [editor] = useLexicalComposerContext()
-  useEffect(() => registerCodeHighlighting(editor), [editor])
+  useEffect(() => registerCodeHighlighting(editor, { ...PrismTokenizer, defaultLanguage: null }), [editor])
   return null
 }
 
@@ -53,7 +54,7 @@ const theme = {
     strikethrough: 'line-through',
     code: 'bg-sidebar rounded px-1.5 py-0.5 font-mono text-[0.9em]',
   },
-  code: 'block whitespace-pre-wrap bg-sidebar rounded-lg p-3 font-mono text-[0.9em] my-3 overflow-x-auto',
+  code: 'block whitespace-pre-wrap bg-sidebar rounded-lg pt-3 px-3 pb-8 font-mono text-[0.9em] my-3 overflow-x-auto',
 }
 
 interface DocumentEditorProps {
@@ -96,6 +97,7 @@ export function DocumentEditor({ documentId }: DocumentEditorProps) {
           <ListPlugin />
           <LinkPlugin />
           <CodeHighlightPlugin />
+          <CodeBlockControlsPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           <AutoFocusPlugin />
           <CollaborationPlugin
