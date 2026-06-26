@@ -3,7 +3,7 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { ChevronRightIcon, DocsIcon, FolderIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
+import { ChevronRightIcon, DocsIcon, FolderIcon, PencilIcon, SearchIcon, TrashIcon } from '../workspace/icons'
 
 interface Folder {
   id: number
@@ -456,12 +456,6 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
       <div className="h-[46px] shrink-0 flex items-center justify-between px-3 border-b border-line">
         <span className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">Документы</span>
         <div className="flex gap-1.5">
-          <button type="button" className={iconBtn} title="Новая папка" onClick={() => setCreateKind('folder')}>
-            <FolderIcon size={14} />
-          </button>
-          <button type="button" className={iconBtn} title="Новый документ" onClick={() => setCreateKind('doc')}>
-            <PlusIcon size={15} />
-          </button>
           {onToggleVisibility && (
             <button type="button" className={iconBtn} title="Скрыть панель" onClick={onToggleVisibility}>
               <ChevronRightIcon size={15} />
