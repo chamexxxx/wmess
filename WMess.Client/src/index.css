@@ -172,3 +172,31 @@ p {
   border-radius: 4px;
   color: var(--text-h);
 }
+
+/* Подсветка синтаксиса в блоках кода: Prism-токены → цвета. Классы назначаются через
+   theme.codeHighlight в DocumentEditor; палитра подобрана под светлую тему воркспейса. */
+.wm-tok-comment {
+  color: #9b978c;
+  font-style: italic;
+}
+.wm-tok-punctuation {
+  color: #7c7a70;
+}
+.wm-tok-keyword {
+  color: #8a3ab0;
+}
+.wm-tok-selector {
+  color: #3c8a63;
+}
+.wm-tok-tag {
+  color: #b5466b;
+}
+.wm-tok-operator {
+  color: #9a6a00;
+}
+.wm-tok-function {
+  color: #c2410c;
+}
+.wm-tok-regex {
+  color: #d6336c;
+}

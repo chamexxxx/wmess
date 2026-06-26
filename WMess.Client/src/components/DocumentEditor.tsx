@@ -16,6 +16,7 @@ import { ListNode, ListItemNode } from '@lexical/list'
 import { LinkNode } from '@lexical/link'
 import { CodeNode, CodeHighlightNode } from '@lexical/code'
 import { registerCodeHighlighting, PrismTokenizer } from '@lexical/code-prism'
+import './prismLanguages' // side-effect: догружает грамматики Prism для подсветки
 import { EditorToolbar } from './EditorToolbar'
 import { CodeBlockControlsPlugin } from './CodeBlockControlsPlugin'
 import { useDocument } from '../providers/DocumentProvider'
@@ -55,6 +56,39 @@ const theme = {
     code: 'bg-sidebar rounded px-1.5 py-0.5 font-mono text-[0.9em]',
   },
   code: 'block whitespace-pre-wrap bg-sidebar rounded-lg pt-3 px-3 pb-8 font-mono text-[0.9em] my-3 overflow-x-auto',
+  // Маппинг типов токенов Prism → CSS-классы (цвета заданы в index.css, .wm-tok-*).
+  codeHighlight: {
+    atrule: 'wm-tok-keyword',
+    'attr-name': 'wm-tok-selector',
+    'attr-value': 'wm-tok-keyword',
+    boolean: 'wm-tok-tag',
+    builtin: 'wm-tok-selector',
+    cdata: 'wm-tok-comment',
+    char: 'wm-tok-selector',
+    'class-name': 'wm-tok-function',
+    comment: 'wm-tok-comment',
+    constant: 'wm-tok-tag',
+    deleted: 'wm-tok-tag',
+    doctype: 'wm-tok-comment',
+    entity: 'wm-tok-operator',
+    function: 'wm-tok-function',
+    important: 'wm-tok-regex',
+    inserted: 'wm-tok-selector',
+    keyword: 'wm-tok-keyword',
+    namespace: 'wm-tok-tag',
+    number: 'wm-tok-tag',
+    operator: 'wm-tok-operator',
+    prolog: 'wm-tok-comment',
+    property: 'wm-tok-tag',
+    punctuation: 'wm-tok-punctuation',
+    regex: 'wm-tok-regex',
+    selector: 'wm-tok-selector',
+    string: 'wm-tok-selector',
+    symbol: 'wm-tok-tag',
+    tag: 'wm-tok-tag',
+    url: 'wm-tok-operator',
+    variable: 'wm-tok-operator',
+  },
 }
 
 interface DocumentEditorProps {

@@ -1,14 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $isCodeNode, getLanguageFriendlyName, CODE_LANGUAGE_FRIENDLY_NAME_MAP } from '@lexical/code'
+import { $isCodeNode } from '@lexical/code'
 import { $getNodeByKey } from 'lexical'
-import { getCodeLanguages } from '@lexical/code'
 import { CheckIcon, ChevronDownIcon } from '../workspace/icons'
-
-const LANGUAGE_OPTIONS: [string, string][] = [
-  ['', 'Код'],
-  ...getCodeLanguages().map((lang): [string, string] => [lang, getLanguageFriendlyName(lang)]),
-]
+import { CODE_LANGUAGES } from './prismLanguages'
 
 interface CodeLanguageSelectProps {
   editor: ReturnType<typeof useLexicalComposerContext>[0]
@@ -19,7 +14,7 @@ interface CodeLanguageSelectProps {
 export function CodeLanguageSelect({ editor, nodeKey, disabled }: CodeLanguageSelectProps) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null)
-  const [label, setLabel] = useState('Код')
+  const [label, setLabel] = useState('Не определен')
   const [currentLang, setCurrentLang] = useState<string>('')
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -32,7 +27,8 @@ export function CodeLanguageSelect({ editor, nodeKey, disabled }: CodeLanguageSe
         if ($isCodeNode(node)) {
           const lang = node.getLanguage() || ''
           setCurrentLang(lang)
-          setLabel(lang ? (CODE_LANGUAGE_FRIENDLY_NAME_MAP[lang] || getLanguageFriendlyName(lang)) : 'Код')
+          const friendly = CODE_LANGUAGES.find(([value]) => value === lang)?.[1]
+          setLabel(friendly ?? (lang || 'Не определен'))
         }
       })
     })
@@ -92,8 +88,12 @@ export function CodeLanguageSelect({ editor, nodeKey, disabled }: CodeLanguageSe
   }
 
   const filtered = filter
-    ? LANGUAGE_OPTIONS.filter(([, name]) => name.toLowerCase().includes(filter.toLowerCase()))
-    : LANGUAGE_OPTIONS
+    ? CODE_LANGUAGES.filter(
+        ([value, name]) =>
+          name.toLowerCase().includes(filter.toLowerCase()) ||
+          value.toLowerCase().includes(filter.toLowerCase()),
+      )
+    : CODE_LANGUAGES
 
   return (
     <>
