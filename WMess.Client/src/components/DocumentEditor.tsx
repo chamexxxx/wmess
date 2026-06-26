@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
@@ -13,11 +15,20 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { ListNode, ListItemNode } from '@lexical/list'
 import { LinkNode } from '@lexical/link'
 import { CodeNode, CodeHighlightNode } from '@lexical/code'
+import { registerCodeHighlighting } from '@lexical/code-prism'
 import { EditorToolbar } from './EditorToolbar'
 import { useDocument } from '../providers/DocumentProvider'
 
 function onError(error: Error) {
   console.error(error)
+}
+
+// Подсветка кода + корректная обработка клавиш (Enter/Tab/стрелки) внутри код-блоков.
+// Без registerCodeHighlighting CodeNode ведёт себя некорректно — ломается перенос строк.
+function CodeHighlightPlugin() {
+  const [editor] = useLexicalComposerContext()
+  useEffect(() => registerCodeHighlighting(editor), [editor])
+  return null
 }
 
 const theme = {
@@ -42,7 +53,7 @@ const theme = {
     strikethrough: 'line-through',
     code: 'bg-sidebar rounded px-1.5 py-0.5 font-mono text-[0.9em]',
   },
-  code: 'block bg-sidebar rounded-lg p-3 font-mono text-[0.9em] my-3 overflow-x-auto',
+  code: 'block whitespace-pre-wrap bg-sidebar rounded-lg p-3 font-mono text-[0.9em] my-3 overflow-x-auto',
 }
 
 interface DocumentEditorProps {
@@ -84,6 +95,7 @@ export function DocumentEditor({ documentId }: DocumentEditorProps) {
           </div>
           <ListPlugin />
           <LinkPlugin />
+          <CodeHighlightPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           <AutoFocusPlugin />
           <CollaborationPlugin
