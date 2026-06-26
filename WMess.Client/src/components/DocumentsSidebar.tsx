@@ -31,8 +31,9 @@ interface DocumentsSidebarProps {
   refreshSignal?: number
   width?: number
   onToggleVisibility?: () => void
+  onResizeStart?: (e: React.MouseEvent) => void
 }
-export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal, width = 256, onToggleVisibility }: DocumentsSidebarProps) {
+export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal, width = 256, onToggleVisibility, onResizeStart }: DocumentsSidebarProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [documents, setDocuments] = useState<Doc[]>([])
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -452,7 +453,14 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
     'h-7 w-7 rounded-md border border-line bg-white flex items-center justify-center text-muted cursor-pointer hover:bg-sidebar'
 
   return (
-    <div style={{ width }} className="shrink-0 border-l border-line bg-sidebar flex flex-col h-full min-h-0">
+    <div style={{ width }} className="relative shrink-0 border-l border-line bg-sidebar flex flex-col h-full min-h-0">
+      {onResizeStart && (
+        <div
+          onMouseDown={onResizeStart}
+          title="Потяните, чтобы изменить ширину"
+          className="absolute left-0 top-0 bottom-0 w-1.5 z-10 cursor-col-resize"
+        />
+      )}
       <div className="h-[46px] shrink-0 flex items-center justify-between px-3 border-b border-line">
         <span className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">Документы</span>
         <div className="flex gap-1.5">

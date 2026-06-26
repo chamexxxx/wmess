@@ -239,10 +239,17 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
 
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
+    // На время драга гасим выделение текста и фиксируем курсор «ресайза».
+    const prevUserSelect = document.body.style.userSelect
+    const prevCursor = document.body.style.cursor
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.userSelect = prevUserSelect
+      document.body.style.cursor = prevCursor
     }
   }, [isResizing])
 
@@ -264,26 +271,21 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
         </div>
 
         {!sidebarHidden && (
-          <>
-            <div
-              onMouseDown={handleMouseDown}
-              className="w-1 shrink-0 cursor-col-resize"
-            />
-            <DocumentsSidebar
-              width={sidebarWidth}
-              projectId={projectId}
-              selectedId={doc.id}
-              onSelect={(id, title) => openDocument(id, title)}
-              onDeleted={(id) => {
-                if (id === doc.id) backToFiles()
-              }}
-              onTitleUpdated={(id, title) => {
-                if (id === doc.id) setOpenDoc((prev) => (prev ? { ...prev, title } : { id, title }))
-              }}
-              refreshSignal={docsRefresh}
-              onToggleVisibility={() => setSidebarHidden(true)}
-            />
-          </>
+          <DocumentsSidebar
+            width={sidebarWidth}
+            onResizeStart={handleMouseDown}
+            projectId={projectId}
+            selectedId={doc.id}
+            onSelect={(id, title) => openDocument(id, title)}
+            onDeleted={(id) => {
+              if (id === doc.id) backToFiles()
+            }}
+            onTitleUpdated={(id, title) => {
+              if (id === doc.id) setOpenDoc((prev) => (prev ? { ...prev, title } : { id, title }))
+            }}
+            refreshSignal={docsRefresh}
+            onToggleVisibility={() => setSidebarHidden(true)}
+          />
         )}
 
         {sidebarHidden && (
