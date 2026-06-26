@@ -15,6 +15,17 @@ import { MessagePackHubProtocol } from '@microsoft/signalr-protocol-msgpack'
 
 type ProviderEvent = 'sync' | 'status' | 'update' | 'reload'
 
+// Uint8Array → base64 чанками (spread целиком переполнил бы стек на больших снапшотах).
+// Нужно для REST-флаша при выгрузке страницы: [FromBody] byte[] принимает base64-строку в JSON.
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
 /**
  * Yjs-провайдер поверх SignalR, совместимый с интерфейсом @lexical/yjs `Provider`.
  *
@@ -180,17 +191,35 @@ export class SignalRProvider {
       if (this.connection.state === HubConnectionState.Disconnected) {
         await this.connection.start()
         this.emit('status', { status: 'connected' })
+        // На время активной сессии вешаем флаш снапшота на выгрузку страницы (закрытие вкладки / F5).
+        window.addEventListener('pagehide', this.handlePageHide)
         await this.connection.invoke('JoinDocument', this.documentId)
         // Снапшот придёт событием DocumentState; затем тянем недостающее у активных участников.
         await this.sendSyncStep1()
         this.broadcastLocalAwareness()
       }
     } else {
+      window.removeEventListener('pagehide', this.handlePageHide)
+      // Был ли отложенный (дебаунс 1.5с) снапшот, который ещё не успел уйти в БД.
+      const hadPendingSave = this.saveTimer !== null
       if (this.saveTimer !== null) {
         clearTimeout(this.saveTimer)
         this.saveTimer = null
       }
       if (this.connection.state === HubConnectionState.Connected) {
+        // Дослать снапшот ДО отключения, иначе правки за последние <1.5с (дебаунс не успел
+        // сработать) потеряются при уходе из документа в другой раздел.
+        if (hadPendingSave) {
+          try {
+            await this.connection.invoke(
+              'SaveDocumentState',
+              this.documentId,
+              Y.encodeStateAsUpdate(this.doc),
+            )
+          } catch (error) {
+            console.error('Error flushing snapshot on disconnect:', error)
+          }
+        }
         // Сообщаем остальным, что наш курсор/presence ушёл, пока соединение ещё живо.
         removeAwarenessStates(this.awareness, [this.doc.clientID], 'local')
         try {
@@ -226,6 +255,22 @@ export class SignalRProvider {
     this.connection.invoke(method, ...args).catch((error) => {
       console.error(`Error invoking ${method}:`, error)
     })
+  }
+
+  // При выгрузке страницы (закрытие вкладки / F5) SignalR-инвок долететь не успеет, поэтому
+  // несохранённый снапшот дописываем REST-ом с keepalive (запрос переживёт выгрузку; BFF
+  // подставит Bearer из HttpOnly-куки). Стрелка — стабильная ссылка для add/removeEventListener.
+  private readonly handlePageHide = (): void => {
+    if (this.saveTimer === null) return
+    clearTimeout(this.saveTimer)
+    this.saveTimer = null
+    void fetch(`/api/documents/${this.documentId}/state`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      keepalive: true,
+      body: JSON.stringify(bytesToBase64(Y.encodeStateAsUpdate(this.doc))),
+    }).catch(() => {})
   }
 
   private scheduleSnapshotSave(): void {
