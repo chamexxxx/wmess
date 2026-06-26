@@ -3,7 +3,7 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { DocsIcon, FolderIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
+import { ChevronRightIcon, DocsIcon, FolderIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
 
 interface Folder {
   id: number
@@ -29,9 +29,10 @@ interface DocumentsSidebarProps {
   // Меняется, когда заголовок документа правят вне сайдбара (в шапке редактора) —
   // сигнал тихо перезагрузить список.
   refreshSignal?: number
+  width?: number
+  onToggleVisibility?: () => void
 }
-
-export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal }: DocumentsSidebarProps) {
+export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal, width = 256, onToggleVisibility }: DocumentsSidebarProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [documents, setDocuments] = useState<Doc[]>([])
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -451,7 +452,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
     'h-7 w-7 rounded-md border border-line bg-white flex items-center justify-center text-muted cursor-pointer hover:bg-sidebar'
 
   return (
-    <div className="w-64 shrink-0 border-l border-line bg-sidebar flex flex-col h-full min-h-0">
+    <div style={{ width }} className="shrink-0 border-l border-line bg-sidebar flex flex-col h-full min-h-0">
       <div className="h-[46px] shrink-0 flex items-center justify-between px-3 border-b border-line">
         <span className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">Документы</span>
         <div className="flex gap-1.5">
@@ -461,9 +462,13 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
           <button type="button" className={iconBtn} title="Новый документ" onClick={() => setCreateKind('doc')}>
             <PlusIcon size={15} />
           </button>
+          {onToggleVisibility && (
+            <button type="button" className={iconBtn} title="Скрыть панель" onClick={onToggleVisibility}>
+              <ChevronRightIcon size={15} />
+            </button>
+          )}
         </div>
       </div>
-
       <div className="shrink-0 px-2 py-2 border-b border-line">
         <div className="relative">
           <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { DocumentProvider, useDocument } from '../providers/DocumentProvider'
 import { DocumentEditor } from './DocumentEditor'
@@ -178,6 +178,9 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
 
   const [openDoc, setOpenDoc] = useState<SelectedDoc | null>(null)
   const [docsRefresh, setDocsRefresh] = useState(0)
+  const [sidebarWidth, setSidebarWidth] = useState(256)
+  const [sidebarHidden, setSidebarHidden] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
 
   // Резолвим документ при прямой загрузке/обновлении (id в пути; заголовок и папка ещё не известны).
   useEffect(() => {
@@ -216,6 +219,33 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
 
   const backToFiles = () => navigate(folderPath(openDoc?.folderId ?? null))
 
+  // Обработка ресайза сайдбара
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = window.innerWidth - e.clientX
+      setSidebarWidth(Math.min(Math.max(newWidth, 200), 500))
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [isResizing])
+
   if (docId != null) {
     const doc = openDoc ?? { id: docId, title: 'Документ' }
     return (
@@ -233,18 +263,45 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
           </DocumentProvider>
         </div>
 
-        <DocumentsSidebar
-          projectId={projectId}
-          selectedId={doc.id}
-          onSelect={(id, title) => openDocument(id, title)}
-          onDeleted={(id) => {
-            if (id === doc.id) backToFiles()
-          }}
-          onTitleUpdated={(id, title) => {
-            if (id === doc.id) setOpenDoc((prev) => (prev ? { ...prev, title } : { id, title }))
-          }}
-          refreshSignal={docsRefresh}
-        />
+        {!sidebarHidden && (
+          <>
+            <div
+              onMouseDown={handleMouseDown}
+              className="w-1 shrink-0 cursor-col-resize"
+            />
+            <DocumentsSidebar
+              width={sidebarWidth}
+              projectId={projectId}
+              selectedId={doc.id}
+              onSelect={(id, title) => openDocument(id, title)}
+              onDeleted={(id) => {
+                if (id === doc.id) backToFiles()
+              }}
+              onTitleUpdated={(id, title) => {
+                if (id === doc.id) setOpenDoc((prev) => (prev ? { ...prev, title } : { id, title }))
+              }}
+              refreshSignal={docsRefresh}
+              onToggleVisibility={() => setSidebarHidden(true)}
+            />
+          </>
+        )}
+
+        {sidebarHidden && (
+          <button
+            type="button"
+            onClick={() => setSidebarHidden(false)}
+            title="Показать список документов"
+            className="w-10 h-10 shrink-0 flex items-center justify-center text-muted hover:bg-hovered hover:text-ink transition-colors cursor-pointer"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+          </button>
+        )}
       </div>
     )
   }
