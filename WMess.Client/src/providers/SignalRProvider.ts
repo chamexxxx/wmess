@@ -43,6 +43,7 @@ export class SignalRProvider {
 
   private synced = false
   private saveTimer: ReturnType<typeof setTimeout> | null = null
+  private maxSaveTimer: ReturnType<typeof setTimeout> | null = null
   private desired = false
   private op: Promise<void> = Promise.resolve()
 
@@ -200,12 +201,9 @@ export class SignalRProvider {
       }
     } else {
       window.removeEventListener('pagehide', this.handlePageHide)
-      // Был ли отложенный (дебаунс 1.5с) снапшот, который ещё не успел уйти в БД.
-      const hadPendingSave = this.saveTimer !== null
-      if (this.saveTimer !== null) {
-        clearTimeout(this.saveTimer)
-        this.saveTimer = null
-      }
+      // Был ли отложенный снапшот (дебаунс / периодический автосейв), не успевший уйти в БД.
+      const hadPendingSave = this.hasPendingSave()
+      this.clearSaveTimers()
       if (this.connection.state === HubConnectionState.Connected) {
         // Дослать снапшот ДО отключения, иначе правки за последние <1.5с (дебаунс не успел
         // сработать) потеряются при уходе из документа в другой раздел.
@@ -261,9 +259,8 @@ export class SignalRProvider {
   // несохранённый снапшот дописываем REST-ом с keepalive (запрос переживёт выгрузку; BFF
   // подставит Bearer из HttpOnly-куки). Стрелка — стабильная ссылка для add/removeEventListener.
   private readonly handlePageHide = (): void => {
-    if (this.saveTimer === null) return
-    clearTimeout(this.saveTimer)
-    this.saveTimer = null
+    if (!this.hasPendingSave()) return
+    this.clearSaveTimers()
     void fetch(`/api/documents/${this.documentId}/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -273,14 +270,38 @@ export class SignalRProvider {
     }).catch(() => {})
   }
 
+  private hasPendingSave(): boolean {
+    return this.saveTimer !== null || this.maxSaveTimer !== null
+  }
+
+  private clearSaveTimers(): void {
+    if (this.saveTimer !== null) {
+      clearTimeout(this.saveTimer)
+      this.saveTimer = null
+    }
+    if (this.maxSaveTimer !== null) {
+      clearTimeout(this.maxSaveTimer)
+      this.maxSaveTimer = null
+    }
+  }
+
   private scheduleSnapshotSave(): void {
+    // Дебаунс: снапшот уходит в БД через 1.5с после паузы в правках.
     if (this.saveTimer !== null) {
       clearTimeout(this.saveTimer)
     }
-    this.saveTimer = setTimeout(() => {
-      this.saveTimer = null
-      const state = Y.encodeStateAsUpdate(this.doc)
-      this.invoke('SaveDocumentState', this.documentId, state)
-    }, 1500)
+    this.saveTimer = setTimeout(() => this.flushSnapshotSave(), 1500)
+
+    // Max-wait: при непрерывной печати дебаунс откладывался бы бесконечно и снапшот не
+    // сохранялся бы вовсе. Гарантируем запись минимум раз в 10с — это ограничивает окно
+    // возможной потери и снимает зависимость от 64КБ-лимита keepalive на больших документах.
+    if (this.maxSaveTimer === null) {
+      this.maxSaveTimer = setTimeout(() => this.flushSnapshotSave(), 10000)
+    }
+  }
+
+  private flushSnapshotSave(): void {
+    this.clearSaveTimers()
+    this.invoke('SaveDocumentState', this.documentId, Y.encodeStateAsUpdate(this.doc))
   }
 }
