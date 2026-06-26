@@ -49,9 +49,9 @@ function CodeCopyButton({
       onMouseDown={(e) => e.preventDefault()}
       onClick={handleCopy}
       title={copied ? 'Скопировано' : 'Скопировать фрагмент'}
-      className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-line bg-panel/90 backdrop-blur-sm text-muted hover:text-ink hover:bg-sidebar shadow-sm cursor-pointer transition-colors"
+      className="inline-flex items-center justify-center p-1 text-faint hover:text-muted cursor-pointer transition-colors"
     >
-      {copied ? <CheckIcon size={15} className="text-accent" /> : <CopyIcon size={15} />}
+      {copied ? <CheckIcon size={13} className="text-accent" /> : <CopyIcon size={13} />}
     </button>
   )
 }
