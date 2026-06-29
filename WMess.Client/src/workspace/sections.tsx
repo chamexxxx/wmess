@@ -3,8 +3,8 @@ import {
   BoardsIcon,
   CalendarIcon,
   ChatIcon,
-  DocsIcon,
   FolderIcon,
+  LibraryIcon,
   TablesIcon,
   TasksIcon,
   type IconProps,
@@ -19,7 +19,7 @@ export interface Section {
 // The sections every project gets. `id` doubles as the URL segment.
 export const sections: Section[] = [
   { id: 'chats', label: 'Чаты', Icon: ChatIcon },
-  { id: 'docs', label: 'Документы', Icon: DocsIcon },
+  { id: 'library', label: 'Библиотека', Icon: LibraryIcon },
   { id: 'tasks', label: 'Задачи', Icon: TasksIcon },
   { id: 'boards', label: 'Доски', Icon: BoardsIcon },
   { id: 'calendar', label: 'Календарь', Icon: CalendarIcon },

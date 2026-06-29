@@ -20,7 +20,7 @@ interface DocItem {
 type RenameTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
 type DeleteTarget = RenameTarget
 
-interface DocumentExplorerProps {
+interface LibraryExplorerProps {
   projectId: number
   folderId: number | null
   onNavigateFolder: (id: number | null) => void
@@ -34,7 +34,7 @@ function formatDate(value?: string): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpenDocument }: DocumentExplorerProps) {
+export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenDocument }: LibraryExplorerProps) {
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [documents, setDocuments] = useState<DocItem[]>([])
   const [path, setPath] = useState<{ id: number; name: string }[]>([])

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { DocumentProvider, useDocument } from '../providers/DocumentProvider'
 import { DocumentEditor } from './DocumentEditor'
-import { DocumentsSidebar } from './DocumentsSidebar'
-import { DocumentExplorer } from './DocumentExplorer'
+import { LibrarySidebar } from './LibrarySidebar'
+import { LibraryExplorer } from './LibraryExplorer'
 import { PermissionsPanel } from './PermissionsPanel'
 import { apiClient } from '../api'
 import { ArrowLeftIcon, PencilIcon } from '../workspace/icons'
@@ -165,8 +165,8 @@ function DocumentWorkspace({
   )
 }
 
-export function DocumentsSection({ projectId }: { projectId: number }) {
-  // Документ — в пути (/docs/:docId), папка файлового менеджера — в ?folder.
+export function LibrarySection({ projectId }: { projectId: number }) {
+  // Документ — в пути (/library/:docId), папка файлового менеджера — в ?folder.
   const { teamId, docId: docIdParam } = useParams()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -174,7 +174,7 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
   const folderParam = params.get('folder')
   const folderId = folderParam ? Number(folderParam) : null
 
-  const docsBase = `/teams/${teamId}/projects/${projectId}/docs`
+  const libraryBase = `/teams/${teamId}/projects/${projectId}/library`
 
   const [openDoc, setOpenDoc] = useState<SelectedDoc | null>(null)
   const [docsRefresh, setDocsRefresh] = useState(0)
@@ -208,11 +208,11 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId])
 
-  const folderPath = (id: number | null) => (id == null ? docsBase : `${docsBase}?folder=${id}`)
+  const folderPath = (id: number | null) => (id == null ? libraryBase : `${libraryBase}?folder=${id}`)
 
   const openDocument = (id: number, title: string) => {
     setOpenDoc({ id, title })
-    navigate(`${docsBase}/${id}`)
+    navigate(`${libraryBase}/${id}`)
   }
 
   const navigateFolder = (id: number | null) => navigate(folderPath(id))
@@ -271,7 +271,7 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
         </div>
 
         {!sidebarHidden && (
-          <DocumentsSidebar
+          <LibrarySidebar
             width={sidebarWidth}
             onResizeStart={handleMouseDown}
             projectId={projectId}
@@ -309,7 +309,7 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
   }
 
   return (
-    <DocumentExplorer
+    <LibraryExplorer
       projectId={projectId}
       folderId={folderId}
       onNavigateFolder={navigateFolder}

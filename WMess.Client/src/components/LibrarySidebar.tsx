@@ -20,7 +20,7 @@ interface Doc {
 type DeleteTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
 type DragItem = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
 
-interface DocumentsSidebarProps {
+interface LibrarySidebarProps {
   projectId: number
   selectedId: number | null
   onSelect: (id: number, title: string) => void
@@ -33,7 +33,7 @@ interface DocumentsSidebarProps {
   onToggleVisibility?: () => void
   onResizeStart?: (e: React.MouseEvent) => void
 }
-export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal, width = 256, onToggleVisibility, onResizeStart }: DocumentsSidebarProps) {
+export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal, width = 256, onToggleVisibility, onResizeStart }: LibrarySidebarProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [documents, setDocuments] = useState<Doc[]>([])
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
