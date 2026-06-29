@@ -83,8 +83,8 @@ export const DocsIcon = (p: IconProps) => (
 
 export const LibraryIcon = (p: IconProps) => (
   <Svg {...p}>
-    <path d="M4 4v16M8 8v12M12 6v14" />
-    <path d="m16 6 4 14" />
+    <rect x="5" y="3.5" width="14" height="17" rx="1.8" />
+    <path d="M8.5 3.5v17" />
   </Svg>
 )
 
