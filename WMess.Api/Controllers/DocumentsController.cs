@@ -5,8 +5,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WMess.Api.Authorization;
 using WMess.Api.Data;
+using WMess.Api.Infrastructure;
 using WMess.Api.Models;
 using WMess.Api.Models.DTO.Documents;
+using WMess.Api.Services;
 
 namespace WMess.Api.Controllers;
 
@@ -17,15 +19,18 @@ public class DocumentsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
+    private readonly IDocumentAccessService _documentAccess;
     private readonly UserManager<IdentityUser> _userManager;
 
     public DocumentsController(
         ApplicationDbContext context,
         IAuthorizationService authorizationService,
+        IDocumentAccessService documentAccess,
         UserManager<IdentityUser> userManager)
     {
         _context = context;
         _authorizationService = authorizationService;
+        _documentAccess = documentAccess;
         _userManager = userManager;
     }
 
@@ -33,29 +38,6 @@ public class DocumentsController : ControllerBase
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new UnauthorizedAccessException("User ID not found in token");
-    }
-
-    private readonly record struct DocumentRights(bool CanView, bool CanEdit, bool CanManage);
-
-    /// <summary>
-    /// Комбинирует ролевой доступ к проекту с персональными правами <see cref="DocumentPermission"/>.
-    /// Иерархия: manage ⇒ edit ⇒ view. Требует загруженный <see cref="Document.Project"/>.
-    /// </summary>
-    private async Task<DocumentRights> GetRightsAsync(Document document, string userId)
-    {
-        var manageProject = (await _authorizationService.AuthorizeAsync(User, document.Project, Policies.ProjectManage)).Succeeded;
-        var accessProject = manageProject
-            || (await _authorizationService.AuthorizeAsync(User, document.Project, Policies.ProjectAccess)).Succeeded;
-
-        var permission = await _context.DocumentPermissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.DocumentId == document.Id && p.UserId == userId);
-
-        var canManage = manageProject || (permission?.CanManage ?? false);
-        var canEdit = canManage || (permission?.CanEdit ?? false);
-        var canView = canEdit || accessProject || (permission?.CanView ?? false);
-
-        return new DocumentRights(canView, canEdit, canManage);
     }
 
     #region Folders
@@ -273,7 +255,39 @@ public class DocumentsController : ControllerBase
             return Forbid();
         }
 
-        _context.DocumentFolders.Remove(folder);
+        // Удаляем всё поддерево: саму папку, вложенные папки и документы внутри них.
+        // Папок в проекте обычно немного — собираем дерево в памяти.
+        var projectFolders = await _context.DocumentFolders
+            .Where(f => f.ProjectId == folder.ProjectId)
+            .Select(f => new { f.Id, f.ParentFolderId })
+            .ToListAsync();
+
+        var folderIds = new HashSet<int> { folder.Id };
+        var queue = new Queue<int>();
+        queue.Enqueue(folder.Id);
+        while (queue.Count > 0)
+        {
+            var currentId = queue.Dequeue();
+            foreach (var child in projectFolders.Where(f => f.ParentFolderId == currentId))
+            {
+                if (folderIds.Add(child.Id))
+                {
+                    queue.Enqueue(child.Id);
+                }
+            }
+        }
+
+        // Документы внутри удаляемых папок (их DocumentPermission снимаются каскадно).
+        var documents = await _context.Documents
+            .Where(d => d.FolderId != null && folderIds.Contains(d.FolderId.Value))
+            .ToListAsync();
+        _context.Documents.RemoveRange(documents);
+
+        var folders = await _context.DocumentFolders
+            .Where(f => folderIds.Contains(f.Id))
+            .ToListAsync();
+        _context.DocumentFolders.RemoveRange(folders);
+
         await _context.SaveChangesAsync();
 
         return NoContent();
@@ -420,8 +434,10 @@ public class DocumentsController : ControllerBase
             return Ok(new DocumentSearchResponse());
         }
 
+        var pattern = SearchPattern.Contains(term);
+
         var folders = await _context.DocumentFolders
-            .Where(f => f.ProjectId == projectId && f.Name.Contains(term))
+            .Where(f => f.ProjectId == projectId && EF.Functions.ILike(f.Name, pattern, SearchPattern.EscapeChar))
             .OrderBy(f => f.Name)
             .Take(50)
             .Select(f => new FolderResponse
@@ -436,7 +452,7 @@ public class DocumentsController : ControllerBase
             .ToListAsync();
 
         var documents = await _context.Documents
-            .Where(d => d.ProjectId == projectId && d.Title.Contains(term))
+            .Where(d => d.ProjectId == projectId && EF.Functions.ILike(d.Title, pattern, SearchPattern.EscapeChar))
             .OrderBy(d => d.Title)
             .Take(50)
             .Select(d => new DocumentResponse
@@ -467,7 +483,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanView)
         {
             return Forbid();
@@ -498,7 +514,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanView)
         {
             return Forbid();
@@ -542,24 +558,23 @@ public class DocumentsController : ControllerBase
             CreatedBy = userId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            YjsState = null
+            YjsState = null,
+            // Создателю выдаём полные права на документ. Добавляем через навигацию,
+            // чтобы документ и права сохранились одной атомарной транзакцией.
+            Permissions =
+            {
+                new DocumentPermission
+                {
+                    UserId = userId,
+                    CanView = true,
+                    CanEdit = true,
+                    CanManage = true,
+                    GrantedAt = DateTime.UtcNow
+                }
+            }
         };
 
         _context.Documents.Add(document);
-        await _context.SaveChangesAsync();
-
-        // Создателю выдаём полные права на документ.
-        var permission = new DocumentPermission
-        {
-            DocumentId = document.Id,
-            UserId = userId,
-            CanView = true,
-            CanEdit = true,
-            CanManage = true,
-            GrantedAt = DateTime.UtcNow
-        };
-
-        _context.DocumentPermissions.Add(permission);
         await _context.SaveChangesAsync();
 
         var response = new DocumentResponse
@@ -589,7 +604,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanManage)
         {
             return Forbid();
@@ -617,7 +632,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanManage)
         {
             return Forbid();
@@ -653,7 +668,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanManage)
         {
             return Forbid();
@@ -678,7 +693,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanEdit)
         {
             return Forbid();
@@ -709,7 +724,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanManage)
         {
             return Forbid();
@@ -747,7 +762,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanManage)
         {
             return Forbid();
@@ -759,32 +774,44 @@ public class DocumentsController : ControllerBase
             return BadRequest(new { message = "User not found" });
         }
 
-        var existingPermission = await _context.DocumentPermissions
+        var permission = await _context.DocumentPermissions
             .FirstOrDefaultAsync(p => p.DocumentId == id && p.UserId == request.UserId);
 
-        if (existingPermission != null)
+        if (permission == null)
         {
-            existingPermission.CanView = request.CanView;
-            existingPermission.CanEdit = request.CanEdit;
-            existingPermission.CanManage = request.CanManage;
-            existingPermission.GrantedAt = DateTime.UtcNow;
-        }
-        else
-        {
-            var permission = new DocumentPermission
+            permission = new DocumentPermission
             {
                 DocumentId = id,
-                UserId = request.UserId,
-                CanView = request.CanView,
-                CanEdit = request.CanEdit,
-                CanManage = request.CanManage,
-                GrantedAt = DateTime.UtcNow
+                UserId = request.UserId
             };
-
             _context.DocumentPermissions.Add(permission);
         }
 
-        await _context.SaveChangesAsync();
+        permission.CanView = request.CanView;
+        permission.CanEdit = request.CanEdit;
+        permission.CanManage = request.CanManage;
+        permission.GrantedAt = DateTime.UtcNow;
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Параллельный запрос успел создать права с тем же (DocumentId, UserId)
+            // — упёрлись в уникальный индекс. Перечитываем актуальную запись и применяем значения к ней.
+            _context.Entry(permission).State = EntityState.Detached;
+
+            permission = await _context.DocumentPermissions
+                .FirstAsync(p => p.DocumentId == id && p.UserId == request.UserId);
+
+            permission.CanView = request.CanView;
+            permission.CanEdit = request.CanEdit;
+            permission.CanManage = request.CanManage;
+            permission.GrantedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+        }
 
         var updatedPermission = await _context.DocumentPermissions
             .Include(p => p.User)
@@ -816,7 +843,7 @@ public class DocumentsController : ControllerBase
             return NotFound();
         }
 
-        var rights = await GetRightsAsync(document, GetCurrentUserId());
+        var rights = await _documentAccess.GetRightsAsync(User, document);
         if (!rights.CanManage)
         {
             return Forbid();

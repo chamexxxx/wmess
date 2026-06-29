@@ -2,9 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using WMess.Api.Authorization;
 using WMess.Api.Data;
-using WMess.Api.Models;
+using WMess.Api.Services;
 
 namespace WMess.Api.Hubs;
 
@@ -17,16 +16,16 @@ namespace WMess.Api.Hubs;
 public class DocumentHub : Hub
 {
     private readonly ApplicationDbContext _context;
-    private readonly IAuthorizationService _authorizationService;
+    private readonly IDocumentAccessService _documentAccess;
     private readonly ILogger<DocumentHub> _logger;
 
     public DocumentHub(
         ApplicationDbContext context,
-        IAuthorizationService authorizationService,
+        IDocumentAccessService documentAccess,
         ILogger<DocumentHub> logger)
     {
         _context = context;
-        _authorizationService = authorizationService;
+        _documentAccess = documentAccess;
         _logger = logger;
     }
 
@@ -41,11 +40,9 @@ public class DocumentHub : Hub
     private static string EditRightKey(int documentId) => $"doc:{documentId}:canEdit";
 
     /// <summary>
-    /// Вычисляет права текущего пользователя на документ, комбинируя ролевой доступ
-    /// к проекту с персональными правами <see cref="DocumentPermission"/>.
-    /// Иерархия: manage ⇒ edit ⇒ view.
+    /// Вычисляет права текущего пользователя на документ через общий <see cref="IDocumentAccessService"/>.
     /// </summary>
-    private async Task<(bool CanView, bool CanEdit)> ResolveRightsAsync(int documentId)
+    private async Task<DocumentRights> ResolveRightsAsync(int documentId)
     {
         var document = await _context.Documents
             .Include(d => d.Project)
@@ -57,39 +54,35 @@ public class DocumentHub : Hub
             throw new HubException("Document not found");
         }
 
-        var userId = GetCurrentUserId();
-        var user = Context.User!;
-
-        var canManageProject = (await _authorizationService.AuthorizeAsync(user, document.Project, Policies.ProjectManage)).Succeeded;
-        var canAccessProject = canManageProject
-            || (await _authorizationService.AuthorizeAsync(user, document.Project, Policies.ProjectAccess)).Succeeded;
-
-        var permission = await _context.DocumentPermissions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.DocumentId == documentId && p.UserId == userId);
-
-        var canManage = canManageProject || (permission?.CanManage ?? false);
-        var canEdit = canManage || (permission?.CanEdit ?? false);
-        var canView = canEdit || canAccessProject || (permission?.CanView ?? false);
-
-        return (canView, canEdit);
+        return await _documentAccess.GetRightsAsync(Context.User!, document);
     }
 
     private bool CachedCanEdit(int documentId)
         => Context.Items.TryGetValue(EditRightKey(documentId), out var value) && value is true;
 
+    /// <summary>Бросает <see cref="HubException"/>, если у соединения нет хотя бы права на просмотр документа.</summary>
+    private async Task EnsureCanViewAsync(int documentId)
+    {
+        // Право на редактирование кэшируется при JoinDocument и подразумевает просмотр;
+        // иначе перепроверяем доступ в БД.
+        if (!CachedCanEdit(documentId) && !(await ResolveRightsAsync(documentId)).CanView)
+        {
+            throw new HubException("Access denied");
+        }
+    }
+
     public async Task JoinDocument(int documentId)
     {
         var userId = GetCurrentUserId();
-        var (canView, canEdit) = await ResolveRightsAsync(documentId);
+        var rights = await ResolveRightsAsync(documentId);
 
-        if (!canView)
+        if (!rights.CanView)
         {
             throw new HubException("Access denied");
         }
 
         // Запоминаем права на время жизни соединения, чтобы не ходить в БД на каждый апдейт.
-        Context.Items[EditRightKey(documentId)] = canEdit;
+        Context.Items[EditRightKey(documentId)] = rights.CanEdit;
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(documentId));
 
@@ -101,7 +94,7 @@ public class DocumentHub : Hub
 
         await Clients.Caller.SendAsync("DocumentState", snapshot ?? Array.Empty<byte>());
 
-        _logger.LogInformation("User {UserId} joined document {DocumentId} (canEdit={CanEdit})", userId, documentId, canEdit);
+        _logger.LogInformation("User {UserId} joined document {DocumentId} (canEdit={CanEdit})", userId, documentId, rights.CanEdit);
     }
 
     public async Task LeaveDocument(int documentId)
@@ -114,10 +107,7 @@ public class DocumentHub : Hub
     /// <summary>Шаг 1 sync-протокола: рассылаем вектор состояния остальным, чтобы они прислали недостающее.</summary>
     public async Task SyncStep1(int documentId, byte[] stateVector)
     {
-        if (!CachedCanEdit(documentId) && !(await ResolveRightsAsync(documentId)).CanView)
-        {
-            throw new HubException("Access denied");
-        }
+        await EnsureCanViewAsync(documentId);
 
         await Clients.OthersInGroup(GroupName(documentId))
             .SendAsync("ReceiveSyncStep1", documentId, stateVector, Context.ConnectionId);
@@ -126,6 +116,8 @@ public class DocumentHub : Hub
     /// <summary>Шаг 2 sync-протокола: адресный ответ конкретному соединению с недостающими апдейтами.</summary>
     public async Task SyncStep2(int documentId, byte[] update, string targetConnectionId)
     {
+        await EnsureCanViewAsync(documentId);
+
         await Clients.Client(targetConnectionId).SendAsync("ReceiveSyncStep2", documentId, update);
     }
 
@@ -143,6 +135,8 @@ public class DocumentHub : Hub
     /// <summary>Апдейт presence/курсоров (awareness) — широковещательно остальным участникам.</summary>
     public async Task SendAwareness(int documentId, byte[] update)
     {
+        await EnsureCanViewAsync(documentId);
+
         await Clients.OthersInGroup(GroupName(documentId)).SendAsync("ReceiveAwareness", documentId, update);
     }
 

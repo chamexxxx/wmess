@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WMess.Api.Infrastructure;
 using WMess.Api.Models.DTO;
 
 namespace WMess.Api.Controllers;
@@ -54,10 +55,10 @@ public class UserController : ControllerBase
             return Ok(Array.Empty<UserResponse>());
         }
 
-        var term = email.Trim();
+        var pattern = SearchPattern.Contains(email.Trim());
 
         var users = await _userManager.Users
-            .Where(u => u.Email != null && u.Email.Contains(term))
+            .Where(u => u.Email != null && EF.Functions.ILike(u.Email, pattern, SearchPattern.EscapeChar))
             .OrderBy(u => u.Email)
             .Take(10)
             .Select(u => new UserResponse { Id = u.Id, Email = u.Email! })
