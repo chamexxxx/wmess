@@ -58,13 +58,13 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
   const loadContents = async () => {
     setLoading(true)
     try {
-      const res = await apiClient.documents.getFolderContents(projectId, {
+      const res = await apiClient.library.getFolderContents(projectId, {
         folderId: folderId ?? undefined,
       })
       const data = res.data
       setFolders((data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '', updatedAt: f.updatedAt })))
       setDocuments(
-        (data?.documents ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', updatedAt: d.updatedAt })),
+        (data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', updatedAt: d.updatedAt })),
       )
       setPath((data?.path ?? []).map((p) => ({ id: Number(p.id), name: p.name ?? '' })))
     } catch (error) {
@@ -89,9 +89,9 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await apiClient.documents.searchDocuments(projectId, { query: q })
+        const res = await apiClient.library.searchLibrary(projectId, { query: q })
         setSearchFolders((res.data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '' })))
-        setSearchDocs((res.data?.documents ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия' })))
+        setSearchDocs((res.data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия' })))
       } catch (error) {
         console.error('Failed to search:', error)
       }
@@ -102,7 +102,7 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
   const createFolder = async (name: string) => {
     setBusy(true)
     try {
-      await apiClient.documents.createFolder({ projectId, parentFolderId: folderId, name })
+      await apiClient.library.createFolder({ projectId, parentFolderId: folderId, name })
       setCreateKind(null)
       await loadContents()
     } catch (error) {
@@ -115,7 +115,7 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
   const createDocument = async (title: string) => {
     setBusy(true)
     try {
-      const res = await apiClient.documents.createDocument({ projectId, folderId: createDocFolderId, title })
+      const res = await apiClient.library.createDocument({ projectId, folderId: createDocFolderId, title })
       setCreateKind(null)
       setCreateDocFolderId(null)
       if (res.data?.id != null) {
@@ -133,9 +133,9 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
     setBusy(true)
     try {
       if (renameTarget.kind === 'folder') {
-        await apiClient.documents.updateFolder(renameTarget.id, { name })
+        await apiClient.library.updateFolder(renameTarget.id, { name })
       } else {
-        await apiClient.documents.updateDocument(renameTarget.id, { title: name })
+        await apiClient.library.updateItem(renameTarget.id, { title: name })
       }
       setRenameTarget(null)
       await loadContents()
@@ -151,9 +151,9 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
     setBusy(true)
     try {
       if (deleteTarget.kind === 'folder') {
-        await apiClient.documents.deleteFolder(deleteTarget.id)
+        await apiClient.library.deleteFolder(deleteTarget.id)
       } else {
-        await apiClient.documents.deleteDocument(deleteTarget.id)
+        await apiClient.library.deleteItem(deleteTarget.id)
       }
       setDeleteTarget(null)
       await loadContents()
@@ -173,9 +173,9 @@ export function DocumentExplorer({ projectId, folderId, onNavigateFolder, onOpen
     if (item.kind === 'folder' && item.id === target) return
     try {
       if (item.kind === 'folder') {
-        await apiClient.documents.moveFolder(item.id, { parentFolderId: target })
+        await apiClient.library.moveFolder(item.id, { parentFolderId: target })
       } else {
-        await apiClient.documents.moveDocument(item.id, { folderId: target })
+        await apiClient.library.moveItem(item.id, { folderId: target })
       }
       await loadContents()
     } catch (error) {

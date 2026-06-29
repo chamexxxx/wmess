@@ -86,7 +86,7 @@ function DocumentWorkspace({
 
     setSaving(true)
     try {
-      await apiClient.documents.updateDocument(doc.id, { title: newTitle })
+      await apiClient.library.updateItem(doc.id, { title: newTitle })
       setEditingTitle(false)
       onTitleUpdate(newTitle)
     } catch (error) {
@@ -190,8 +190,8 @@ export function DocumentsSection({ projectId }: { projectId: number }) {
     }
     if (openDoc?.id === docId && openDoc.folderId !== undefined) return
     let cancelled = false
-    apiClient.documents
-      .getDocument(docId)
+    apiClient.library
+      .getItem(docId)
       .then((res) => {
         if (!cancelled && res.data) {
           setOpenDoc({

@@ -1,4 +1,4 @@
-namespace WMess.Api.Models.DTO.Documents;
+namespace WMess.Api.Models.DTO.Library;
 
 /// <summary>Элемент пути (хлебных крошек) до текущей папки.</summary>
 public class BreadcrumbItem

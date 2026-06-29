@@ -1,4 +1,4 @@
-namespace WMess.Api.Models.DTO.Documents;
+namespace WMess.Api.Models.DTO.Library;
 
 /// <summary>Непосредственное содержимое папки (или корня проекта) для файлового менеджера.</summary>
 public class FolderContentsResponse
@@ -13,5 +13,5 @@ public class FolderContentsResponse
 
     public List<FolderResponse> Folders { get; set; } = new();
 
-    public List<DocumentResponse> Documents { get; set; } = new();
+    public List<LibraryItemResponse> Items { get; set; } = new();
 }

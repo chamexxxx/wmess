@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WMess.Api.Models;
 
-public class DocumentFolder
+public class LibraryFolder
 {
     [Key]
     public int Id { get; set; }
@@ -26,8 +26,8 @@ public class DocumentFolder
     public Project Project { get; set; } = null!;
 
     [ForeignKey(nameof(ParentFolderId))]
-    public DocumentFolder? ParentFolder { get; set; }
+    public LibraryFolder? ParentFolder { get; set; }
 
-    public ICollection<DocumentFolder> SubFolders { get; set; } = new List<DocumentFolder>();
-    public ICollection<Document> Documents { get; set; } = new List<Document>();
+    public ICollection<LibraryFolder> SubFolders { get; set; } = new List<LibraryFolder>();
+    public ICollection<LibraryItem> Items { get; set; } = new List<LibraryItem>();
 }

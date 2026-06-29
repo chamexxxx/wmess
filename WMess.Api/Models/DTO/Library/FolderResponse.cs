@@ -1,4 +1,4 @@
-namespace WMess.Api.Models.DTO.Documents;
+namespace WMess.Api.Models.DTO.Library;
 
 public class FolderResponse
 {

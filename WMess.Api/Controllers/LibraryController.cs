@@ -7,7 +7,7 @@ using WMess.Api.Authorization;
 using WMess.Api.Data;
 using WMess.Api.Infrastructure;
 using WMess.Api.Models;
-using WMess.Api.Models.DTO.Documents;
+using WMess.Api.Models.DTO.Library;
 using WMess.Api.Services;
 
 namespace WMess.Api.Controllers;
@@ -15,22 +15,22 @@ namespace WMess.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
-public class DocumentsController : ControllerBase
+public class LibraryController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
-    private readonly IDocumentAccessService _documentAccess;
+    private readonly ILibraryAccessService _libraryAccess;
     private readonly UserManager<IdentityUser> _userManager;
 
-    public DocumentsController(
+    public LibraryController(
         ApplicationDbContext context,
         IAuthorizationService authorizationService,
-        IDocumentAccessService documentAccess,
+        ILibraryAccessService libraryAccess,
         UserManager<IdentityUser> userManager)
     {
         _context = context;
         _authorizationService = authorizationService;
-        _documentAccess = documentAccess;
+        _libraryAccess = libraryAccess;
         _userManager = userManager;
     }
 
@@ -39,6 +39,26 @@ public class DocumentsController : ControllerBase
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new UnauthorizedAccessException("User ID not found in token");
     }
+
+    private static string TypeName(LibraryItemType type) => type switch
+    {
+        LibraryItemType.Document => "document",
+        LibraryItemType.Board => "board",
+        LibraryItemType.Table => "table",
+        _ => type.ToString().ToLowerInvariant(),
+    };
+
+    private static LibraryItemResponse ToItemResponse(LibraryItem item) => new()
+    {
+        Id = item.Id,
+        ProjectId = item.ProjectId,
+        FolderId = item.FolderId,
+        Type = TypeName(item.Type),
+        Title = item.Title,
+        CreatedBy = item.CreatedBy,
+        CreatedAt = item.CreatedAt,
+        UpdatedAt = item.UpdatedAt
+    };
 
     #region Folders
 
@@ -58,7 +78,7 @@ public class DocumentsController : ControllerBase
             return Forbid();
         }
 
-        var folders = await _context.DocumentFolders
+        var folders = await _context.LibraryFolders
             .Where(f => f.ProjectId == projectId)
             .Select(f => new FolderResponse
             {
@@ -78,7 +98,7 @@ public class DocumentsController : ControllerBase
     [EndpointName("GetFolder")]
     public async Task<ActionResult<FolderResponse>> GetFolder(int id)
     {
-        var folder = await _context.DocumentFolders
+        var folder = await _context.LibraryFolders
             .Include(f => f.Project)
             .FirstOrDefaultAsync(f => f.Id == id);
 
@@ -122,14 +142,14 @@ public class DocumentsController : ControllerBase
 
         if (request.ParentFolderId.HasValue)
         {
-            var parentFolder = await _context.DocumentFolders.FindAsync(request.ParentFolderId.Value);
+            var parentFolder = await _context.LibraryFolders.FindAsync(request.ParentFolderId.Value);
             if (parentFolder == null || parentFolder.ProjectId != request.ProjectId)
             {
                 return BadRequest(new { message = "Parent folder not found or doesn't belong to this project" });
             }
         }
 
-        var folder = new DocumentFolder
+        var folder = new LibraryFolder
         {
             ProjectId = request.ProjectId,
             ParentFolderId = request.ParentFolderId,
@@ -138,7 +158,7 @@ public class DocumentsController : ControllerBase
             UpdatedAt = DateTime.UtcNow
         };
 
-        _context.DocumentFolders.Add(folder);
+        _context.LibraryFolders.Add(folder);
         await _context.SaveChangesAsync();
 
         var response = new FolderResponse
@@ -158,7 +178,7 @@ public class DocumentsController : ControllerBase
     [EndpointName("UpdateFolder")]
     public async Task<IActionResult> UpdateFolder(int id, UpdateFolderRequest request)
     {
-        var folder = await _context.DocumentFolders
+        var folder = await _context.LibraryFolders
             .Include(f => f.Project)
             .FirstOrDefaultAsync(f => f.Id == id);
 
@@ -187,7 +207,7 @@ public class DocumentsController : ControllerBase
     [EndpointName("MoveFolder")]
     public async Task<IActionResult> MoveFolder(int id, MoveFolderRequest request)
     {
-        var folder = await _context.DocumentFolders
+        var folder = await _context.LibraryFolders
             .Include(f => f.Project)
             .FirstOrDefaultAsync(f => f.Id == id);
 
@@ -209,7 +229,7 @@ public class DocumentsController : ControllerBase
                 return BadRequest(new { message = "Папка не может быть родителем самой себя" });
             }
 
-            var parentFolder = await _context.DocumentFolders.FindAsync(request.ParentFolderId.Value);
+            var parentFolder = await _context.LibraryFolders.FindAsync(request.ParentFolderId.Value);
             if (parentFolder == null || parentFolder.ProjectId != folder.ProjectId)
             {
                 return BadRequest(new { message = "Родительская папка не найдена или не принадлежит этому проекту" });
@@ -223,7 +243,7 @@ public class DocumentsController : ControllerBase
                 {
                     return BadRequest(new { message = "Нельзя переместить папку в её потомка" });
                 }
-                var ancestor = await _context.DocumentFolders.FindAsync(currentParentId.Value);
+                var ancestor = await _context.LibraryFolders.FindAsync(currentParentId.Value);
                 currentParentId = ancestor?.ParentFolderId;
             }
         }
@@ -240,7 +260,7 @@ public class DocumentsController : ControllerBase
     [EndpointName("DeleteFolder")]
     public async Task<IActionResult> DeleteFolder(int id)
     {
-        var folder = await _context.DocumentFolders
+        var folder = await _context.LibraryFolders
             .Include(f => f.Project)
             .FirstOrDefaultAsync(f => f.Id == id);
 
@@ -255,9 +275,9 @@ public class DocumentsController : ControllerBase
             return Forbid();
         }
 
-        // Удаляем всё поддерево: саму папку, вложенные папки и документы внутри них.
+        // Удаляем всё поддерево: саму папку, вложенные папки и элементы внутри них.
         // Папок в проекте обычно немного — собираем дерево в памяти.
-        var projectFolders = await _context.DocumentFolders
+        var projectFolders = await _context.LibraryFolders
             .Where(f => f.ProjectId == folder.ProjectId)
             .Select(f => new { f.Id, f.ParentFolderId })
             .ToListAsync();
@@ -277,16 +297,16 @@ public class DocumentsController : ControllerBase
             }
         }
 
-        // Документы внутри удаляемых папок (их DocumentPermission снимаются каскадно).
-        var documents = await _context.Documents
+        // Элементы внутри удаляемых папок (их контент и LibraryPermission снимаются каскадно).
+        var items = await _context.LibraryItems
             .Where(d => d.FolderId != null && folderIds.Contains(d.FolderId.Value))
             .ToListAsync();
-        _context.Documents.RemoveRange(documents);
+        _context.LibraryItems.RemoveRange(items);
 
-        var folders = await _context.DocumentFolders
+        var folders = await _context.LibraryFolders
             .Where(f => folderIds.Contains(f.Id))
             .ToListAsync();
-        _context.DocumentFolders.RemoveRange(folders);
+        _context.LibraryFolders.RemoveRange(folders);
 
         await _context.SaveChangesAsync();
 
@@ -295,11 +315,11 @@ public class DocumentsController : ControllerBase
 
     #endregion
 
-    #region Documents
+    #region Items
 
-    [HttpGet("project/{projectId}")]
-    [EndpointName("GetProjectDocuments")]
-    public async Task<ActionResult<IEnumerable<DocumentResponse>>> GetProjectDocuments(int projectId)
+    [HttpGet("project/{projectId}/items")]
+    [EndpointName("GetProjectItems")]
+    public async Task<ActionResult<IEnumerable<LibraryItemResponse>>> GetProjectItems(int projectId, [FromQuery] LibraryItemType? type)
     {
         var project = await _context.Projects.FindAsync(projectId);
         if (project == null)
@@ -313,13 +333,20 @@ public class DocumentsController : ControllerBase
             return Forbid();
         }
 
-        var documents = await _context.Documents
-            .Where(d => d.ProjectId == projectId)
-            .Select(d => new DocumentResponse
+        var query = _context.LibraryItems.Where(d => d.ProjectId == projectId);
+        if (type.HasValue)
+        {
+            query = query.Where(d => d.Type == type.Value);
+        }
+
+        var items = await query
+            .OrderBy(d => d.Title)
+            .Select(d => new LibraryItemResponse
             {
                 Id = d.Id,
                 ProjectId = d.ProjectId,
                 FolderId = d.FolderId,
+                Type = TypeName(d.Type),
                 Title = d.Title,
                 CreatedBy = d.CreatedBy,
                 CreatedAt = d.CreatedAt,
@@ -327,7 +354,7 @@ public class DocumentsController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(documents);
+        return Ok(items);
     }
 
     [HttpGet("project/{projectId}/contents")]
@@ -347,7 +374,7 @@ public class DocumentsController : ControllerBase
         }
 
         // Папок в проекте обычно немного — грузим все для построения дочернего списка и пути.
-        var allFolders = await _context.DocumentFolders
+        var allFolders = await _context.LibraryFolders
             .Where(f => f.ProjectId == projectId)
             .Select(f => new { f.Id, f.ParentFolderId, f.Name, f.CreatedAt, f.UpdatedAt })
             .ToListAsync();
@@ -371,20 +398,21 @@ public class DocumentsController : ControllerBase
             })
             .ToList();
 
-        // Документы — только непосредственно в этой папке (основной объём фильтруется на сервере).
+        // Элементы — только непосредственно в этой папке (основной объём фильтруется на сервере).
         // Сравнение с null выносим явно, чтобы EF гарантированно сгенерировал IS NULL для корня.
-        var documentsQuery = _context.Documents.Where(d => d.ProjectId == projectId);
-        documentsQuery = folderId.HasValue
-            ? documentsQuery.Where(d => d.FolderId == folderId.Value)
-            : documentsQuery.Where(d => d.FolderId == null);
+        var itemsQuery = _context.LibraryItems.Where(d => d.ProjectId == projectId);
+        itemsQuery = folderId.HasValue
+            ? itemsQuery.Where(d => d.FolderId == folderId.Value)
+            : itemsQuery.Where(d => d.FolderId == null);
 
-        var documents = await documentsQuery
+        var items = await itemsQuery
             .OrderBy(d => d.Title)
-            .Select(d => new DocumentResponse
+            .Select(d => new LibraryItemResponse
             {
                 Id = d.Id,
                 ProjectId = d.ProjectId,
                 FolderId = d.FolderId,
+                Type = TypeName(d.Type),
                 Title = d.Title,
                 CreatedBy = d.CreatedBy,
                 CreatedAt = d.CreatedAt,
@@ -408,13 +436,13 @@ public class DocumentsController : ControllerBase
             FolderName = folderId.HasValue && byId.TryGetValue(folderId.Value, out var current) ? current.Name : null,
             Path = path,
             Folders = folders,
-            Documents = documents
+            Items = items
         });
     }
 
     [HttpGet("project/{projectId}/search")]
-    [EndpointName("SearchDocuments")]
-    public async Task<ActionResult<DocumentSearchResponse>> SearchDocuments(int projectId, [FromQuery] string query)
+    [EndpointName("SearchLibrary")]
+    public async Task<ActionResult<LibrarySearchResponse>> SearchLibrary(int projectId, [FromQuery] string query)
     {
         var project = await _context.Projects.FindAsync(projectId);
         if (project == null)
@@ -431,12 +459,12 @@ public class DocumentsController : ControllerBase
         var term = (query ?? string.Empty).Trim();
         if (term.Length == 0)
         {
-            return Ok(new DocumentSearchResponse());
+            return Ok(new LibrarySearchResponse());
         }
 
         var pattern = SearchPattern.Contains(term);
 
-        var folders = await _context.DocumentFolders
+        var folders = await _context.LibraryFolders
             .Where(f => f.ProjectId == projectId && EF.Functions.ILike(f.Name, pattern, SearchPattern.EscapeChar))
             .OrderBy(f => f.Name)
             .Take(50)
@@ -451,15 +479,16 @@ public class DocumentsController : ControllerBase
             })
             .ToListAsync();
 
-        var documents = await _context.Documents
+        var items = await _context.LibraryItems
             .Where(d => d.ProjectId == projectId && EF.Functions.ILike(d.Title, pattern, SearchPattern.EscapeChar))
             .OrderBy(d => d.Title)
             .Take(50)
-            .Select(d => new DocumentResponse
+            .Select(d => new LibraryItemResponse
             {
                 Id = d.Id,
                 ProjectId = d.ProjectId,
                 FolderId = d.FolderId,
+                Type = TypeName(d.Type),
                 Title = d.Title,
                 CreatedBy = d.CreatedBy,
                 CreatedAt = d.CreatedAt,
@@ -467,65 +496,127 @@ public class DocumentsController : ControllerBase
             })
             .ToListAsync();
 
-        return Ok(new DocumentSearchResponse { Folders = folders, Documents = documents });
+        return Ok(new LibrarySearchResponse { Folders = folders, Items = items });
     }
 
-    [HttpGet("{id}")]
-    [EndpointName("GetDocument")]
-    public async Task<ActionResult<DocumentResponse>> GetDocument(int id)
+    [HttpGet("items/{id}")]
+    [EndpointName("GetItem")]
+    public async Task<ActionResult<LibraryItemResponse>> GetItem(int id)
     {
-        var document = await _context.Documents
+        var item = await _context.LibraryItems
             .Include(d => d.Project)
             .FirstOrDefaultAsync(d => d.Id == id);
 
-        if (document == null)
+        if (item == null)
         {
             return NotFound();
         }
 
-        var rights = await _documentAccess.GetRightsAsync(User, document);
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
         if (!rights.CanView)
         {
             return Forbid();
         }
 
-        return Ok(new DocumentResponse
-        {
-            Id = document.Id,
-            ProjectId = document.ProjectId,
-            FolderId = document.FolderId,
-            Title = document.Title,
-            CreatedBy = document.CreatedBy,
-            CreatedAt = document.CreatedAt,
-            UpdatedAt = document.UpdatedAt
-        });
+        return Ok(ToItemResponse(item));
     }
 
-    [HttpGet("{id}/content")]
-    [EndpointName("GetDocumentContent")]
-    public async Task<ActionResult<byte[]>> GetDocumentContent(int id)
+    [HttpPut("items/{id}")]
+    [EndpointName("UpdateItem")]
+    public async Task<IActionResult> UpdateItem(int id, UpdateItemRequest request)
     {
-        var document = await _context.Documents
+        var item = await _context.LibraryItems
             .Include(d => d.Project)
             .FirstOrDefaultAsync(d => d.Id == id);
 
-        if (document == null)
+        if (item == null)
         {
             return NotFound();
         }
 
-        var rights = await _documentAccess.GetRightsAsync(User, document);
-        if (!rights.CanView)
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
+        if (!rights.CanManage)
         {
             return Forbid();
         }
 
-        return Ok(document.YjsState ?? Array.Empty<byte>());
+        // Только переименование. Перемещение — отдельный эндпоинт MoveItem.
+        item.Title = request.Title;
+        item.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return NoContent();
     }
 
-    [HttpPost]
+    [HttpPut("items/{id}/move")]
+    [EndpointName("MoveItem")]
+    public async Task<IActionResult> MoveItem(int id, MoveItemRequest request)
+    {
+        var item = await _context.LibraryItems
+            .Include(d => d.Project)
+            .FirstOrDefaultAsync(d => d.Id == id);
+
+        if (item == null)
+        {
+            return NotFound();
+        }
+
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
+        if (!rights.CanManage)
+        {
+            return Forbid();
+        }
+
+        if (request.FolderId.HasValue)
+        {
+            var folder = await _context.LibraryFolders.FindAsync(request.FolderId.Value);
+            if (folder == null || folder.ProjectId != item.ProjectId)
+            {
+                return BadRequest(new { message = "Folder not found or doesn't belong to this project" });
+            }
+        }
+
+        item.FolderId = request.FolderId;
+        item.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    [HttpDelete("items/{id}")]
+    [EndpointName("DeleteItem")]
+    public async Task<IActionResult> DeleteItem(int id)
+    {
+        var item = await _context.LibraryItems
+            .Include(d => d.Project)
+            .FirstOrDefaultAsync(d => d.Id == id);
+
+        if (item == null)
+        {
+            return NotFound();
+        }
+
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
+        if (!rights.CanManage)
+        {
+            return Forbid();
+        }
+
+        _context.LibraryItems.Remove(item);
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    #endregion
+
+    #region Documents (тип-специфичный контент)
+
+    [HttpPost("documents")]
     [EndpointName("CreateDocument")]
-    public async Task<ActionResult<DocumentResponse>> CreateDocument(CreateDocumentRequest request)
+    public async Task<ActionResult<LibraryItemResponse>> CreateDocument(CreateDocumentRequest request)
     {
         var project = await _context.Projects.FindAsync(request.ProjectId);
         if (project == null)
@@ -541,7 +632,7 @@ public class DocumentsController : ControllerBase
 
         if (request.FolderId.HasValue)
         {
-            var folder = await _context.DocumentFolders.FindAsync(request.FolderId.Value);
+            var folder = await _context.LibraryFolders.FindAsync(request.FolderId.Value);
             if (folder == null || folder.ProjectId != request.ProjectId)
             {
                 return BadRequest(new { message = "Folder not found or doesn't belong to this project" });
@@ -550,20 +641,20 @@ public class DocumentsController : ControllerBase
 
         var userId = GetCurrentUserId();
 
-        var document = new Document
+        var item = new LibraryItem
         {
             ProjectId = request.ProjectId,
             FolderId = request.FolderId,
+            Type = LibraryItemType.Document,
             Title = request.Title,
             CreatedBy = userId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            YjsState = null,
-            // Создателю выдаём полные права на документ. Добавляем через навигацию,
-            // чтобы документ и права сохранились одной атомарной транзакцией.
+            // Пустой контент документа и полные права создателю — одной атомарной транзакцией.
+            DocumentContent = new DocumentContent { YjsState = null },
             Permissions =
             {
-                new DocumentPermission
+                new LibraryPermission
                 {
                     UserId = userId,
                     CanView = true,
@@ -574,133 +665,63 @@ public class DocumentsController : ControllerBase
             }
         };
 
-        _context.Documents.Add(document);
+        _context.LibraryItems.Add(item);
         await _context.SaveChangesAsync();
 
-        var response = new DocumentResponse
-        {
-            Id = document.Id,
-            ProjectId = document.ProjectId,
-            FolderId = document.FolderId,
-            Title = document.Title,
-            CreatedBy = document.CreatedBy,
-            CreatedAt = document.CreatedAt,
-            UpdatedAt = document.UpdatedAt
-        };
-
-        return CreatedAtAction(nameof(GetDocument), new { id = document.Id }, response);
+        return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
 
-    [HttpPut("{id}")]
-    [EndpointName("UpdateDocument")]
-    public async Task<IActionResult> UpdateDocument(int id, UpdateDocumentRequest request)
+    [HttpGet("documents/{id}/content")]
+    [EndpointName("GetDocumentContent")]
+    public async Task<ActionResult<byte[]>> GetDocumentContent(int id)
     {
-        var document = await _context.Documents
+        var item = await _context.LibraryItems
             .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == id);
+            .Include(d => d.DocumentContent)
+            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Document);
 
-        if (document == null)
+        if (item == null)
         {
             return NotFound();
         }
 
-        var rights = await _documentAccess.GetRightsAsync(User, document);
-        if (!rights.CanManage)
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
+        if (!rights.CanView)
         {
             return Forbid();
         }
 
-        // Только переименование. Перемещение — отдельный эндпоинт MoveDocument.
-        document.Title = request.Title;
-        document.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return NoContent();
+        return Ok(item.DocumentContent?.YjsState ?? Array.Empty<byte>());
     }
 
-    [HttpPut("{id}/move")]
-    [EndpointName("MoveDocument")]
-    public async Task<IActionResult> MoveDocument(int id, MoveDocumentRequest request)
-    {
-        var document = await _context.Documents
-            .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == id);
-
-        if (document == null)
-        {
-            return NotFound();
-        }
-
-        var rights = await _documentAccess.GetRightsAsync(User, document);
-        if (!rights.CanManage)
-        {
-            return Forbid();
-        }
-
-        if (request.FolderId.HasValue)
-        {
-            var folder = await _context.DocumentFolders.FindAsync(request.FolderId.Value);
-            if (folder == null || folder.ProjectId != document.ProjectId)
-            {
-                return BadRequest(new { message = "Folder not found or doesn't belong to this project" });
-            }
-        }
-
-        document.FolderId = request.FolderId;
-        document.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return NoContent();
-    }
-
-    [HttpDelete("{id}")]
-    [EndpointName("DeleteDocument")]
-    public async Task<IActionResult> DeleteDocument(int id)
-    {
-        var document = await _context.Documents
-            .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == id);
-
-        if (document == null)
-        {
-            return NotFound();
-        }
-
-        var rights = await _documentAccess.GetRightsAsync(User, document);
-        if (!rights.CanManage)
-        {
-            return Forbid();
-        }
-
-        _context.Documents.Remove(document);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
-    }
-
-    [HttpPut("{id}/state")]
+    [HttpPut("documents/{id}/state")]
     [EndpointName("UpdateDocumentState")]
     public async Task<IActionResult> UpdateDocumentState(int id, [FromBody] byte[] state)
     {
-        var document = await _context.Documents
+        var item = await _context.LibraryItems
             .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == id);
+            .Include(d => d.DocumentContent)
+            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Document);
 
-        if (document == null)
+        if (item == null)
         {
             return NotFound();
         }
 
-        var rights = await _documentAccess.GetRightsAsync(User, document);
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
         if (!rights.CanEdit)
         {
             return Forbid();
         }
 
-        document.YjsState = state;
-        document.UpdatedAt = DateTime.UtcNow;
+        if (item.DocumentContent == null)
+        {
+            item.DocumentContent = new DocumentContent { LibraryItemId = item.Id };
+            _context.DocumentContents.Add(item.DocumentContent);
+        }
+
+        item.DocumentContent.YjsState = state;
+        item.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
@@ -711,32 +732,32 @@ public class DocumentsController : ControllerBase
 
     #region Permissions
 
-    [HttpGet("{id}/permissions")]
-    [EndpointName("GetDocumentPermissions")]
-    public async Task<ActionResult<IEnumerable<PermissionResponse>>> GetDocumentPermissions(int id)
+    [HttpGet("items/{id}/permissions")]
+    [EndpointName("GetItemPermissions")]
+    public async Task<ActionResult<IEnumerable<PermissionResponse>>> GetItemPermissions(int id)
     {
-        var document = await _context.Documents
+        var item = await _context.LibraryItems
             .Include(d => d.Project)
             .FirstOrDefaultAsync(d => d.Id == id);
 
-        if (document == null)
+        if (item == null)
         {
             return NotFound();
         }
 
-        var rights = await _documentAccess.GetRightsAsync(User, document);
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
         if (!rights.CanManage)
         {
             return Forbid();
         }
 
-        var permissions = await _context.DocumentPermissions
-            .Where(p => p.DocumentId == id)
+        var permissions = await _context.LibraryPermissions
+            .Where(p => p.LibraryItemId == id)
             .Include(p => p.User)
             .Select(p => new PermissionResponse
             {
                 Id = p.Id,
-                DocumentId = p.DocumentId,
+                LibraryItemId = p.LibraryItemId,
                 UserId = p.UserId,
                 UserEmail = p.User.Email ?? "",
                 CanView = p.CanView,
@@ -749,20 +770,20 @@ public class DocumentsController : ControllerBase
         return Ok(permissions);
     }
 
-    [HttpPost("{id}/permissions")]
-    [EndpointName("SetDocumentPermission")]
-    public async Task<ActionResult<PermissionResponse>> SetDocumentPermission(int id, SetPermissionRequest request)
+    [HttpPost("items/{id}/permissions")]
+    [EndpointName("SetItemPermission")]
+    public async Task<ActionResult<PermissionResponse>> SetItemPermission(int id, SetPermissionRequest request)
     {
-        var document = await _context.Documents
+        var item = await _context.LibraryItems
             .Include(d => d.Project)
             .FirstOrDefaultAsync(d => d.Id == id);
 
-        if (document == null)
+        if (item == null)
         {
             return NotFound();
         }
 
-        var rights = await _documentAccess.GetRightsAsync(User, document);
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
         if (!rights.CanManage)
         {
             return Forbid();
@@ -774,17 +795,17 @@ public class DocumentsController : ControllerBase
             return BadRequest(new { message = "User not found" });
         }
 
-        var permission = await _context.DocumentPermissions
-            .FirstOrDefaultAsync(p => p.DocumentId == id && p.UserId == request.UserId);
+        var permission = await _context.LibraryPermissions
+            .FirstOrDefaultAsync(p => p.LibraryItemId == id && p.UserId == request.UserId);
 
         if (permission == null)
         {
-            permission = new DocumentPermission
+            permission = new LibraryPermission
             {
-                DocumentId = id,
+                LibraryItemId = id,
                 UserId = request.UserId
             };
-            _context.DocumentPermissions.Add(permission);
+            _context.LibraryPermissions.Add(permission);
         }
 
         permission.CanView = request.CanView;
@@ -798,12 +819,12 @@ public class DocumentsController : ControllerBase
         }
         catch (DbUpdateException)
         {
-            // Параллельный запрос успел создать права с тем же (DocumentId, UserId)
+            // Параллельный запрос успел создать права с тем же (LibraryItemId, UserId)
             // — упёрлись в уникальный индекс. Перечитываем актуальную запись и применяем значения к ней.
             _context.Entry(permission).State = EntityState.Detached;
 
-            permission = await _context.DocumentPermissions
-                .FirstAsync(p => p.DocumentId == id && p.UserId == request.UserId);
+            permission = await _context.LibraryPermissions
+                .FirstAsync(p => p.LibraryItemId == id && p.UserId == request.UserId);
 
             permission.CanView = request.CanView;
             permission.CanEdit = request.CanEdit;
@@ -813,14 +834,14 @@ public class DocumentsController : ControllerBase
             await _context.SaveChangesAsync();
         }
 
-        var updatedPermission = await _context.DocumentPermissions
+        var updatedPermission = await _context.LibraryPermissions
             .Include(p => p.User)
-            .FirstOrDefaultAsync(p => p.DocumentId == id && p.UserId == request.UserId);
+            .FirstOrDefaultAsync(p => p.LibraryItemId == id && p.UserId == request.UserId);
 
         return Ok(new PermissionResponse
         {
             Id = updatedPermission!.Id,
-            DocumentId = updatedPermission.DocumentId,
+            LibraryItemId = updatedPermission.LibraryItemId,
             UserId = updatedPermission.UserId,
             UserEmail = updatedPermission.User.Email ?? "",
             CanView = updatedPermission.CanView,
@@ -830,34 +851,34 @@ public class DocumentsController : ControllerBase
         });
     }
 
-    [HttpDelete("{id}/permissions/{userId}")]
-    [EndpointName("RemoveDocumentPermission")]
-    public async Task<IActionResult> RemoveDocumentPermission(int id, string userId)
+    [HttpDelete("items/{id}/permissions/{userId}")]
+    [EndpointName("RemoveItemPermission")]
+    public async Task<IActionResult> RemoveItemPermission(int id, string userId)
     {
-        var document = await _context.Documents
+        var item = await _context.LibraryItems
             .Include(d => d.Project)
             .FirstOrDefaultAsync(d => d.Id == id);
 
-        if (document == null)
+        if (item == null)
         {
             return NotFound();
         }
 
-        var rights = await _documentAccess.GetRightsAsync(User, document);
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
         if (!rights.CanManage)
         {
             return Forbid();
         }
 
-        var permission = await _context.DocumentPermissions
-            .FirstOrDefaultAsync(p => p.DocumentId == id && p.UserId == userId);
+        var permission = await _context.LibraryPermissions
+            .FirstOrDefaultAsync(p => p.LibraryItemId == id && p.UserId == userId);
 
         if (permission == null)
         {
             return NotFound();
         }
 
-        _context.DocumentPermissions.Remove(permission);
+        _context.LibraryPermissions.Remove(permission);
         await _context.SaveChangesAsync();
 
         return NoContent();

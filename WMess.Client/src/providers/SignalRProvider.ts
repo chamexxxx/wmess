@@ -261,7 +261,7 @@ export class SignalRProvider {
   private readonly handlePageHide = (): void => {
     if (!this.hasPendingSave()) return
     this.clearSaveTimers()
-    void fetch(`/api/documents/${this.documentId}/state`, {
+    void fetch(`/api/library/documents/${this.documentId}/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',

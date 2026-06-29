@@ -1,9 +1,9 @@
-namespace WMess.Api.Models.DTO.Documents;
+namespace WMess.Api.Models.DTO.Library;
 
 public class PermissionResponse
 {
     public int Id { get; set; }
-    public int DocumentId { get; set; }
+    public int LibraryItemId { get; set; }
     public string UserId { get; set; } = string.Empty;
     public string UserEmail { get; set; } = string.Empty;
     public bool CanView { get; set; }

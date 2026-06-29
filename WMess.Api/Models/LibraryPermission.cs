@@ -4,13 +4,13 @@ using Microsoft.AspNetCore.Identity;
 
 namespace WMess.Api.Models;
 
-public class DocumentPermission
+public class LibraryPermission
 {
     [Key]
     public int Id { get; set; }
 
     [Required]
-    public int DocumentId { get; set; }
+    public int LibraryItemId { get; set; }
 
     [Required]
     public string UserId { get; set; } = string.Empty;
@@ -24,8 +24,8 @@ public class DocumentPermission
     public DateTime GrantedAt { get; set; } = DateTime.UtcNow;
 
     // Навигационные свойства
-    [ForeignKey(nameof(DocumentId))]
-    public Document Document { get; set; } = null!;
+    [ForeignKey(nameof(LibraryItemId))]
+    public LibraryItem Item { get; set; } = null!;
 
     [ForeignKey(nameof(UserId))]
     public IdentityUser User { get; set; } = null!;
