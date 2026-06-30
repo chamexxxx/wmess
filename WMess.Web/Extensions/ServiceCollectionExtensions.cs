@@ -6,15 +6,19 @@ namespace WMess.Web.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddBff(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddBff(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
         services
             .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
-                options.Cookie.Name = "__Host-session";
+                // В Development разрешаем доступ по локальной сети (http://<ip>:5173).
+                // Префикс __Host- и флаг Secure требуют secure-context/HTTPS (localhost — исключение),
+                // поэтому для dev их снимаем; в production остаётся строгий вариант.
+                var isDev = environment.IsDevelopment();
+                options.Cookie.Name = isDev ? "session" : "__Host-session";
                 options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.SecurePolicy = isDev ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
                 options.Cookie.SameSite = SameSiteMode.Strict;
                 options.Cookie.Path = "/";
                 options.SlidingExpiration = false;

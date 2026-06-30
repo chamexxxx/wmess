@@ -3,7 +3,7 @@ using WMess.Web.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddBff(builder.Configuration);
+builder.Services.AddBff(builder.Configuration, builder.Environment);
 builder.Services.AddControllers();
 builder.Services.AddSpaYarp();
 builder.Services.AddOpenApi(options =>
