@@ -20,7 +20,7 @@ interface Doc {
 type DeleteTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
 type DragItem = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
 
-interface DocumentsSidebarProps {
+interface LibrarySidebarProps {
   projectId: number
   selectedId: number | null
   onSelect: (id: number, title: string) => void
@@ -33,7 +33,7 @@ interface DocumentsSidebarProps {
   onToggleVisibility?: () => void
   onResizeStart?: (e: React.MouseEvent) => void
 }
-export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal, width = 256, onToggleVisibility, onResizeStart }: DocumentsSidebarProps) {
+export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onTitleUpdated, refreshSignal, width = 256, onToggleVisibility, onResizeStart }: LibrarySidebarProps) {
   const [folders, setFolders] = useState<Folder[]>([])
   const [documents, setDocuments] = useState<Doc[]>([])
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
@@ -53,8 +53,8 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
   const loadData = async () => {
     try {
       const [foldersRes, docsRes] = await Promise.all([
-        apiClient.documents.getProjectFolders(projectId),
-        apiClient.documents.getProjectDocuments(projectId),
+        apiClient.library.getProjectFolders(projectId),
+        apiClient.library.getProjectItems(projectId),
       ])
       setFolders(
         (foldersRes.data ?? []).map((f) => ({
@@ -97,7 +97,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
   const createFolder = async (name: string) => {
     setBusy(true)
     try {
-      await apiClient.documents.createFolder({ projectId, parentFolderId: null, name })
+      await apiClient.library.createFolder({ projectId, parentFolderId: null, name })
       setCreateKind(null)
       await loadData()
     } catch (error) {
@@ -111,7 +111,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
     if (!renameFolder) return
     setBusy(true)
     try {
-      await apiClient.documents.updateFolder(renameFolder.id, { name })
+      await apiClient.library.updateFolder(renameFolder.id, { name })
       setRenameFolder(null)
       await loadData()
     } catch (error) {
@@ -125,7 +125,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
     if (!renameDoc) return
     setBusy(true)
     try {
-      await apiClient.documents.updateDocument(renameDoc.id, { title })
+      await apiClient.library.updateItem(renameDoc.id, { title })
       const renamedId = renameDoc.id
       setRenameDoc(null)
       await loadData()
@@ -146,7 +146,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
     setBusy(true)
     const folderId = createInFolder
     try {
-      const res = await apiClient.documents.createDocument({ projectId, folderId, title })
+      const res = await apiClient.library.createDocument({ projectId, folderId, title })
       setCreateKind(null)
       setCreateInFolder(null)
       await loadData()
@@ -168,9 +168,9 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
     setBusy(true)
     try {
       if (deleteTarget.kind === 'folder') {
-        await apiClient.documents.deleteFolder(deleteTarget.id)
+        await apiClient.library.deleteFolder(deleteTarget.id)
       } else {
-        await apiClient.documents.deleteDocument(deleteTarget.id)
+        await apiClient.library.deleteItem(deleteTarget.id)
         onDeleted(deleteTarget.id)
       }
       setDeleteTarget(null)
@@ -211,7 +211,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
 
   const moveFolder = async (folderId: number, targetFolderId: number | null) => {
     try {
-      await apiClient.documents.moveFolder(folderId, { parentFolderId: targetFolderId })
+      await apiClient.library.moveFolder(folderId, { parentFolderId: targetFolderId })
       await loadData()
       if (targetFolderId !== null) {
         setExpanded((prev) => new Set(prev).add(targetFolderId))
@@ -223,7 +223,7 @@ export function DocumentsSidebar({ projectId, selectedId, onSelect, onDeleted, o
 
   const moveDocument = async (docId: number, targetFolderId: number | null) => {
     try {
-      await apiClient.documents.moveDocument(docId, { folderId: targetFolderId })
+      await apiClient.library.moveItem(docId, { folderId: targetFolderId })
       await loadData()
       if (targetFolderId !== null) {
         setExpanded((prev) => new Set(prev).add(targetFolderId))

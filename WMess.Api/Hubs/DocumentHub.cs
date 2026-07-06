@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using WMess.Api.Data;
+using WMess.Api.Models;
 using WMess.Api.Services;
 
 namespace WMess.Api.Hubs;
@@ -16,16 +17,16 @@ namespace WMess.Api.Hubs;
 public class DocumentHub : Hub
 {
     private readonly ApplicationDbContext _context;
-    private readonly IDocumentAccessService _documentAccess;
+    private readonly ILibraryAccessService _libraryAccess;
     private readonly ILogger<DocumentHub> _logger;
 
     public DocumentHub(
         ApplicationDbContext context,
-        IDocumentAccessService documentAccess,
+        ILibraryAccessService libraryAccess,
         ILogger<DocumentHub> logger)
     {
         _context = context;
-        _documentAccess = documentAccess;
+        _libraryAccess = libraryAccess;
         _logger = logger;
     }
 
@@ -40,21 +41,21 @@ public class DocumentHub : Hub
     private static string EditRightKey(int documentId) => $"doc:{documentId}:canEdit";
 
     /// <summary>
-    /// Вычисляет права текущего пользователя на документ через общий <see cref="IDocumentAccessService"/>.
+    /// Вычисляет права текущего пользователя на документ через общий <see cref="ILibraryAccessService"/>.
     /// </summary>
-    private async Task<DocumentRights> ResolveRightsAsync(int documentId)
+    private async Task<LibraryRights> ResolveRightsAsync(int documentId)
     {
-        var document = await _context.Documents
+        var document = await _context.LibraryItems
             .Include(d => d.Project)
             .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.Id == documentId);
+            .FirstOrDefaultAsync(d => d.Id == documentId && d.Type == LibraryItemType.Document);
 
         if (document == null)
         {
             throw new HubException("Document not found");
         }
 
-        return await _documentAccess.GetRightsAsync(Context.User!, document);
+        return await _libraryAccess.GetRightsAsync(Context.User!, document);
     }
 
     private bool CachedCanEdit(int documentId)
@@ -87,9 +88,9 @@ public class DocumentHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(documentId));
 
         // Отправляем сохранённый снапшот как стартовую базу (важно, если пользователь зашёл первым).
-        var snapshot = await _context.Documents
-            .Where(d => d.Id == documentId)
-            .Select(d => d.YjsState)
+        var snapshot = await _context.DocumentContents
+            .Where(c => c.LibraryItemId == documentId)
+            .Select(c => c.YjsState)
             .FirstOrDefaultAsync();
 
         await Clients.Caller.SendAsync("DocumentState", snapshot ?? Array.Empty<byte>());
@@ -148,13 +149,21 @@ public class DocumentHub : Hub
             throw new HubException("Edit access denied");
         }
 
-        var document = await _context.Documents.FirstOrDefaultAsync(d => d.Id == documentId);
+        var document = await _context.LibraryItems
+            .Include(d => d.DocumentContent)
+            .FirstOrDefaultAsync(d => d.Id == documentId && d.Type == LibraryItemType.Document);
         if (document == null)
         {
             throw new HubException("Document not found");
         }
 
-        document.YjsState = state;
+        if (document.DocumentContent == null)
+        {
+            document.DocumentContent = new DocumentContent { LibraryItemId = document.Id };
+            _context.DocumentContents.Add(document.DocumentContent);
+        }
+
+        document.DocumentContent.YjsState = state;
         document.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 

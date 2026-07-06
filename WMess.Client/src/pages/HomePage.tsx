@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import type { ProjectResponse, TeamResponse, TeamDetailResponse } from '../api/generated/data-contracts'
 import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
-import { DocumentsSection } from '../components/DocumentsSection'
+import { LibrarySection } from '../components/LibrarySection'
 import { ProjectSettings } from '../components/ProjectSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
 import { TeamMembersModal } from '../components/TeamMembersModal'
@@ -22,12 +22,12 @@ export function HomePage() {
   const navigate = useNavigate()
 
   // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
-  // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/docs/:docId
+  // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/library/:docId
   const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, docId: docIdParam } = useParams()
   const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
-  // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Документы».
-  const sectionKey = docIdParam != null ? 'docs' : sectionParam
+  // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Библиотека».
+  const sectionKey = docIdParam != null ? 'library' : sectionParam
 
   const [teams, setTeams] = useState<TeamResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])
@@ -309,8 +309,8 @@ export function HomePage() {
               onRename={(name) => updateProject(selectedProject, name)}
               onDelete={() => setConfirm({ kind: 'project', project: selectedProject })}
             />
-          ) : section?.id === 'docs' ? (
-            <DocumentsSection projectId={selectedProjectId!} />
+          ) : section?.id === 'library' ? (
+            <LibrarySection projectId={selectedProjectId!} />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}

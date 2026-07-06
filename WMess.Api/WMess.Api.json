@@ -117,10 +117,10 @@
         ]
       }
     },
-    "/api/documents/folders/project/{projectId}": {
+    "/api/library/folders/project/{projectId}": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "GetProjectFolders",
         "parameters": [
@@ -176,10 +176,10 @@
         ]
       }
     },
-    "/api/documents/folders/{id}": {
+    "/api/library/folders/{id}": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "GetFolder",
         "parameters": [
@@ -227,7 +227,7 @@
       },
       "put": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "UpdateFolder",
         "parameters": [
@@ -278,7 +278,7 @@
       },
       "delete": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "DeleteFolder",
         "parameters": [
@@ -308,10 +308,10 @@
         ]
       }
     },
-    "/api/documents/folders": {
+    "/api/library/folders": {
       "post": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "CreateFolder",
         "requestBody": {
@@ -363,10 +363,10 @@
         ]
       }
     },
-    "/api/documents/folders/{id}/move": {
+    "/api/library/folders/{id}/move": {
       "put": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "MoveFolder",
         "parameters": [
@@ -416,12 +416,12 @@
         ]
       }
     },
-    "/api/documents/project/{projectId}": {
+    "/api/library/project/{projectId}/items": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "GetProjectDocuments",
+        "operationId": "GetProjectItems",
         "parameters": [
           {
             "name": "projectId",
@@ -435,6 +435,13 @@
               ],
               "format": "int32"
             }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LibraryItemType"
+            }
           }
         ],
         "responses": {
@@ -445,7 +452,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/DocumentResponse"
+                    "$ref": "#/components/schemas/LibraryItemResponse"
                   }
                 }
               },
@@ -453,7 +460,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/DocumentResponse"
+                    "$ref": "#/components/schemas/LibraryItemResponse"
                   }
                 }
               },
@@ -461,7 +468,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/DocumentResponse"
+                    "$ref": "#/components/schemas/LibraryItemResponse"
                   }
                 }
               }
@@ -475,10 +482,10 @@
         ]
       }
     },
-    "/api/documents/project/{projectId}/contents": {
+    "/api/library/project/{projectId}/contents": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "GetFolderContents",
         "parameters": [
@@ -537,12 +544,12 @@
         ]
       }
     },
-    "/api/documents/project/{projectId}/search": {
+    "/api/library/project/{projectId}/search": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "SearchDocuments",
+        "operationId": "SearchLibrary",
         "parameters": [
           {
             "name": "projectId",
@@ -571,17 +578,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentSearchResponse"
+                  "$ref": "#/components/schemas/LibrarySearchResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentSearchResponse"
+                  "$ref": "#/components/schemas/LibrarySearchResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentSearchResponse"
+                  "$ref": "#/components/schemas/LibrarySearchResponse"
                 }
               }
             }
@@ -594,12 +601,12 @@
         ]
       }
     },
-    "/api/documents/{id}": {
+    "/api/library/items/{id}": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "GetDocument",
+        "operationId": "GetItem",
         "parameters": [
           {
             "name": "id",
@@ -621,17 +628,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentResponse"
+                  "$ref": "#/components/schemas/LibraryItemResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentResponse"
+                  "$ref": "#/components/schemas/LibraryItemResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DocumentResponse"
+                  "$ref": "#/components/schemas/LibraryItemResponse"
                 }
               }
             }
@@ -645,9 +652,9 @@
       },
       "put": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "UpdateDocument",
+        "operationId": "UpdateItem",
         "parameters": [
           {
             "name": "id",
@@ -667,17 +674,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateDocumentRequest"
+                "$ref": "#/components/schemas/UpdateItemRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateDocumentRequest"
+                "$ref": "#/components/schemas/UpdateItemRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateDocumentRequest"
+                "$ref": "#/components/schemas/UpdateItemRequest"
               }
             }
           },
@@ -696,9 +703,9 @@
       },
       "delete": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "DeleteDocument",
+        "operationId": "DeleteItem",
         "parameters": [
           {
             "name": "id",
@@ -726,10 +733,118 @@
         ]
       }
     },
-    "/api/documents/{id}/content": {
+    "/api/library/items/{id}/move": {
+      "put": {
+        "tags": [
+          "Library"
+        ],
+        "operationId": "MoveItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveItemRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveItemRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/library/documents": {
+      "post": {
+        "tags": [
+          "Library"
+        ],
+        "operationId": "CreateDocument",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDocumentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryItemResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryItemResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryItemResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/library/documents/{id}/content": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "GetDocumentContent",
         "parameters": [
@@ -779,118 +894,10 @@
         ]
       }
     },
-    "/api/documents": {
-      "post": {
-        "tags": [
-          "Documents"
-        ],
-        "operationId": "CreateDocument",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDocumentRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDocumentRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDocumentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DocumentResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/documents/{id}/move": {
+    "/api/library/documents/{id}/state": {
       "put": {
         "tags": [
-          "Documents"
-        ],
-        "operationId": "MoveDocument",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MoveDocumentRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MoveDocumentRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/MoveDocumentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/documents/{id}/state": {
-      "put": {
-        "tags": [
-          "Documents"
+          "Library"
         ],
         "operationId": "UpdateDocumentState",
         "parameters": [
@@ -943,12 +950,12 @@
         ]
       }
     },
-    "/api/documents/{id}/permissions": {
+    "/api/library/items/{id}/permissions": {
       "get": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "GetDocumentPermissions",
+        "operationId": "GetItemPermissions",
         "parameters": [
           {
             "name": "id",
@@ -1003,9 +1010,9 @@
       },
       "post": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "SetDocumentPermission",
+        "operationId": "SetItemPermission",
         "parameters": [
           {
             "name": "id",
@@ -1070,12 +1077,12 @@
         ]
       }
     },
-    "/api/documents/{id}/permissions/{userId}": {
+    "/api/library/items/{id}/permissions/{userId}": {
       "delete": {
         "tags": [
-          "Documents"
+          "Library"
         ],
-        "operationId": "RemoveDocumentPermission",
+        "operationId": "RemoveItemPermission",
         "parameters": [
           {
             "name": "id",
@@ -1953,68 +1960,6 @@
           }
         }
       },
-      "DocumentResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "projectId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "folderId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "title": {
-            "type": "string"
-          },
-          "createdBy": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "DocumentSearchResponse": {
-        "type": "object",
-        "properties": {
-          "folders": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FolderResponse"
-            }
-          },
-          "documents": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DocumentResponse"
-            }
-          }
-        },
-        "description": "Результаты поиска по проекту: совпавшие папки и документы."
-      },
       "FolderContentsResponse": {
         "type": "object",
         "properties": {
@@ -2047,10 +1992,10 @@
               "$ref": "#/components/schemas/FolderResponse"
             }
           },
-          "documents": {
+          "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/DocumentResponse"
+              "$ref": "#/components/schemas/LibraryItemResponse"
             }
           }
         },
@@ -2097,6 +2042,75 @@
           }
         }
       },
+      "LibraryItemResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "projectId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "folderId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "type": {
+            "type": "string",
+            "description": "Тип элемента: \"document\" | \"board\" | \"table\"."
+          },
+          "title": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "LibraryItemType": {
+        "type": "integer"
+      },
+      "LibrarySearchResponse": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FolderResponse"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LibraryItemResponse"
+            }
+          }
+        },
+        "description": "Результаты поиска по проекту: совпавшие папки и элементы библиотеки."
+      },
       "LoginRequest": {
         "required": [
           "email",
@@ -2112,21 +2126,6 @@
           }
         }
       },
-      "MoveDocumentRequest": {
-        "type": "object",
-        "properties": {
-          "folderId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          }
-        },
-        "description": "Перемещение документа: null — в корень проекта (вне папок)."
-      },
       "MoveFolderRequest": {
         "type": "object",
         "properties": {
@@ -2139,8 +2138,22 @@
             ],
             "format": "int32"
           }
+        }
+      },
+      "MoveItemRequest": {
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
         },
-        "description": "Перемещение папки: null — в корень проекта."
+        "description": "Перемещение элемента библиотеки в другую папку (тип-агностично)."
       },
       "PermissionResponse": {
         "type": "object",
@@ -2153,7 +2166,7 @@
             ],
             "format": "int32"
           },
-          "documentId": {
+          "libraryItemId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "integer",
@@ -2344,14 +2357,6 @@
         "type": "integer",
         "description": "Роль пользователя в команде.\r\nЗначения упорядочены от наименьших прав к наибольшим, чтобы значение по умолчанию (0)\r\nсоответствовало наименее привилегированной роли (fail-safe)."
       },
-      "UpdateDocumentRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string"
-          }
-        }
-      },
       "UpdateFolderRequest": {
         "type": "object",
         "properties": {
@@ -2359,6 +2364,15 @@
             "type": "string"
           }
         }
+      },
+      "UpdateItemRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "description": "Переименование элемента библиотеки (тип-агностично)."
       },
       "UpdateMemberRoleRequest": {
         "required": [
@@ -2431,7 +2445,7 @@
       "name": "Auth"
     },
     {
-      "name": "Documents"
+      "name": "Library"
     },
     {
       "name": "Projects"

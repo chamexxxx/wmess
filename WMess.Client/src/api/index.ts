@@ -1,7 +1,7 @@
 import axios, { isAxiosError } from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { Bff } from './generated/Bff'
-import { Documents } from './generated/Documents'
+import { Library } from './generated/Library'
 import { Projects } from './generated/Projects'
 import { Teams } from './generated/Teams'
 import { User } from './generated/User'
@@ -78,7 +78,7 @@ class WMessApiClient extends Bff {
   public teams: Teams
   public projects: Projects
   public user: User
-  public documents: Documents
+  public library: Library
 
   constructor(config: ApiConfig) {
     super(config)
@@ -86,13 +86,13 @@ class WMessApiClient extends Bff {
     this.teams = new Teams(config)
     this.projects = new Projects(config)
     this.user = new User(config)
-    this.documents = new Documents(config)
+    this.library = new Library(config)
 
     attachAuthInterceptor(this.instance)
     attachAuthInterceptor(this.teams.instance)
     attachAuthInterceptor(this.projects.instance)
     attachAuthInterceptor(this.user.instance)
-    attachAuthInterceptor(this.documents.instance)
+    attachAuthInterceptor(this.library.instance)
   }
 }
 

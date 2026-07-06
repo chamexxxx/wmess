@@ -4,7 +4,12 @@ using Microsoft.AspNetCore.Identity;
 
 namespace WMess.Api.Models;
 
-public class Document
+/// <summary>
+/// Элемент библиотеки проекта. Несёт общие поля для всех типов (размещение в папке,
+/// заголовок, автор, права). Контент, специфичный для типа, живёт в отдельной 1:1
+/// сущности (например <see cref="DocumentContent"/>).
+/// </summary>
+public class LibraryItem
 {
     [Key]
     public int Id { get; set; }
@@ -15,11 +20,11 @@ public class Document
     public int? FolderId { get; set; }
 
     [Required]
+    public LibraryItemType Type { get; set; } = LibraryItemType.Document;
+
+    [Required]
     [MaxLength(300)]
     public string Title { get; set; } = "Untitled Document";
-
-    // Yjs state хранится как binary blob
-    public byte[]? YjsState { get; set; }
 
     [Required]
     public string CreatedBy { get; set; } = string.Empty;
@@ -33,10 +38,13 @@ public class Document
     public Project Project { get; set; } = null!;
 
     [ForeignKey(nameof(FolderId))]
-    public DocumentFolder? Folder { get; set; }
+    public LibraryFolder? Folder { get; set; }
 
     [ForeignKey(nameof(CreatedBy))]
     public IdentityUser Creator { get; set; } = null!;
 
-    public ICollection<DocumentPermission> Permissions { get; set; } = new List<DocumentPermission>();
+    public ICollection<LibraryPermission> Permissions { get; set; } = new List<LibraryPermission>();
+
+    // Контент типа Document (1:1, PK = FK). Для прочих типов появятся свои content-сущности.
+    public DocumentContent? DocumentContent { get; set; }
 }

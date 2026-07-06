@@ -34,7 +34,7 @@ export function PermissionsPanel({ documentId, onClose }: PermissionsPanelProps)
 
   const loadPermissions = async () => {
     try {
-      const res = await apiClient.documents.getDocumentPermissions(documentId)
+      const res = await apiClient.library.getItemPermissions(documentId)
       setPermissions(
         (res.data ?? []).map((p) => ({
           id: Number(p.id),
@@ -72,7 +72,7 @@ export function PermissionsPanel({ documentId, onClose }: PermissionsPanelProps)
         return
       }
 
-      await apiClient.documents.setDocumentPermission(documentId, {
+      await apiClient.library.setItemPermission(documentId, {
         userId: match.id,
         canView: true,
         canEdit: level === 'edit' || level === 'manage',
@@ -93,7 +93,7 @@ export function PermissionsPanel({ documentId, onClose }: PermissionsPanelProps)
   const removePermission = async (userId: string) => {
     setBusy(true)
     try {
-      await apiClient.documents.removeDocumentPermission(documentId, userId)
+      await apiClient.library.removeItemPermission(documentId, userId)
       await loadPermissions()
     } catch (error) {
       console.error('Failed to remove permission:', error)

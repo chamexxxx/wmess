@@ -93,8 +93,8 @@ builder.Services.AddAuthorization(options =>
 // Register Token Service
 builder.Services.AddScoped<ITokenService, TokenService>();
 
-// Register Document Access Service (единый источник вычисления прав на документ)
-builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
+// Register Library Access Service (единый источник вычисления прав на элемент библиотеки)
+builder.Services.AddScoped<ILibraryAccessService, LibraryAccessService>();
 
 // Register Authorization Handlers
 builder.Services.AddScoped<IAuthorizationHandler, TeamMemberHandler>();

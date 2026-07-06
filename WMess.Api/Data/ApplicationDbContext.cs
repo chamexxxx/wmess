@@ -16,9 +16,10 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<Project> Projects { get; set; }
     public DbSet<TeamUser> TeamUsers { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
-    public DbSet<Document> Documents { get; set; }
-    public DbSet<DocumentFolder> DocumentFolders { get; set; }
-    public DbSet<DocumentPermission> DocumentPermissions { get; set; }
+    public DbSet<LibraryItem> LibraryItems { get; set; }
+    public DbSet<DocumentContent> DocumentContents { get; set; }
+    public DbSet<LibraryFolder> LibraryFolders { get; set; }
+    public DbSet<LibraryPermission> LibraryPermissions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -47,58 +48,65 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             .HasForeignKey(p => p.TeamId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация связи DocumentFolder -> Project
-        builder.Entity<DocumentFolder>()
+        // Конфигурация связи LibraryFolder -> Project
+        builder.Entity<LibraryFolder>()
             .HasOne(df => df.Project)
             .WithMany()
             .HasForeignKey(df => df.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Конфигурация иерархии папок (самоссылающаяся связь)
-        builder.Entity<DocumentFolder>()
+        builder.Entity<LibraryFolder>()
             .HasOne(df => df.ParentFolder)
             .WithMany(df => df.SubFolders)
             .HasForeignKey(df => df.ParentFolderId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Конфигурация связи Document -> Project
-        builder.Entity<Document>()
+        // Конфигурация связи LibraryItem -> Project
+        builder.Entity<LibraryItem>()
             .HasOne(d => d.Project)
             .WithMany()
             .HasForeignKey(d => d.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация связи Document -> DocumentFolder
-        builder.Entity<Document>()
+        // Конфигурация связи LibraryItem -> LibraryFolder
+        builder.Entity<LibraryItem>()
             .HasOne(d => d.Folder)
-            .WithMany(f => f.Documents)
+            .WithMany(f => f.Items)
             .HasForeignKey(d => d.FolderId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Конфигурация связи Document -> Creator (IdentityUser)
-        builder.Entity<Document>()
+        // Конфигурация связи LibraryItem -> Creator (IdentityUser)
+        builder.Entity<LibraryItem>()
             .HasOne(d => d.Creator)
             .WithMany()
             .HasForeignKey(d => d.CreatedBy)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация связи DocumentPermission -> Document
-        builder.Entity<DocumentPermission>()
-            .HasOne(dp => dp.Document)
-            .WithMany(d => d.Permissions)
-            .HasForeignKey(dp => dp.DocumentId)
+        // Контент типа Document (1:1, PK = FK); удаляется вместе с элементом
+        builder.Entity<DocumentContent>()
+            .HasOne(c => c.Item)
+            .WithOne(i => i.DocumentContent)
+            .HasForeignKey<DocumentContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация связи DocumentPermission -> User
-        builder.Entity<DocumentPermission>()
+        // Конфигурация связи LibraryPermission -> LibraryItem
+        builder.Entity<LibraryPermission>()
+            .HasOne(dp => dp.Item)
+            .WithMany(d => d.Permissions)
+            .HasForeignKey(dp => dp.LibraryItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Конфигурация связи LibraryPermission -> User
+        builder.Entity<LibraryPermission>()
             .HasOne(dp => dp.User)
             .WithMany()
             .HasForeignKey(dp => dp.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Уникальный индекс для предотвращения дублирования прав
-        builder.Entity<DocumentPermission>()
-            .HasIndex(dp => new { dp.DocumentId, dp.UserId })
+        builder.Entity<LibraryPermission>()
+            .HasIndex(dp => new { dp.LibraryItemId, dp.UserId })
             .IsUnique();
     }
 }
