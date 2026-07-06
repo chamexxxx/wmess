@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { DocumentProvider, useDocument } from '../providers/DocumentProvider'
+import { BoardProvider, useBoard } from '../providers/BoardProvider'
 import { DocumentEditor } from './DocumentEditor'
+import { BoardEditor } from './BoardEditor'
 import { LibrarySidebar } from './LibrarySidebar'
 import { LibraryExplorer } from './LibraryExplorer'
 import { PermissionsPanel } from './PermissionsPanel'
@@ -13,6 +15,7 @@ interface SelectedDoc {
   title: string
   // Папка документа — чтобы при «назад» вернуться к ней в файловом менеджере.
   folderId?: number | null
+  type?: string
 }
 
 function ConnectedUsers() {
@@ -165,6 +168,151 @@ function DocumentWorkspace({
   )
 }
 
+// BoardWorkspace — хедер + редактор доски (использует useBoard для статуса/участников).
+// На уровне модуля (как DocumentWorkspace): вложенный компонент пересоздавался бы на каждый
+// рендер LibrarySection и ремонтировал бы BoardEditor (обрыв SignalR) при любом ресайзе/refresh.
+function BoardWorkspace({
+  board,
+  onBack,
+  onTitleUpdate,
+}: {
+  board: SelectedDoc
+  onBack: () => void
+  onTitleUpdate: (title: string) => void
+}) {
+  const { users, isConnected, isSynced } = useBoard()
+  const [showPermissions, setShowPermissions] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState(board.title)
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleTitleClick = () => {
+    setEditingTitle(true)
+    setTitleValue(board.title)
+  }
+
+  useEffect(() => {
+    if (editingTitle && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editingTitle])
+
+  const handleTitleSave = async () => {
+    const newTitle = titleValue.trim()
+    if (!newTitle || newTitle === board.title) {
+      setEditingTitle(false)
+      return
+    }
+
+    setSaving(true)
+    try {
+      await apiClient.library.updateItem(board.id, { title: newTitle })
+      setEditingTitle(false)
+      onTitleUpdate(newTitle)
+    } catch (error) {
+      console.error('Failed to update title:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleSave()
+    } else if (e.key === 'Escape') {
+      setEditingTitle(false)
+      setTitleValue(board.title)
+    }
+  }
+
+  // Уникальные участники по имени (как ConnectedUsers для документа)
+  const uniqueUsers = Array.from(new Map(users.map((u) => [u.name, u])).values())
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="h-[46px] shrink-0 flex items-center gap-2 px-3 border-b border-line">
+        <button
+          type="button"
+          onClick={onBack}
+          title="К списку документов"
+          className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-muted hover:bg-hovered cursor-pointer"
+        >
+          <ArrowLeftIcon size={18} />
+        </button>
+
+        {editingTitle ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={titleValue}
+            onChange={(e) => setTitleValue(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={handleTitleKeyDown}
+            disabled={saving}
+            autoFocus
+            className="flex-1 min-w-0 h-8 px-2 text-[14px] font-semibold text-ink bg-white border border-accent rounded outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={handleTitleClick}
+            className="group flex items-center gap-1.5 min-w-0 px-2 py-1 rounded-md text-[14px] font-semibold text-ink hover:bg-hovered transition-colors cursor-text"
+            title="Нажмите, чтобы переименовать"
+          >
+            <span className="truncate">{board.title}</span>
+            <PencilIcon size={13} className="shrink-0 text-faint group-hover:text-accent transition-colors" />
+          </button>
+        )}
+
+        <div className="ml-auto flex items-center gap-3">
+          {/* ConnectedUsers для доски */}
+          {uniqueUsers.length > 0 && (
+            <div className="flex items-center -space-x-2">
+              {uniqueUsers.slice(0, 6).map((u, idx) => (
+                <div
+                  key={idx}
+                  title={u.name}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold border-2 border-panel"
+                  style={{ backgroundColor: u.color }}
+                >
+                  {u.name.charAt(0).toUpperCase()}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* StatusBadge для доски */}
+          {!isConnected ? (
+            <span className="px-2 py-1 rounded-md bg-tile text-muted text-[11.5px] font-medium">Подключение…</span>
+          ) : !isSynced ? (
+            <span className="px-2 py-1 rounded-md bg-accent-soft text-accent text-[11.5px] font-medium">Синхронизация…</span>
+          ) : (
+            <span className="px-2 py-1 rounded-md bg-accent-soft text-accent text-[11.5px] font-medium">● Онлайн</span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowPermissions(true)}
+            className="h-8 px-3 rounded-md border border-line bg-white text-muted text-[13px] font-medium hover:bg-sidebar cursor-pointer"
+          >
+            Доступ
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <BoardEditor />
+      </div>
+
+      {showPermissions && (
+        <PermissionsPanel documentId={board.id} onClose={() => setShowPermissions(false)} />
+      )}
+    </div>
+  )
+}
+
 export function LibrarySection({ projectId }: { projectId: number }) {
   // Документ — в пути (/library/:docId), папка файлового менеджера — в ?folder.
   const { teamId, docId: docIdParam } = useParams()
@@ -198,6 +346,7 @@ export function LibrarySection({ projectId }: { projectId: number }) {
             id: docId,
             title: res.data.title ?? 'Без названия',
             folderId: res.data.folderId == null ? null : Number(res.data.folderId),
+            type: res.data.type,
           })
         }
       })
@@ -255,19 +404,34 @@ export function LibrarySection({ projectId }: { projectId: number }) {
 
   if (docId != null) {
     const doc = openDoc ?? { id: docId, title: 'Документ' }
+    const isBoard = doc.type === 'board'
+
     return (
       <div className="flex h-full min-h-0">
         <div className="flex-1 min-w-0 bg-panel">
-          <DocumentProvider key={doc.id} documentId={doc.id}>
-            <DocumentWorkspace
-              doc={doc}
-              onBack={backToFiles}
-              onTitleUpdate={(title) => {
-                setOpenDoc((prev) => (prev ? { ...prev, title } : { id: doc.id, title }))
-                setDocsRefresh((n) => n + 1)
-              }}
-            />
-          </DocumentProvider>
+          {isBoard ? (
+            <BoardProvider key={doc.id} boardId={doc.id}>
+              <BoardWorkspace
+                board={doc}
+                onBack={backToFiles}
+                onTitleUpdate={(title) => {
+                  setOpenDoc((prev) => (prev ? { ...prev, title } : { id: doc.id, title }))
+                  setDocsRefresh((n) => n + 1)
+                }}
+              />
+            </BoardProvider>
+          ) : (
+            <DocumentProvider key={doc.id} documentId={doc.id}>
+              <DocumentWorkspace
+                doc={doc}
+                onBack={backToFiles}
+                onTitleUpdate={(title) => {
+                  setOpenDoc((prev) => (prev ? { ...prev, title } : { id: doc.id, title }))
+                  setDocsRefresh((n) => n + 1)
+                }}
+              />
+            </DocumentProvider>
+          )}
         </div>
 
         {!sidebarHidden && (
