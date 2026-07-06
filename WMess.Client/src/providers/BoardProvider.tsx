@@ -72,14 +72,16 @@ export function BoardProvider({ boardId, children }: BoardProviderProps) {
       setIsSynced(synced === true)
     }
     const updateUsers = () => {
+      // BoardEditor кладёт имя/цвет во вложенное поле `user` (конвенция Excalidraw-коллабораторов),
+      // поэтому читаем оттуда, а не с верхнего уровня awareness-состояния.
       const states = Array.from(provider.awareness.getStates().values()) as Array<{
-        name?: string
-        color?: string
+        user?: { name?: string; color?: string }
       }>
       setUsers(
         states
-          .filter((s) => typeof s.name === 'string')
-          .map((s) => ({ name: s.name as string, color: s.color ?? '#888' })),
+          .map((s) => s.user)
+          .filter((u): u is { name: string; color?: string } => typeof u?.name === 'string')
+          .map((u) => ({ name: u.name, color: u.color ?? '#888' })),
       )
     }
 
