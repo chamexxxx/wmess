@@ -3,7 +3,7 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { DocsIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, DocsIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
 
 interface FolderItem {
   id: number
@@ -14,6 +14,7 @@ interface FolderItem {
 interface DocItem {
   id: number
   title: string
+  type?: string
   updatedAt?: string
 }
 
@@ -45,7 +46,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   const [searchDocs, setSearchDocs] = useState<DocItem[]>([])
   const searching = query.trim().length > 0
 
-  const [createKind, setCreateKind] = useState<'folder' | 'doc' | null>(null)
+  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | null>(null)
   // Папка, в которой создаётся документ (через контекстное меню папки); null — текущая папка.
   const [createDocFolderId, setCreateDocFolderId] = useState<number | null>(null)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
@@ -64,7 +65,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       const data = res.data
       setFolders((data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '', updatedAt: f.updatedAt })))
       setDocuments(
-        (data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', updatedAt: d.updatedAt })),
+        (data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type, updatedAt: d.updatedAt })),
       )
       setPath((data?.path ?? []).map((p) => ({ id: Number(p.id), name: p.name ?? '' })))
     } catch (error) {
@@ -91,7 +92,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       try {
         const res = await apiClient.library.searchLibrary(projectId, { query: q })
         setSearchFolders((res.data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '' })))
-        setSearchDocs((res.data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия' })))
+        setSearchDocs((res.data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type })))
       } catch (error) {
         console.error('Failed to search:', error)
       }
@@ -123,6 +124,22 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       }
     } catch (error) {
       console.error('Failed to create document:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createBoard = async (title: string) => {
+    setBusy(true)
+    try {
+      const res = await apiClient.library.createBoard({ projectId, folderId: createDocFolderId, title })
+      setCreateKind(null)
+      setCreateDocFolderId(null)
+      if (res.data?.id != null) {
+        onOpenDocument(Number(res.data.id), res.data.title ?? title)
+      }
+    } catch (error) {
+      console.error('Failed to create board:', error)
     } finally {
       setBusy(false)
     }
@@ -205,6 +222,14 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           },
         },
         {
+          label: 'Создать доску',
+          icon: <BoardsIcon size={15} />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('board')
+          },
+        },
+        {
           label: 'Переименовать',
           icon: <PencilIcon size={15} />,
           onClick: () => setRenameTarget({ kind: 'folder', id: f.id, name: f.name }),
@@ -255,6 +280,14 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           onClick: () => {
             setCreateDocFolderId(folderId)
             setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Создать доску',
+          icon: <BoardsIcon size={15} />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('board')
           },
         },
         {
@@ -361,7 +394,11 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           : undefined
       }
     >
-      <DocsIcon size={18} className="text-doc shrink-0" />
+      {d.type === 'board' ? (
+        <BoardsIcon size={18} className="text-doc shrink-0" />
+      ) : (
+        <DocsIcon size={18} className="text-doc shrink-0" />
+      )}
       <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{d.title}</span>
       {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(d.updatedAt)}</span>}
     </div>
@@ -451,6 +488,17 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
             <PlusIcon size={15} strokeWidth={2} />
             Документ
           </button>
+          <button
+            type="button"
+            className="h-8 px-3 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer flex items-center gap-1.5"
+            onClick={() => {
+              setCreateDocFolderId(folderId)
+              setCreateKind('board')
+            }}
+          >
+            <PlusIcon size={15} strokeWidth={2} />
+            Доска
+          </button>
         </div>
       </div>
 
@@ -500,6 +548,19 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           submitLabel="Создать"
           busy={busy}
           onSubmit={createDocument}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
+        />
+      )}
+      {createKind === 'board' && (
+        <FormModal
+          title="Новая доска"
+          label="Название доски"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createBoard}
           onClose={() => {
             setCreateKind(null)
             setCreateDocFolderId(null)
