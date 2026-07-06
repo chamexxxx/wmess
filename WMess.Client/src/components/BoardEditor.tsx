@@ -75,13 +75,23 @@ export function BoardEditor() {
     const yMap = doc.getMap<Record<string, unknown>>('elements')
     yMapRef.current = yMap
 
+    // Пересборка сцены (reconcile + updateScene) — тяжёлая; при быстрой серии чужих апдейтов
+    // делать её на каждый апдейт нельзя: получатель захлёбывается, его приёмный буфер тормозит
+    // сервер (backpressure), и апдейты выливаются пачкой. Коалесим серию апдейтов за один кадр
+    // в одну пересборку через requestAnimationFrame — сцена всё равно строится из полного Y.Map.
+    let rafId: number | null = null
+    const flush = () => {
+      rafId = null
+      const api = excalidrawAPIRef.current
+      if (api) applyRemoteToScene(api)
+    }
+
     // Подписка на изменения из Yjs → обновление сцены Excalidraw
     const observeHandler = (event: Y.YMapEvent<Record<string, unknown>>) => {
       // Игнорируем изменения, которые мы сами инициировали
       if (event.transaction.origin === EXCALIDRAW_ORIGIN) return
-      const api = excalidrawAPIRef.current
-      if (!api) return
-      applyRemoteToScene(api)
+      if (!excalidrawAPIRef.current) return
+      if (rafId == null) rafId = requestAnimationFrame(flush)
     }
 
     yMap.observe(observeHandler)
@@ -90,6 +100,7 @@ export function BoardEditor() {
     connect()
 
     return () => {
+      if (rafId != null) cancelAnimationFrame(rafId)
       yMap.unobserve(observeHandler)
       disconnect()
     }
@@ -179,9 +190,16 @@ export function BoardEditor() {
     [doc],
   )
 
-  // Обработчик позиции курсора → awareness
+  // Обработчик позиции курсора → awareness.
+  // Троттлим до ~20 Гц: onPointerUpdate стреляет на каждый mousemove, а каждый апдект
+  // рассылается остальным и у них дёргает updateScene(collaborators). Без троттла поток
+  // курсора флудит соединение и конкурирует с апдейтами рисунка.
+  const lastPointerSentRef = useRef(0)
   const handlePointerUpdate = useCallback(
     (payload: { pointer: { x: number; y: number; tool: 'pointer' | 'laser' }; button: 'up' | 'down' }) => {
+      const now = performance.now()
+      if (now - lastPointerSentRef.current < 50) return
+      lastPointerSentRef.current = now
       awareness.setLocalStateField('pointer', {
         x: payload.pointer.x,
         y: payload.pointer.y,

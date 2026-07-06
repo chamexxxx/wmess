@@ -105,7 +105,22 @@ builder.Services.AddScoped<IAuthorizationHandler, ProjectAccessHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ProjectManageHandler>();
 
 // Register SignalR (MessagePack — для эффективной передачи бинарных Yjs-апдейтов)
-builder.Services.AddSignalR().AddMessagePackProtocol();
+builder.Services.AddSignalR(options =>
+{
+    // По умолчанию вызовы одного клиента обрабатываются строго последовательно (лимит = 1).
+    // SaveDocumentState пишет снапшот в БД (медленно) и при этом лимите блокирует поток
+    // инкрементальных SendUpdate/SendAwareness — у других участников правки появляются
+    // рывками/с задержкой. Разрешаем несколько параллельных вызовов, чтобы запись снапшота
+    // не вставала «в голову очереди». Каждый вызов хаба получает свой DI-scope (и свой
+    // DbContext), поэтому параллелизм безопасен.
+    options.MaximumParallelInvocationsPerClient = 8;
+
+    // Дефолтный лимит входящего сообщения — 32 КБ. SaveDocumentState шлёт полный Yjs-снапшот
+    // состояния (encodeStateAsUpdate), который на доске с несколькими фигурами легко превышает
+    // 32 КБ; сервер тогда закрывает соединение с ошибкой, а на реконнекте Yjs ре-синкает всё
+    // разом — отсюда обрывы в консоли и «пачки» правок у других участников. Поднимаем лимит.
+    options.MaximumReceiveMessageSize = 20 * 1024 * 1024;
+}).AddMessagePackProtocol();
 
 // Register Controllers
 builder.Services.AddControllers(options =>
