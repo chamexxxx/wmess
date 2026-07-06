@@ -33,12 +33,15 @@ function bytesToBase64(bytes: Uint8Array): string {
  * а также пересылку awareness (курсоры/presence). Сервер не мержит CRDT — он лишь
  * рассылает апдейты между участниками и хранит снапшот для холодного старта.
  */
+export type ContentType = 'documents' | 'boards'
+
 export class SignalRProvider {
   public readonly doc: Y.Doc
   public readonly awareness: Awareness
 
   private readonly documentId: number
   private readonly connection: HubConnection
+  private readonly contentType: ContentType
   private readonly listeners: Map<ProviderEvent, Set<(...args: unknown[]) => void>> = new Map()
 
   private synced = false
@@ -47,10 +50,16 @@ export class SignalRProvider {
   private desired = false
   private op: Promise<void> = Promise.resolve()
 
-  constructor(documentId: number, doc: Y.Doc, serverUrl: string = '/hubs/document') {
+  constructor(
+    documentId: number,
+    doc: Y.Doc,
+    serverUrl: string = '/hubs/document',
+    contentType: ContentType = 'documents',
+  ) {
     this.documentId = documentId
     this.doc = doc
     this.awareness = new Awareness(doc)
+    this.contentType = contentType
 
     this.connection = new HubConnectionBuilder()
       .withUrl(serverUrl, {
@@ -261,7 +270,7 @@ export class SignalRProvider {
   private readonly handlePageHide = (): void => {
     if (!this.hasPendingSave()) return
     this.clearSaveTimers()
-    void fetch(`/api/library/documents/${this.documentId}/state`, {
+    void fetch(`/api/library/${this.contentType}/${this.documentId}/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
