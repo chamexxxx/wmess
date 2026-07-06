@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { Excalidraw } from '@excalidraw/excalidraw'
-import '@excalidraw/excalidraw/index.css'
+import { BoardProvider } from '../providers/BoardProvider'
+import { BoardEditor } from '../components/BoardEditor'
 
 export function ExcalidrawTestPage() {
   useEffect(() => {
@@ -11,16 +11,12 @@ export function ExcalidrawTestPage() {
       '/excalidraw-assets/'
   }, [])
 
+  // Временно используем тестовый boardId=1 для проверки синхронизации
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
-      <Excalidraw
-        initialData={{
-          elements: [],
-          appState: {
-            viewBackgroundColor: '#ffffff',
-          },
-        }}
-      />
+      <BoardProvider boardId={1}>
+        <BoardEditor />
+      </BoardProvider>
     </div>
   )
 }
