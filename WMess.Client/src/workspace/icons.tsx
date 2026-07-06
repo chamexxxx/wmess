@@ -95,12 +95,11 @@ export const TasksIcon = (p: IconProps) => (
   </Svg>
 )
 
+// Доска для совместного рисования: рамка холста с рукописной волной внутри.
 export const BoardsIcon = (p: IconProps) => (
   <Svg {...p}>
-    <rect x="4" y="4" width="7" height="7" rx="1.5" />
-    <rect x="13" y="4" width="7" height="7" rx="1.5" />
-    <rect x="4" y="13" width="7" height="7" rx="1.5" />
-    <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <path d="M6.5 14c1.6-3 3.2-3 4.8 0s3.2 3 4.8 0" />
   </Svg>
 )
 

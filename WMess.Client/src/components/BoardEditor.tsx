@@ -157,9 +157,14 @@ export function BoardEditor() {
           const existingRaw = yMap.get(element.id)
           const existing = existingRaw as unknown as ExcalidrawElement | undefined
 
-          // Записываем только если версия изменилась (или элемент новый)
+          // Записываем только если версия изменилась (или элемент новый).
           if (!existing || existing.version !== element.version) {
-            yMap.set(element.id, element as unknown as Record<string, unknown>)
+            // ВАЖНО: кладём глубокую копию, а не сам объект элемента. Excalidraw переиспользует
+            // и мутирует элемент на месте во время рисования; если хранить живую ссылку, то
+            // yMap.get вернёт её же с уже обновлённой version, сравнение version === version
+            // окажется истинным, и промежуточные кадры линии не запишутся и не разойдутся —
+            // у других участников элемент застынет на первом снимке (точке старта).
+            yMap.set(element.id, structuredClone(element) as unknown as Record<string, unknown>)
           }
 
           currentElementIds.delete(element.id)

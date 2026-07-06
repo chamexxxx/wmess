@@ -359,8 +359,10 @@ export function LibrarySection({ projectId }: { projectId: number }) {
 
   const folderPath = (id: number | null) => (id == null ? libraryBase : `${libraryBase}?folder=${id}`)
 
-  const openDocument = (id: number, title: string) => {
-    setOpenDoc({ id, title })
+  // type (когда известен, например из проводника) выставляем сразу, чтобы не мигал
+  // редактор документа до резолва типа через getItem.
+  const openDocument = (id: number, title: string, type?: string) => {
+    setOpenDoc({ id, title, type })
     navigate(`${libraryBase}/${id}`)
   }
 
@@ -409,7 +411,11 @@ export function LibrarySection({ projectId }: { projectId: number }) {
     return (
       <div className="flex h-full min-h-0">
         <div className="flex-1 min-w-0 bg-panel">
-          {isBoard ? (
+          {doc.type == null ? (
+            // Тип ещё резолвится (прямая загрузка/выбор из сайдбара) — нейтральный лоадер,
+            // а не редактор документа, иначе на миг мелькает чужой (документный) воркспейс.
+            <div className="h-full flex items-center justify-center text-[13px] text-faint">Загрузка…</div>
+          ) : isBoard ? (
             <BoardProvider key={doc.id} boardId={doc.id}>
               <BoardWorkspace
                 board={doc}

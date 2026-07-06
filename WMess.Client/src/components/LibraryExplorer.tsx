@@ -25,7 +25,7 @@ interface LibraryExplorerProps {
   projectId: number
   folderId: number | null
   onNavigateFolder: (id: number | null) => void
-  onOpenDocument: (id: number, title: string) => void
+  onOpenDocument: (id: number, title: string, type?: string) => void
 }
 
 function formatDate(value?: string): string {
@@ -120,7 +120,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       setCreateKind(null)
       setCreateDocFolderId(null)
       if (res.data?.id != null) {
-        onOpenDocument(Number(res.data.id), res.data.title ?? title)
+        onOpenDocument(Number(res.data.id), res.data.title ?? title, 'document')
       }
     } catch (error) {
       console.error('Failed to create document:', error)
@@ -136,7 +136,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       setCreateKind(null)
       setCreateDocFolderId(null)
       if (res.data?.id != null) {
-        onOpenDocument(Number(res.data.id), res.data.title ?? title)
+        onOpenDocument(Number(res.data.id), res.data.title ?? title, 'board')
       }
     } catch (error) {
       console.error('Failed to create board:', error)
@@ -215,7 +215,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       items: [
         {
           label: 'Создать документ',
-          icon: <DocsIcon size={15} />,
+          icon: <DocsIcon size={15} className="text-doc" />,
           onClick: () => {
             setCreateDocFolderId(f.id)
             setCreateKind('doc')
@@ -223,7 +223,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         },
         {
           label: 'Создать доску',
-          icon: <BoardsIcon size={15} />,
+          icon: <BoardsIcon size={15} className="text-board" />,
           onClick: () => {
             setCreateDocFolderId(f.id)
             setCreateKind('board')
@@ -275,8 +275,13 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       y: e.clientY,
       items: [
         {
+          label: 'Создать папку',
+          icon: <FolderIcon size={15} className="text-folder" />,
+          onClick: () => setCreateKind('folder'),
+        },
+        {
           label: 'Создать документ',
-          icon: <DocsIcon size={15} />,
+          icon: <DocsIcon size={15} className="text-doc" />,
           onClick: () => {
             setCreateDocFolderId(folderId)
             setCreateKind('doc')
@@ -284,16 +289,11 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         },
         {
           label: 'Создать доску',
-          icon: <BoardsIcon size={15} />,
+          icon: <BoardsIcon size={15} className="text-board" />,
           onClick: () => {
             setCreateDocFolderId(folderId)
             setCreateKind('board')
           },
-        },
-        {
-          label: 'Создать папку',
-          icon: <FolderIcon size={15} />,
-          onClick: () => setCreateKind('folder'),
         },
       ],
     })
@@ -374,7 +374,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     <div
       key={`d-${d.id}`}
       className={`${rowBase} ${isDragging ? 'opacity-50' : ''}`}
-      onClick={() => onOpenDocument(d.id, d.title)}
+      onClick={() => onOpenDocument(d.id, d.title, d.type)}
       onContextMenu={(e) => openDocMenu(e, d)}
       draggable={withMeta}
       onDragStart={
@@ -395,7 +395,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       }
     >
       {d.type === 'board' ? (
-        <BoardsIcon size={18} className="text-doc shrink-0" />
+        <BoardsIcon size={18} className="text-board shrink-0" />
       ) : (
         <DocsIcon size={18} className="text-doc shrink-0" />
       )}
