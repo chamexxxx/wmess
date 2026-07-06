@@ -57,12 +57,16 @@ export function BoardEditor() {
         return aIndex.localeCompare(bIndex)
       })
 
-      // Reconcile: merge local и remote с сохранением порядка
-      // RemoteExcalidrawElement - это OrderedExcalidrawElement с брендом, приводим через unknown
+      // Reconcile: merge local и remote с сохранением порядка.
+      // RemoteExcalidrawElement — это OrderedExcalidrawElement с брендом, приводим через unknown.
+      // ВАЖНО: передаём реальный appState (не пустой). По нему reconcileElements определяет,
+      // какой элемент пользователь сейчас рисует/ресайзит/тащит, и НЕ затирает его удалённой
+      // версией. С пустым appState активный элемент сбрасывался до версии из Y.Map — отсюда
+      // «квадрат схлопывается до меньшего размера» и «линия обрывается на середине».
       const reconciled = reconcileElements(
         localElements,
         remoteElements as unknown as readonly RemoteExcalidrawElement[],
-        {} as AppState,
+        api.getAppState(),
       )
 
       api.updateScene({ elements: reconciled })
