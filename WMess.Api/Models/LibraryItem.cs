@@ -47,4 +47,7 @@ public class LibraryItem
 
     // Контент типа Document (1:1, PK = FK). Для прочих типов появятся свои content-сущности.
     public DocumentContent? DocumentContent { get; set; }
+
+    // Контент типа Board (1:1, PK = FK).
+    public BoardContent? BoardContent { get; set; }
 }

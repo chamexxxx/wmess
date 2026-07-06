@@ -727,7 +727,122 @@ public class LibraryController : ControllerBase
 
         return NoContent();
     }
+    #endregion
 
+    #region Boards (тип-специфичный контент)
+
+    [HttpPost("boards")]
+    [EndpointName("CreateBoard")]
+    public async Task<ActionResult<LibraryItemResponse>> CreateBoard(CreateDocumentRequest request)
+    {
+        var project = await _context.Projects.FindAsync(request.ProjectId);
+        if (project == null)
+        {
+            return BadRequest(new { message = "Project not found" });
+        }
+
+        var result = await _authorizationService.AuthorizeAsync(User, project, Policies.ProjectManage);
+        if (!result.Succeeded)
+        {
+            return Forbid();
+        }
+
+        if (request.FolderId.HasValue)
+        {
+            var folder = await _context.LibraryFolders.FindAsync(request.FolderId.Value);
+            if (folder == null || folder.ProjectId != request.ProjectId)
+            {
+                return BadRequest(new { message = "Folder not found or doesn't belong to this project" });
+            }
+        }
+
+        var userId = GetCurrentUserId();
+
+        var item = new LibraryItem
+        {
+            ProjectId = request.ProjectId,
+            FolderId = request.FolderId,
+            Type = LibraryItemType.Board,
+            Title = request.Title,
+            CreatedBy = userId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            BoardContent = new BoardContent { YjsState = null },
+            Permissions =
+            {
+                new LibraryPermission
+                {
+                    UserId = userId,
+                    CanView = true,
+                    CanEdit = true,
+                    CanManage = true,
+                    GrantedAt = DateTime.UtcNow
+                }
+            }
+        };
+
+        _context.LibraryItems.Add(item);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
+    }
+
+    [HttpGet("boards/{id}/content")]
+    [EndpointName("GetBoardContent")]
+    public async Task<ActionResult<byte[]>> GetBoardContent(int id)
+    {
+        var item = await _context.LibraryItems
+            .Include(d => d.Project)
+            .Include(d => d.BoardContent)
+            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Board);
+
+        if (item == null)
+        {
+            return NotFound();
+        }
+
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
+        if (!rights.CanView)
+        {
+            return Forbid();
+        }
+
+        return Ok(item.BoardContent?.YjsState ?? Array.Empty<byte>());
+    }
+
+    [HttpPut("boards/{id}/state")]
+    [EndpointName("UpdateBoardState")]
+    public async Task<IActionResult> UpdateBoardState(int id, [FromBody] byte[] state)
+    {
+        var item = await _context.LibraryItems
+            .Include(d => d.Project)
+            .Include(d => d.BoardContent)
+            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Board);
+
+        if (item == null)
+        {
+            return NotFound();
+        }
+
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
+        if (!rights.CanEdit)
+        {
+            return Forbid();
+        }
+
+        if (item.BoardContent == null)
+        {
+            item.BoardContent = new BoardContent { LibraryItemId = item.Id };
+            _context.BoardContents.Add(item.BoardContent);
+        }
+
+        item.BoardContent.YjsState = state;
+        item.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
     #endregion
 
     #region Permissions

@@ -132,4 +132,5 @@ app.MapControllers();
 
 // Map SignalR Hubs
 app.MapHub<WMess.Api.Hubs.DocumentHub>("/hubs/document");
+app.MapHub<WMess.Api.Hubs.BoardHub>("/hubs/board");
 app.Run();

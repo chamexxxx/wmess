@@ -18,6 +18,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<LibraryItem> LibraryItems { get; set; }
     public DbSet<DocumentContent> DocumentContents { get; set; }
+    public DbSet<BoardContent> BoardContents { get; set; }
     public DbSet<LibraryFolder> LibraryFolders { get; set; }
     public DbSet<LibraryPermission> LibraryPermissions { get; set; }
 
@@ -88,6 +89,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             .HasOne(c => c.Item)
             .WithOne(i => i.DocumentContent)
             .HasForeignKey<DocumentContent>(c => c.LibraryItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Контент типа Board (1:1, PK = FK); удаляется вместе с элементом
+        builder.Entity<BoardContent>()
+            .HasOne(c => c.Item)
+            .WithOne(i => i.BoardContent)
+            .HasForeignKey<BoardContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Конфигурация связи LibraryPermission -> LibraryItem
