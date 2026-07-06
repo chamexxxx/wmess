@@ -4,13 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run generate-api && vite",
-    "build": "npm run generate-api && tsc -b && vite build",
+    "dev": "npm run generate-api && npm run copy-excalidraw-assets && vite",
+    "build": "npm run generate-api && npm run copy-excalidraw-assets && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "generate-api": "node scripts/generate-api.mjs"
+    "generate-api": "node scripts/generate-api.mjs",
+    "copy-excalidraw-assets": "node scripts/copy-excalidraw-assets.mjs"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
     "@lexical/code": "^0.45.0",
     "@lexical/code-prism": "^0.45.0",
     "@lexical/link": "^0.45.0",

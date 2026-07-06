@@ -3,6 +3,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ExcalidrawTestPage } from './pages/ExcalidrawTestPage'
 
 export const router = createBrowserRouter([
   {
@@ -13,6 +14,8 @@ export const router = createBrowserRouter([
       { path: '/teams/:teamId/projects/:projectId', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId/:section', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId/library/:docId', element: <HomePage /> },
+      // Временный роут для тестирования Excalidraw
+      { path: '/excalidraw-test', element: <ExcalidrawTestPage /> },
     ],
   },
   {
