@@ -16,12 +16,13 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react'
-import { Excalidraw, reconcileElements } from '@excalidraw/excalidraw'
+import { Excalidraw, MainMenu, reconcileElements } from '@excalidraw/excalidraw'
 import type { ExcalidrawImperativeAPI, AppState } from '@excalidraw/excalidraw/types'
 import type { ExcalidrawElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type { RemoteExcalidrawElement } from '@excalidraw/excalidraw/data/reconcile'
 import * as Y from 'yjs'
 import { useBoard } from '../providers/BoardProvider'
+import { SearchIcon } from '../workspace/icons'
 import '@excalidraw/excalidraw/index.css'
 
 // Origin-объект для транзакций Yjs, чтобы отличать наши изменения от внешних
@@ -225,6 +226,7 @@ export function BoardEditor() {
         onChange={handleChange}
         onPointerUpdate={handlePointerUpdate}
         isCollaborating
+        langCode="ru-RU"
         UIOptions={{
           canvasActions: {
             loadScene: false,
@@ -232,7 +234,29 @@ export function BoardEditor() {
             saveToActiveFile: false,
           },
         }}
-      />
+      >
+        {/* Кастомное меню заменяет дефолтное целиком, поэтому повторяем все стандартные
+            пункты в том же порядке — но БЕЗ блока «Excalidraw links» (Socials). */}
+        <MainMenu>
+          <MainMenu.DefaultItems.SaveAsImage />
+          {/* Свой пункт с русской подписью вместо DefaultItems.SearchMenu (у Excalidraw нет
+              ru-перевода для «Find on canvas»). Внутри поиск — это таб "search" дефолтного
+              сайдбара (name "default"); штатный экшен searchMenu открывает именно его. Делаем
+              то же самое публичным методом toggleSidebar — без эмуляции горячей клавиши. */}
+          <MainMenu.Item
+            icon={<SearchIcon size={16} />}
+            shortcut="Ctrl+F"
+            onSelect={() => excalidrawAPIRef.current?.toggleSidebar({ name: 'default', tab: 'search' })}
+          >
+            Найти на холсте
+          </MainMenu.Item>
+          <MainMenu.DefaultItems.Help />
+          <MainMenu.DefaultItems.ClearCanvas />
+          <MainMenu.Separator />
+          <MainMenu.DefaultItems.ToggleTheme />
+          <MainMenu.DefaultItems.ChangeCanvasBackground />
+        </MainMenu>
+      </Excalidraw>
     </div>
   )
 }
