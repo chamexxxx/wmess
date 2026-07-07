@@ -126,7 +126,11 @@ export function BoardEditor() {
       const collaborators: AppState['collaborators'] = new Map()
 
       states.forEach((state, clientId) => {
-        if (clientId === doc.clientID) return // пропускаем себя
+        if (clientId === doc.clientID) return // своя вкладка
+        // Каждая вкладка — отдельный Yjs-клиент со своим clientID, поэтому другие вкладки
+        // ТОГО ЖE аккаунта прилетают как «участники». Не показываем курсоры своего аккаунта
+        // (сравниваем по имени = email пользователя).
+        if (state.user?.name === username) return
         if (state.user) {
           collaborators.set(clientId.toString() as AppState['collaborators'] extends Map<infer K, unknown> ? K : never, {
             username: state.user.name,
@@ -138,11 +142,9 @@ export function BoardEditor() {
         }
       })
 
-      excalidrawAPIRef.current.updateScene({
-        appState: {
-          collaborators,
-        } as unknown as Pick<AppState, 'collaborators'>,
-      })
+      // collaborators — отдельный параметр updateScene верхнего уровня (НЕ внутри appState).
+      // Через appState карта не заменялась целиком, и убранный курсор своей вкладки оставался.
+      excalidrawAPIRef.current.updateScene({ collaborators })
     }
 
     awareness.on('change', changeHandler)
