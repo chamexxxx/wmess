@@ -98,9 +98,15 @@
   color: #d6336c;
 }
 
-/* Прячем встроенный список коллабораторов Excalidraw (аватары «+N» справа сверху):
-   у нас есть свои аватары участников в шапке доски, чтобы не дублировать.
-   Курсоры участников на холсте — отдельный элемент и остаются видимыми. */
-.excalidraw .UserList {
-  display: none;
+/* У Excalidraw нет пропов, чтобы скрыть эти элементы (UIOptions.canvasActions умеет
+   только export/loadScene/saveAsImage/theme/clearCanvas/фон), поэтому прячем их CSS-ом.
+   1) .UserList — встроенный список коллабораторов (аватары «+N» справа сверху); у нас
+      есть свои аватары в шапке доски. Курсоры на холсте — отдельный элемент, остаются.
+   2) .help-icon — кнопка «?» (Help) в правом нижнем углу. */
+/* !important обязателен: у Excalidraw эти же селекторы (.excalidraw .UserList /
+   .excalidraw .help-icon) с display:flex, и его CSS импортируется в BoardEditor ПОСЛЕ
+   index.css — при равной специфичности без !important побеждало бы правило Excalidraw. */
+.excalidraw .UserList,
+.excalidraw .help-icon {
+  display: none !important;
 }
