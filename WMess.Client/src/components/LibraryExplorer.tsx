@@ -476,27 +476,35 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
             }`}
             title="Все файлы"
             onClick={() => onNavigateFolder(null)}
-            {...breadcrumbDnd('root')}
+            {...(path.length === 0 ? {} : breadcrumbDnd('root'))}
           >
             <HomeIcon size={16} />
           </button>
-          {path.map((c) => (
-            <span key={c.id} className="flex items-center gap-1.5 min-w-0">
-              <span className="text-faintest shrink-0">/</span>
-              <button
-                type="button"
-                className={`transition-colors truncate cursor-pointer rounded px-1 -mx-1 ${
-                  dropTarget === c.id
-                    ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/40'
-                    : 'text-muted hover:text-accent'
-                }`}
-                onClick={() => onNavigateFolder(c.id)}
-                {...breadcrumbDnd(c.id)}
-              >
-                {c.name}
-              </button>
-            </span>
-          ))}
+          {path.map((c, i) => {
+            // Последний пункт — текущая папка: не ссылка, без подсветки и не цель для переноса.
+            const isCurrent = i === path.length - 1
+            return (
+              <span key={c.id} className="flex items-center gap-1.5 min-w-0">
+                <span className="text-faintest shrink-0">/</span>
+                {isCurrent ? (
+                  <span className="truncate px-1 -mx-1 text-ink font-medium">{c.name}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`transition-colors truncate cursor-pointer rounded px-1 -mx-1 ${
+                      dropTarget === c.id
+                        ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/40'
+                        : 'text-muted hover:text-accent'
+                    }`}
+                    onClick={() => onNavigateFolder(c.id)}
+                    {...breadcrumbDnd(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                )}
+              </span>
+            )
+          })}
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
