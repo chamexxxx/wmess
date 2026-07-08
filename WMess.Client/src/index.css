@@ -22,10 +22,11 @@
   --color-accent-soft: #e6f4ec;
   --color-accent-deep: #3c8a63;
 
-  /* File-explorer item hues: folders amber, documents blue, boards violet (для ориентации). */
+  /* File-explorer item hues: folders amber, documents blue, boards violet, tables teal (для ориентации). */
   --color-folder: #e0a82e;
   --color-doc: #3d6fc2;
   --color-board: #8a63c9;
+  --color-table: #2f9e8f;
 
   --font-ui: "Onest", sans-serif;
   --font-mono: "JetBrains Mono", monospace;

@@ -707,8 +707,56 @@ public class LibraryController : ControllerBase
 
     #endregion
 
-    #region Collaborative content (обобщённо по типам элемента)
+    #region Tables (тип-специфичное создание)
 
+    [HttpPost("tables")]
+    [EndpointName("CreateTable")]
+    public async Task<ActionResult<LibraryItemResponse>> CreateTable(CreateDocumentRequest request)
+    {
+        var project = await _context.Projects.FindAsync(request.ProjectId);
+        if (project == null)
+        {
+            return BadRequest(new { message = "Project not found" });
+        }
+
+        var result = await _authorizationService.AuthorizeAsync(User, project, Policies.ProjectManage);
+        if (!result.Succeeded)
+        {
+            return Forbid();
+        }
+
+        if (request.FolderId.HasValue)
+        {
+            var folder = await _context.LibraryFolders.FindAsync(request.FolderId.Value);
+            if (folder == null || folder.ProjectId != request.ProjectId)
+            {
+                return BadRequest(new { message = "Folder not found or doesn't belong to this project" });
+            }
+        }
+
+        var userId = GetCurrentUserId();
+
+        var item = new LibraryItem
+        {
+            ProjectId = request.ProjectId,
+            FolderId = request.FolderId,
+            Type = LibraryItemType.Table,
+            Title = request.Title,
+            CreatedBy = userId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            TableContent = new TableContent { YjsState = null }
+        };
+
+        _context.LibraryItems.Add(item);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
+    }
+
+    #endregion
+
+    #region Collaborative content (обобщённо по типам элемента)
     // Content/state одинаковы для всех типов (просто байты Yjs-снапшота в своей таблице контента),
     // поэтому один обобщённый маршрут `api/library-items/{id}` вместо дублей per-type. Ветвление по Type выбирает
     // нужную таблицу. Парная точка — hub SaveLibraryItemState; этот REST — фолбэк на выгрузке страницы.
@@ -720,6 +768,7 @@ public class LibraryController : ControllerBase
             .Include(d => d.Project)
             .Include(d => d.DocumentContent)
             .Include(d => d.BoardContent)
+            .Include(d => d.TableContent)
             .FirstOrDefaultAsync(d => d.Id == id);
 
         if (item == null)
@@ -737,9 +786,9 @@ public class LibraryController : ControllerBase
         {
             LibraryItemType.Document => item.DocumentContent?.YjsState,
             LibraryItemType.Board => item.BoardContent?.YjsState,
+            LibraryItemType.Table => item.TableContent?.YjsState,
             _ => null,
         };
-
         return Ok(state ?? Array.Empty<byte>());
     }
 
@@ -751,6 +800,7 @@ public class LibraryController : ControllerBase
             .Include(d => d.Project)
             .Include(d => d.DocumentContent)
             .Include(d => d.BoardContent)
+            .Include(d => d.TableContent)
             .FirstOrDefaultAsync(d => d.Id == id);
 
         if (item == null)
@@ -782,10 +832,17 @@ public class LibraryController : ControllerBase
                 }
                 item.BoardContent.YjsState = state;
                 break;
+            case LibraryItemType.Table:
+                if (item.TableContent == null)
+                {
+                    item.TableContent = new TableContent { LibraryItemId = item.Id };
+                    _context.TableContents.Add(item.TableContent);
+                }
+                item.TableContent.YjsState = state;
+                break;
             default:
                 return BadRequest($"Unsupported item type: {item.Type}");
         }
-
         item.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

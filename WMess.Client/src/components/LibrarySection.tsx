@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { DocumentProvider, useDocument } from '../providers/DocumentProvider'
 import { BoardProvider, useBoard } from '../providers/BoardProvider'
+import { TableProvider, useTable } from '../providers/TableProvider'
 import { DocumentEditor } from './DocumentEditor'
 import { BoardEditor } from './BoardEditor'
+import { TableEditor } from './TableEditor'
 import { LibrarySidebar } from './LibrarySidebar'
 import { LibraryExplorer } from './LibraryExplorer'
 import { apiClient } from '../api'
@@ -287,6 +289,133 @@ function BoardWorkspace({
   )
 }
 
+// TableWorkspace — хедер + редактор таблицы (использует useTable для статуса/участников).
+function TableWorkspace({
+  table,
+  onBack,
+  onTitleUpdate,
+}: {
+  table: SelectedDoc
+  onBack: () => void
+  onTitleUpdate: (title: string) => void
+}) {
+  const { users, isConnected, isSynced } = useTable()
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState(table.title)
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleTitleClick = () => {
+    setEditingTitle(true)
+    setTitleValue(table.title)
+  }
+
+  useEffect(() => {
+    if (editingTitle && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [editingTitle])
+
+  const handleTitleSave = async () => {
+    const newTitle = titleValue.trim()
+    if (!newTitle || newTitle === table.title) {
+      setEditingTitle(false)
+      return
+    }
+
+    setSaving(true)
+    try {
+      await apiClient.library.updateItem(table.id, { title: newTitle })
+      setEditingTitle(false)
+      onTitleUpdate(newTitle)
+    } catch (error) {
+      console.error('Failed to update title:', error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleSave()
+    } else if (e.key === 'Escape') {
+      setEditingTitle(false)
+      setTitleValue(table.title)
+    }
+  }
+
+  const uniqueUsers = Array.from(new Map(users.map((u) => [u.name, u])).values())
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="h-[46px] shrink-0 flex items-center gap-2 px-3 border-b border-line">
+        <button
+          type="button"
+          onClick={onBack}
+          title="К списку документов"
+          className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-muted hover:bg-hovered cursor-pointer"
+        >
+          <ArrowLeftIcon size={18} />
+        </button>
+
+        {editingTitle ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={titleValue}
+            onChange={(e) => setTitleValue(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={handleTitleKeyDown}
+            disabled={saving}
+            autoFocus
+            className="flex-1 min-w-0 h-8 px-2 text-[14px] font-semibold text-ink bg-white border border-accent rounded outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={handleTitleClick}
+            className="group flex items-center gap-1.5 min-w-0 px-2 py-1 rounded-md text-[14px] font-semibold text-ink hover:bg-hovered transition-colors cursor-text"
+            title="Нажмите, чтобы переименовать"
+          >
+            <span className="truncate">{table.title}</span>
+            <PencilIcon size={13} className="shrink-0 text-faint group-hover:text-accent transition-colors" />
+          </button>
+        )}
+
+        <div className="ml-auto flex items-center gap-3">
+          {uniqueUsers.length > 0 && (
+            <div className="flex items-center -space-x-2">
+              {uniqueUsers.slice(0, 6).map((u, idx) => (
+                <div
+                  key={idx}
+                  title={u.name}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold border-2 border-panel"
+                  style={{ backgroundColor: u.color }}
+                >
+                  {u.name.charAt(0).toUpperCase()}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!isConnected ? (
+            <span className="px-2 py-1 rounded-md bg-tile text-muted text-[11.5px] font-medium">Подключение…</span>
+          ) : !isSynced ? (
+            <span className="px-2 py-1 rounded-md bg-accent-soft text-accent text-[11.5px] font-medium">Синхронизация…</span>
+          ) : (
+            <span className="px-2 py-1 rounded-md bg-accent-soft text-accent text-[11.5px] font-medium">● Онлайн</span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <TableEditor />
+      </div>
+    </div>
+  )
+}
+
 export function LibrarySection({ projectId }: { projectId: number }) {
   // Документ — в пути (/library/:itemId), папка файлового менеджера — в ?folder.
   const { teamId, itemId: itemIdParam } = useParams()
@@ -381,6 +510,7 @@ export function LibrarySection({ projectId }: { projectId: number }) {
   if (itemId != null) {
     const doc = openDoc ?? { id: itemId, title: 'Документ' }
     const isBoard = doc.type === 'board'
+    const isTable = doc.type === 'table'
 
     return (
       <div className="flex h-full min-h-0">
@@ -400,6 +530,17 @@ export function LibrarySection({ projectId }: { projectId: number }) {
                 }}
               />
             </BoardProvider>
+          ) : isTable ? (
+            <TableProvider key={doc.id} tableId={doc.id}>
+              <TableWorkspace
+                table={doc}
+                onBack={backToFiles}
+                onTitleUpdate={(title) => {
+                  setOpenDoc((prev) => (prev ? { ...prev, title } : { id: doc.id, title }))
+                  setDocsRefresh((n) => n + 1)
+                }}
+              />
+            </TableProvider>
           ) : (
             <DocumentProvider key={doc.id} documentId={doc.id}>
               <DocumentWorkspace
@@ -413,7 +554,6 @@ export function LibrarySection({ projectId }: { projectId: number }) {
             </DocumentProvider>
           )}
         </div>
-
         {!sidebarHidden && (
           <LibrarySidebar
             width={sidebarWidth}

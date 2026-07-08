@@ -3,7 +3,7 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, DocsIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, DocsIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 
 interface FolderItem {
   id: number
@@ -46,7 +46,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   const [searchDocs, setSearchDocs] = useState<DocItem[]>([])
   const searching = query.trim().length > 0
 
-  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | null>(null)
+  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | null>(null)
   // Папка, в которой создаётся документ (через контекстное меню папки); null — текущая папка.
   const [createDocFolderId, setCreateDocFolderId] = useState<number | null>(null)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
@@ -145,6 +145,22 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     }
   }
 
+  const createTable = async (title: string) => {
+    setBusy(true)
+    try {
+      const res = await apiClient.library.createTable({ projectId, folderId: createDocFolderId, title })
+      setCreateKind(null)
+      setCreateDocFolderId(null)
+      if (res.data?.id != null) {
+        onOpenDocument(Number(res.data.id), res.data.title ?? title, 'table')
+      }
+    } catch (error) {
+      console.error('Failed to create table:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const rename = async (name: string) => {
     if (!renameTarget) return
     setBusy(true)
@@ -230,6 +246,14 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           },
         },
         {
+          label: 'Создать таблицу',
+          icon: <TablesIcon size={15} className="text-table" />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('table')
+          },
+        },
+        {
           label: 'Переименовать',
           icon: <PencilIcon size={15} />,
           onClick: () => setRenameTarget({ kind: 'folder', id: f.id, name: f.name }),
@@ -293,6 +317,14 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           onClick: () => {
             setCreateDocFolderId(folderId)
             setCreateKind('board')
+          },
+        },
+        {
+          label: 'Создать таблицу',
+          icon: <TablesIcon size={15} className="text-table" />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('table')
           },
         },
       ],
@@ -396,6 +428,8 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     >
       {d.type === 'board' ? (
         <BoardsIcon size={18} className="text-board shrink-0" />
+      ) : d.type === 'table' ? (
+        <TablesIcon size={18} className="text-table shrink-0" />
       ) : (
         <DocsIcon size={18} className="text-doc shrink-0" />
       )}
@@ -499,9 +533,19 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
             <PlusIcon size={15} strokeWidth={2} />
             Доска
           </button>
+          <button
+            type="button"
+            className="h-8 px-3 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer flex items-center gap-1.5"
+            onClick={() => {
+              setCreateDocFolderId(folderId)
+              setCreateKind('table')
+            }}
+          >
+            <PlusIcon size={15} strokeWidth={2} />
+            Таблица
+          </button>
         </div>
       </div>
-
       <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 pt-4 pb-2" onContextMenu={openEmptyMenu}>
         {loading ? (
           <div className="px-3 py-4 text-[13px] text-faint">Загрузка…</div>
@@ -561,6 +605,19 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           submitLabel="Создать"
           busy={busy}
           onSubmit={createBoard}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
+        />
+      )}
+      {createKind === 'table' && (
+        <FormModal
+          title="Новая таблица"
+          label="Название таблицы"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createTable}
           onClose={() => {
             setCreateKind(null)
             setCreateDocFolderId(null)

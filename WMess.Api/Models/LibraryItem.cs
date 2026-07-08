@@ -48,4 +48,7 @@ public class LibraryItem
 
     // Контент типа Board (1:1, PK = FK).
     public BoardContent? BoardContent { get; set; }
+
+    // Контент типа Table (1:1, PK = FK).
+    public TableContent? TableContent { get; set; }
 }
