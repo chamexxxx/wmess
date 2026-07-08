@@ -472,7 +472,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
                 ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/40'
                 : 'text-muted hover:bg-hovered hover:text-accent'
             }`}
-            title="Все документы"
+            title="Все файлы"
             onClick={() => onNavigateFolder(null)}
             {...breadcrumbDnd('root')}
           >
@@ -564,7 +564,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
               <FolderIcon size={22} strokeWidth={1.6} />
             </div>
             <div className="text-[13.5px] text-muted max-w-[320px] leading-[1.5]">
-              {path.length > 0 ? 'Папка пуста.' : 'Здесь пока ничего нет.'} Создайте документ или папку.
+              {path.length > 0 ? 'Папка пуста.' : 'Здесь пока ничего нет.'} Создайте элемент или папку.
             </div>
           </div>
         ) : (
@@ -626,8 +626,8 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       )}
       {renameTarget && (
         <FormModal
-          title={renameTarget.kind === 'folder' ? 'Переименовать папку' : 'Переименовать документ'}
-          label={renameTarget.kind === 'folder' ? 'Название папки' : 'Название документа'}
+          title={renameTarget.kind === 'folder' ? 'Переименовать папку' : 'Переименовать элемент'}
+          label={renameTarget.kind === 'folder' ? 'Название папки' : 'Название'}
           submitLabel="Сохранить"
           busy={busy}
           initialValue={renameTarget.name}
@@ -637,12 +637,12 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       )}
       {deleteTarget && (
         <ConfirmDialog
-          title={deleteTarget.kind === 'folder' ? 'Удалить папку?' : 'Удалить документ?'}
+          title={deleteTarget.kind === 'folder' ? 'Удалить папку?' : 'Удалить элемент?'}
           message={
             deleteTarget.kind === 'folder' ? (
-              <>Папка «{deleteTarget.name}» будет удалена. Вложенные документы останутся без папки.</>
+              <>Папка «{deleteTarget.name}» будет удалена. Вложенные элементы останутся без папки.</>
             ) : (
-              <>Документ «{deleteTarget.name}» будет удалён без возможности восстановления.</>
+              <>Элемент «{deleteTarget.name}» будет удалён без возможности восстановления.</>
             )
           }
           confirmLabel="Удалить"

@@ -547,7 +547,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
         />
       )}
       <div className="h-[46px] shrink-0 flex items-center justify-between px-3 border-b border-line">
-        <span className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">Документы</span>
+        <span className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">Библиотека</span>
         <div className="flex gap-1.5">
           {onToggleVisibility && (
             <button type="button" className={iconBtn} title="Скрыть панель" onClick={onToggleVisibility}>
@@ -633,7 +633,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           )
         ) : folders.length === 0 && documents.length === 0 ? (
           <div className="text-[13px] text-faint px-2 py-3 leading-relaxed">
-            Пока нет документов. Создайте первый.
+            Пока пусто. Создайте первый элемент.
           </div>
         ) : (
           <div className={`${dropTarget?.kind === 'root' ? 'bg-hovered rounded-md' : ''}`}>
@@ -705,8 +705,8 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       )}
       {renameDoc && (
         <FormModal
-          title="Переименовать документ"
-          label="Название документа"
+          title="Переименовать элемент"
+          label="Название"
           submitLabel="Сохранить"
           busy={busy}
           initialValue={renameDoc.title}
@@ -716,12 +716,12 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       )}
       {deleteTarget && (
         <ConfirmDialog
-          title={deleteTarget.kind === 'folder' ? 'Удалить папку?' : 'Удалить документ?'}
+          title={deleteTarget.kind === 'folder' ? 'Удалить папку?' : 'Удалить элемент?'}
           message={
             deleteTarget.kind === 'folder' ? (
-              <>Папка «{deleteTarget.name}» будет удалена. Вложенные документы останутся без папки.</>
+              <>Папка «{deleteTarget.name}» будет удалена. Вложенные элементы останутся без папки.</>
             ) : (
-              <>Документ «{deleteTarget.name}» будет удалён без возможности восстановления.</>
+              <>Элемент «{deleteTarget.name}» будет удалён без возможности восстановления.</>
             )
           }
           confirmLabel="Удалить"
