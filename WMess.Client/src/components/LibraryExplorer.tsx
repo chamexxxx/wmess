@@ -3,7 +3,7 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, DocsIcon, FileIcon, FolderIcon, HomeIcon, ImageIcon, PencilIcon, PlusIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, DocsIcon, FileIcon, FolderIcon, HomeIcon, ImageIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 import { ImagePreview, isImageFile } from './ImagePreview'
 import type { PreviewImage } from './ImagePreview'
 
@@ -248,8 +248,6 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
 
   const rowBase =
     'flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-hovered'
-  const iconBtn =
-    'h-8 w-8 rounded-[9px] flex items-center justify-center text-muted cursor-pointer hover:bg-hovered'
 
   // Контекстное меню (правая кнопка) — действия вместо иконок при наведении.
   const openFolderMenu = (e: React.MouseEvent, f: FolderItem) => {
@@ -582,42 +580,6 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
               className="h-8 w-52 pl-8 pr-2 text-[13px] bg-white border border-line rounded-[9px] text-ink placeholder:text-faint focus:outline-none focus:border-accent"
             />
           </div>
-          <button type="button" className={iconBtn} title="Новая папка" onClick={() => setCreateKind('folder')}>
-            <FolderIcon size={16} />
-          </button>
-          <button
-            type="button"
-            className="h-8 px-3 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer flex items-center gap-1.5"
-            onClick={() => {
-              setCreateDocFolderId(folderId)
-              setCreateKind('doc')
-            }}
-          >
-            <PlusIcon size={15} strokeWidth={2} />
-            Документ
-          </button>
-          <button
-            type="button"
-            className="h-8 px-3 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer flex items-center gap-1.5"
-            onClick={() => {
-              setCreateDocFolderId(folderId)
-              setCreateKind('board')
-            }}
-          >
-            <PlusIcon size={15} strokeWidth={2} />
-            Доска
-          </button>
-          <button
-            type="button"
-            className="h-8 px-3 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer flex items-center gap-1.5"
-            onClick={() => {
-              setCreateDocFolderId(folderId)
-              setCreateKind('table')
-            }}
-          >
-            <PlusIcon size={15} strokeWidth={2} />
-            Таблица
-          </button>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 pt-4 pb-2" onContextMenu={openEmptyMenu}>
