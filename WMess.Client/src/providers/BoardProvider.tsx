@@ -17,7 +17,8 @@ interface BoardContextValue {
   isConnected: boolean
   isSynced: boolean
   users: CollabUser[]
-  username: string
+  // email пользователя; undefined, пока авторизация не загрузилась (в presence не транслируем).
+  username: string | undefined
   cursorColor: string
 }
 
@@ -48,8 +49,10 @@ interface BoardProviderProps {
 
 export function BoardProvider({ boardId, children }: BoardProviderProps) {
   const { user } = useAuth()
-  const username = user?.email ?? 'Гость'
-  const cursorColor = useMemo(() => colorFromString(username), [username])
+  // Никаких плейсхолдеров: либо реальный email, либо undefined (авторизация ещё грузится).
+  // Presence с этим именем транслируется только когда оно есть (см. BoardEditor).
+  const username = user?.email
+  const cursorColor = useMemo(() => colorFromString(username ?? ''), [username])
 
   const [isConnected, setIsConnected] = useState(false)
   const [isSynced, setIsSynced] = useState(false)

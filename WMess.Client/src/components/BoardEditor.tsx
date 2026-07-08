@@ -113,11 +113,15 @@ export function BoardEditor() {
 
   // Подписка на awareness (курсоры)
   useEffect(() => {
-    // Установка локального состояния awareness (имя, цвет)
-    awareness.setLocalStateField('user', {
-      name: username,
-      color: cursorColor,
-    })
+    // Транслируем свою личность (имя/цвет) в presence ТОЛЬКО когда знаем реальный аккаунт.
+    // Пока авторизация грузится, username === undefined — молчим. Когда станет email, эффект
+    // перезапустится (username в зависимостях) и выставит поле.
+    if (username) {
+      awareness.setLocalStateField('user', {
+        name: username,
+        color: cursorColor,
+      })
+    }
 
     const changeHandler = () => {
       if (!excalidrawAPIRef.current) return

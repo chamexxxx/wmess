@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router'
+import { Navigate, Outlet } from 'react-router'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
 
@@ -22,6 +22,12 @@ export function ProtectedRoute() {
   }, [])
 
   if (loading) return null
+
+  // Инвариант защищённых страниц: без реального пользователя приватный контент не рендерим,
+  // а уходим на логин. Раньше здесь рендерился <Outlet/> с user=null (полагаясь только на
+  // редирект перехватчика 401), из-за чего при любом другом сбое getUser приложение
+  // открывалось «гостем». Теперь пользователь гарантированно есть ниже по дереву.
+  if (!user) return <Navigate to="/login" replace />
 
   return <Outlet />
 }
