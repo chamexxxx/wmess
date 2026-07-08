@@ -212,6 +212,20 @@ export function HomePage() {
 
   const title = selectedTeam ? 'Проекты' : 'Добро пожаловать'
 
+  // Пока идёт начальная загрузка (команды/проекты) — не показываем каркас с пустыми
+  // сайдбарами, а держим полноэкранный лоадер, чтобы не мелькал пустой layout.
+  if (loading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-app">
+        <div
+          className="h-7 w-7 rounded-full border-2 border-line border-t-accent animate-spin"
+          role="status"
+          aria-label="Загрузка"
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="wm-scroll fixed inset-0 flex bg-app text-ink font-ui text-sm text-left antialiased">
       <TeamRail
