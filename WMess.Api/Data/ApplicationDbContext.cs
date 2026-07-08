@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<DocumentContent> DocumentContents { get; set; }
     public DbSet<BoardContent> BoardContents { get; set; }
     public DbSet<TableContent> TableContents { get; set; }
+    public DbSet<FileContent> FileContents { get; set; }
     public DbSet<LibraryFolder> LibraryFolders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -103,6 +104,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             .HasOne(c => c.Item)
             .WithOne(i => i.TableContent)
             .HasForeignKey<TableContent>(c => c.LibraryItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Контент типа File (1:1, PK = FK); удаляется вместе с элементом
+        builder.Entity<FileContent>()
+            .HasOne(c => c.Item)
+            .WithOne(i => i.FileContent)
+            .HasForeignKey<FileContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

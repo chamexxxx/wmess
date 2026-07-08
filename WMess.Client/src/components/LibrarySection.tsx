@@ -541,6 +541,29 @@ export function LibrarySection({ projectId }: { projectId: number }) {
                 }}
               />
             </TableProvider>
+          ) : doc.type === 'file' ? (
+            // Загруженный файл не открывается в редакторе — предлагаем скачать (прямой переход по URL).
+            <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
+              <div className="text-[14px] text-muted max-w-[340px] leading-[1.5]">
+                «{doc.title}» — загруженный файл, его нельзя открыть в редакторе.
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={backToFiles}
+                  className="h-9 px-4 rounded-[9px] bg-tile text-ink text-[13px] font-semibold hover:bg-hovered cursor-pointer"
+                >
+                  К списку файлов
+                </button>
+                <button
+                  type="button"
+                  onClick={() => apiClient.downloadLibraryFile(doc.id, doc.title)}
+                  className="h-9 px-4 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer"
+                >
+                  Скачать
+                </button>
+              </div>
+            </div>
           ) : (
             <DocumentProvider key={doc.id} documentId={doc.id}>
               <DocumentWorkspace

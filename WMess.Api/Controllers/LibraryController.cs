@@ -41,6 +41,7 @@ public class LibraryController : ControllerBase
         LibraryItemType.Document => "document",
         LibraryItemType.Board => "board",
         LibraryItemType.Table => "table",
+        LibraryItemType.File => "file",
         _ => type.ToString().ToLowerInvariant(),
     };
 
@@ -752,6 +753,129 @@ public class LibraryController : ControllerBase
         await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
+    }
+
+    #endregion
+
+    #region Files (загрузка/скачивание)
+
+    // Загрузка произвольных файлов с компьютера. Multipart-форма: projectId, folderId?, files[].
+    // Каждый файл — отдельный LibraryItem типа File; байты и метаданные — в FileContent.
+    [HttpPost("files")]
+    [EndpointName("UploadFiles")]
+    [RequestSizeLimit(104_857_600)] // до 100 МБ на запрос
+    public async Task<ActionResult<IEnumerable<LibraryItemResponse>>> UploadFiles(
+        [FromForm] int projectId,
+        [FromForm] int? folderId,
+        [FromForm] List<IFormFile> files)
+    {
+        var project = await _context.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            return BadRequest(new { message = "Project not found" });
+        }
+
+        var result = await _authorizationService.AuthorizeAsync(User, project, Policies.ProjectManage);
+        if (!result.Succeeded)
+        {
+            return Forbid();
+        }
+
+        if (folderId.HasValue)
+        {
+            var folder = await _context.LibraryFolders.FindAsync(folderId.Value);
+            if (folder == null || folder.ProjectId != projectId)
+            {
+                return BadRequest(new { message = "Folder not found or doesn't belong to this project" });
+            }
+        }
+
+        if (files == null || files.Count == 0)
+        {
+            return BadRequest(new { message = "No files provided" });
+        }
+
+        var userId = GetCurrentUserId();
+        var created = new List<LibraryItem>();
+
+        foreach (var file in files)
+        {
+            if (file.Length == 0)
+            {
+                continue;
+            }
+
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+
+            // Берём только имя файла (без пути из браузера) и обрезаем под лимит Title/FileName.
+            var name = Path.GetFileName(file.FileName);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = "file";
+            }
+            if (name.Length > 300)
+            {
+                name = name[^300..];
+            }
+
+            var item = new LibraryItem
+            {
+                ProjectId = projectId,
+                FolderId = folderId,
+                Type = LibraryItemType.File,
+                Title = name,
+                CreatedBy = userId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                FileContent = new FileContent
+                {
+                    Data = bytes,
+                    FileName = name,
+                    ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                        ? "application/octet-stream"
+                        : file.ContentType,
+                    Size = bytes.LongLength,
+                }
+            };
+
+            _context.LibraryItems.Add(item);
+            created.Add(item);
+        }
+
+        if (created.Count == 0)
+        {
+            return BadRequest(new { message = "No non-empty files provided" });
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(created.Select(ToItemResponse));
+    }
+
+    // Скачивание загруженного файла: отдаём байты с исходным именем и MIME-типом.
+    [HttpGet("{id}/download")]
+    [EndpointName("DownloadFile")]
+    public async Task<IActionResult> DownloadFile(int id)
+    {
+        var item = await _context.LibraryItems
+            .Include(d => d.Project)
+            .Include(d => d.FileContent)
+            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.File);
+
+        if (item == null || item.FileContent == null)
+        {
+            return NotFound();
+        }
+
+        var rights = await _libraryAccess.GetRightsAsync(User, item);
+        if (!rights.CanView)
+        {
+            return Forbid();
+        }
+
+        return File(item.FileContent.Data, item.FileContent.ContentType, item.FileContent.FileName);
     }
 
     #endregion

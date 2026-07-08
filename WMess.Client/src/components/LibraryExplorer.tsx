@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, DocsIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, DocsIcon, FileIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 
 interface FolderItem {
   id: number
@@ -74,6 +74,31 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       console.error('Failed to load folder contents:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Загрузка файлов: скрытый input, папку-назначение держим в ref (чтобы не зависеть
+  // от асинхронного setState между кликом пункта меню и выбором файлов в диалоге).
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadFolderRef = useRef<number | null>(null)
+
+  const startUpload = (targetFolderId: number | null) => {
+    uploadFolderRef.current = targetFolderId
+    fileInputRef.current?.click()
+  }
+
+  const onFilesPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = '' // сброс, чтобы повторный выбор тех же файлов снова сработал
+    if (files.length === 0) return
+    setBusy(true)
+    try {
+      await apiClient.uploadLibraryFiles(projectId, uploadFolderRef.current, files)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to upload files:', error)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -256,6 +281,11 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           },
         },
         {
+          label: 'Загрузить файлы',
+          icon: <FileIcon size={15} className="text-ink" />,
+          onClick: () => startUpload(f.id),
+        },
+        {
           label: 'Переименовать',
           icon: <PencilIcon size={15} />,
           onClick: () => setRenameTarget({ kind: 'folder', id: f.id, name: f.name }),
@@ -328,6 +358,11 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
             setCreateDocFolderId(folderId)
             setCreateKind('table')
           },
+        },
+        {
+          label: 'Загрузить файлы',
+          icon: <FileIcon size={15} className="text-ink" />,
+          onClick: () => startUpload(folderId),
         },
       ],
     })
@@ -408,7 +443,11 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     <div
       key={`d-${d.id}`}
       className={`${rowBase} ${isDragging ? 'opacity-50' : ''}`}
-      onClick={() => onOpenDocument(d.id, d.title, d.type)}
+      onClick={() =>
+        d.type === 'file'
+          ? apiClient.downloadLibraryFile(d.id, d.title)
+          : onOpenDocument(d.id, d.title, d.type)
+      }
       onContextMenu={(e) => openDocMenu(e, d)}
       draggable={withMeta}
       onDragStart={
@@ -432,6 +471,8 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         <BoardsIcon size={18} className="text-board shrink-0" />
       ) : d.type === 'table' ? (
         <TablesIcon size={18} className="text-table shrink-0" />
+      ) : d.type === 'file' ? (
+        <FileIcon size={18} className="text-ink shrink-0" />
       ) : (
         <DocsIcon size={18} className="text-doc shrink-0" />
       )}
@@ -465,6 +506,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      <input ref={fileInputRef} type="file" multiple hidden onChange={onFilesPicked} />
       <div className="h-[52px] shrink-0 flex items-center gap-3 px-5">
         <nav className="flex items-center gap-1.5 text-[14px] min-w-0">
           <button

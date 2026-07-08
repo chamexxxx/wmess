@@ -3,7 +3,7 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, ChevronRightIcon, DocsIcon, FolderIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, ChevronRightIcon, DocsIcon, FileIcon, FolderIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 
 interface Folder {
   id: number
@@ -77,6 +77,34 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       console.error('Failed to load documents:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Загрузка файлов с компьютера: скрытый input, папку-назначение держим в ref.
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const uploadFolderRef = useRef<number | null>(null)
+
+  const startUpload = (targetFolderId: number | null) => {
+    uploadFolderRef.current = targetFolderId
+    uploadInputRef.current?.click()
+  }
+
+  const onFilesPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length === 0) return
+    const folderId = uploadFolderRef.current
+    setBusy(true)
+    try {
+      await apiClient.uploadLibraryFiles(projectId, folderId, files)
+      await loadData()
+      if (folderId !== null) {
+        setExpanded((prev) => new Set(prev).add(folderId))
+      }
+    } catch (error) {
+      console.error('Failed to upload files:', error)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -349,6 +377,11 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           },
         },
         {
+          label: 'Загрузить файлы',
+          icon: <FileIcon size={15} className="text-ink" />,
+          onClick: () => startUpload(folder.id),
+        },
+        {
           label: 'Переименовать',
           icon: <PencilIcon size={15} />,
           onClick: () => setRenameFolder({ id: folder.id, name: folder.name }),
@@ -418,6 +451,11 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           },
         },
         {
+          label: 'Загрузить файлы',
+          icon: <FileIcon size={15} className="text-ink" />,
+          onClick: () => startUpload(null),
+        },
+        {
           label: 'Создать папку',
           icon: <FolderIcon size={15} />,
           onClick: () => setCreateKind('folder'),
@@ -426,12 +464,30 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
     })
   }
 
-  // Иконка элемента по типу (документ/доска/таблица); у выбранного — акцентный цвет.
+  // Иконка элемента по типу (документ/доска/таблица/файл); у выбранного — акцентный цвет.
   const itemIcon = (type: string | undefined, isSelected: boolean) => {
-    const cls = isSelected ? 'text-accent' : type === 'board' ? 'text-board' : type === 'table' ? 'text-table' : 'text-doc'
+    const cls = isSelected
+      ? 'text-accent'
+      : type === 'board'
+        ? 'text-board'
+        : type === 'table'
+          ? 'text-table'
+          : type === 'file'
+            ? 'text-ink'
+            : 'text-doc'
     if (type === 'board') return <BoardsIcon size={15} className={cls} />
     if (type === 'table') return <TablesIcon size={15} className={cls} />
+    if (type === 'file') return <FileIcon size={15} className={cls} />
     return <DocsIcon size={15} className={cls} />
+  }
+
+  // Клик по элементу: файл — скачиваем, остальное — открываем в редакторе.
+  const openDoc = (doc: Doc) => {
+    if (doc.type === 'file') {
+      apiClient.downloadLibraryFile(doc.id, doc.title)
+    } else {
+      onSelect(doc.id, doc.title)
+    }
   }
 
   const renderDoc = (doc: Doc) => {
@@ -440,7 +496,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       <div
         key={`doc-${doc.id}`}
         className={`${rowBase} ${isSelected ? 'bg-accent-soft' : ''}`}
-        onClick={() => onSelect(doc.id, doc.title)}
+        onClick={() => openDoc(doc)}
         onContextMenu={(e) => openDocMenu(e, doc)}
         draggable
         onDragStart={(e) => {
@@ -539,6 +595,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
 
   return (
     <div style={{ width }} className="relative shrink-0 border-l border-line bg-sidebar flex flex-col h-full min-h-0">
+      <input ref={uploadInputRef} type="file" multiple hidden onChange={onFilesPicked} />
       {onResizeStart && (
         <div
           onMouseDown={onResizeStart}
@@ -616,7 +673,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
                   <div
                     key={`search-doc-${d.id}`}
                     className={`${rowBase} pl-3 ${isSelected ? 'bg-accent-soft' : ''}`}
-                    onClick={() => onSelect(d.id, d.title)}
+                    onClick={() => openDoc(d)}
                   >
                     <span className="flex items-center gap-2 min-w-0">
                       {itemIcon(d.type, isSelected)}

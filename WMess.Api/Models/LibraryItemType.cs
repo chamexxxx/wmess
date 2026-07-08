@@ -10,4 +10,5 @@ public enum LibraryItemType
     Document = 0,
     Board = 1,
     Table = 2,
+    File = 3,
 }

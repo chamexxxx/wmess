@@ -51,4 +51,7 @@ public class LibraryItem
 
     // Контент типа Table (1:1, PK = FK).
     public TableContent? TableContent { get; set; }
+
+    // Контент типа File (1:1, PK = FK) — загруженный файл.
+    public FileContent? FileContent { get; set; }
 }

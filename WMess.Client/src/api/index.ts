@@ -94,6 +94,36 @@ class WMessApiClient extends Bff {
     attachAuthInterceptor(this.user.instance)
     attachAuthInterceptor(this.library.instance)
   }
+
+  // Загрузка файлов с компьютера (multipart). Не входит в сгенерированный клиент,
+  // т.к. тот не умеет FormData/файлы. Использует axios-инстанс библиотеки (куки + CSRF + refresh).
+  uploadLibraryFiles(projectId: number, folderId: number | null, files: File[]) {
+    const form = new FormData()
+    form.append('projectId', String(projectId))
+    if (folderId != null) {
+      form.append('folderId', String(folderId))
+    }
+    for (const file of files) {
+      form.append('files', file)
+    }
+    // Content-Type (multipart с boundary) axios выставит сам по FormData.
+    return this.library.instance.post('/api/library-items/files', form)
+  }
+
+  // Скачивание загруженного файла: тянем blob и сохраняем под исходным именем.
+  async downloadLibraryFile(id: number, fileName: string) {
+    const res = await this.library.instance.get(`/api/library-items/${id}/download`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(res.data as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
 }
 
 export const apiClient = new WMessApiClient(config)

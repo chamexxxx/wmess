@@ -81,6 +81,26 @@ export const DocsIcon = (p: IconProps) => (
   </Svg>
 )
 
+// Загруженный файл (любой тип) — скрепка-вложение. Path Lucide-скрепки занимает почти весь
+// viewBox, поэтому равномерно ужимаем его до 85% (штрих масштабируется вместе с геометрией —
+// без залипания петель), чтобы визуальный размер совпадал с другими иконками.
+export const FileIcon = (p: IconProps) => (
+  <Svg {...p} strokeWidth={p.strokeWidth ?? 1.8}>
+    <g transform="translate(12 12) scale(0.85) translate(-12 -12)">
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </g>
+  </Svg>
+)
+
+// Ссылка на внешний ресурс (ярлык) — стрелка из рамки. Для будущего типа элемента библиотеки.
+export const ExternalLinkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 4h6v6" />
+    <path d="M10.5 13.5 20 4" />
+    <path d="M18 13.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 19V8a1.5 1.5 0 0 1 1.5-1.5H11" />
+  </Svg>
+)
+
 export const LibraryIcon = (p: IconProps) => (
   <Svg {...p}>
     <rect x="5" y="3.5" width="14" height="17" rx="1.8" />
