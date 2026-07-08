@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useMatch, useNavigate, useParams } from 'react-router'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
 import type { ProjectResponse, TeamResponse, TeamDetailResponse } from '../api/generated/data-contracts'
@@ -7,15 +7,13 @@ import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { LibrarySection } from '../components/LibrarySection'
 import { ProjectSettings } from '../components/ProjectSettings'
+import { TeamSettings } from '../components/TeamSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
-import { TeamMembersModal } from '../components/TeamMembersModal'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
 
-type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
 type Confirm = { kind: 'team'; team: TeamResponse } | { kind: 'project'; project: ProjectResponse }
-type MembersModal = { teamId: number }
 
 export function HomePage() {
   const { user, setUser } = useAuth()
@@ -28,16 +26,17 @@ export function HomePage() {
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
   // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Библиотека».
   const sectionKey = itemIdParam != null ? 'library' : sectionParam
+  // Страница настроек команды: /teams/:teamId/settings (отдельно от настроек проекта).
+  const isTeamSettings = useMatch('/teams/:teamId/settings') != null
 
   const [teams, setTeams] = useState<TeamResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [teamModal, setTeamModal] = useState<TeamModal | null>(null)
+  const [createTeamOpen, setCreateTeamOpen] = useState(false)
   const [projectModal, setProjectModal] = useState<ProjectModal | null>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
-  const [membersModal, setMembersModal] = useState<MembersModal | null>(null)
   const [busy, setBusy] = useState(false)
   // Детали выбранной команды (включая права). Грузятся только на странице команды.
   const [teamDetail, setTeamDetail] = useState<TeamDetailResponse | null>(null)
@@ -125,7 +124,7 @@ export function HomePage() {
     try {
       const res = await apiClient.teams.teamsCreate({ name })
       setTeams((prev) => [...prev, res.data])
-      setTeamModal(null)
+      setCreateTeamOpen(false)
       navigate(`/teams/${Number(res.data.id)}`)
     } catch {
       setError('Не удалось создать команду')
@@ -139,7 +138,6 @@ export function HomePage() {
     try {
       await apiClient.teams.teamsUpdate(id, { name })
       setTeams((prev) => prev.map((t) => (Number(t.id) === id ? { ...t, name } : t)))
-      setTeamModal(null)
     } catch {
       setError('Не удалось сохранить команду')
     } finally {
@@ -220,7 +218,7 @@ export function HomePage() {
         teams={teams}
         selectedTeamId={selectedTeamId}
         onSelect={(id) => navigate(`/teams/${id}`)}
-        onCreate={() => setTeamModal({ mode: 'create' })}
+        onCreate={() => setCreateTeamOpen(true)}
         userEmail={user?.email}
         onLogout={handleLogout}
       />
@@ -230,6 +228,7 @@ export function HomePage() {
         projects={teamProjects}
         selectedProjectId={selectedProjectId}
         selectedSectionId={isSettings ? 'settings' : section?.id}
+        teamSettingsActive={isTeamSettings}
         onSelectProject={(id) =>
           navigate(`/teams/${selectedTeamId}/projects/${id}/${section?.id ?? DEFAULT_SECTION}`)
         }
@@ -239,11 +238,8 @@ export function HomePage() {
         onCreateProject={() => setProjectModal({ mode: 'create' })}
         onEditProject={(project) => setProjectModal({ mode: 'edit', project })}
         onDeleteProject={(project) => setConfirm({ kind: 'project', project })}
-        onEditTeam={() => selectedTeam && setTeamModal({ mode: 'edit', team: selectedTeam })}
-        onDeleteTeam={() => selectedTeam && setConfirm({ kind: 'team', team: selectedTeam })}
-        onManageMembers={() => selectedTeamId && setMembersModal({ teamId: selectedTeamId })}
+        onOpenTeamSettings={() => selectedTeamId && navigate(`/teams/${selectedTeamId}/settings`)}
         canManage={canManage}
-        canDelete={canDelete}
       />
 
       {/* MAIN */}
@@ -263,7 +259,7 @@ export function HomePage() {
                 </button>
                 <span className="text-faintest shrink-0">/</span>
                 <span className="text-muted truncate">
-                  {isSettings ? 'Настройки' : (section?.label ?? 'Проект')}
+                  {isSettings ? 'Настройки проекта' : (section?.label ?? 'Проект')}
                 </span>
               </nav>
               {canManage && (
@@ -283,6 +279,18 @@ export function HomePage() {
                 </button>
               )}
             </>
+          ) : isTeamSettings && selectedTeam ? (
+            <nav className="flex items-center gap-2 min-w-0 text-[14px]">
+              <button
+                type="button"
+                className="font-semibold text-ink truncate hover:text-accent transition-colors cursor-pointer"
+                onClick={() => navigate(`/teams/${selectedTeamId}`)}
+              >
+                {selectedTeam.name}
+              </button>
+              <span className="text-faintest shrink-0">/</span>
+              <span className="text-muted truncate">Настройки команды</span>
+            </nav>
           ) : (
             <div className="text-base font-bold truncate">{title}</div>
           )}
@@ -294,9 +302,20 @@ export function HomePage() {
           ) : teams.length === 0 ? (
             <EmptyState
               text="У вас пока нет команд. Создайте первую, чтобы начать работу."
-              action={{ label: 'Создать команду', onClick: () => setTeamModal({ mode: 'create' }) }}
+              action={{ label: 'Создать команду', onClick: () => setCreateTeamOpen(true) }}
             />
-          ) : !selectedTeam ? null : !selectedProject ? (
+          ) : !selectedTeam ? null : isTeamSettings ? (
+            <TeamSettings
+              team={selectedTeam}
+              permissions={perms}
+              busy={busy}
+              canManage={canManage}
+              canDelete={canDelete}
+              onRename={(name) => updateTeam(selectedTeamId!, name)}
+              onDelete={() => setConfirm({ kind: 'team', team: selectedTeam })}
+              onMembersChanged={() => setTeamDetailRefresh((n) => n + 1)}
+            />
+          ) : !selectedProject ? (
             <EmptyState
               text="Выберите проект слева или создайте новый в этой команде."
               action={{ label: 'Новый проект', onClick: () => setProjectModal({ mode: 'create' }) }}
@@ -318,39 +337,16 @@ export function HomePage() {
       </div>
 
       {/* MODALS */}
-      {membersModal && (
-        <TeamMembersModal
-          teamId={membersModal.teamId}
-          permissions={perms}
-          onClose={() => {
-            setMembersModal(null)
-            // Роли могли поменяться внутри модалки — перечитать свои права.
-            setTeamDetailRefresh((n) => n + 1)
-          }}
+      {createTeamOpen && (
+        <FormModal
+          title="Новая команда"
+          label="Название команды"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createTeam}
+          onClose={() => setCreateTeamOpen(false)}
         />
       )}
-
-      {teamModal &&
-        (teamModal.mode === 'create' ? (
-          <FormModal
-            title="Новая команда"
-            label="Название команды"
-            submitLabel="Создать"
-            busy={busy}
-            onSubmit={createTeam}
-            onClose={() => setTeamModal(null)}
-          />
-        ) : (
-          <FormModal
-            title="Переименовать команду"
-            label="Название команды"
-            initialValue={teamModal.team.name}
-            submitLabel="Сохранить"
-            busy={busy}
-            onSubmit={(name) => updateTeam(Number(teamModal.team.id), name)}
-            onClose={() => setTeamModal(null)}
-          />
-        ))}
 
       {projectModal &&
         (projectModal.mode === 'create' ? (

@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WMess.Api.Authorization;
@@ -20,18 +19,15 @@ public class LibraryController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
     private readonly ILibraryAccessService _libraryAccess;
-    private readonly UserManager<IdentityUser> _userManager;
 
     public LibraryController(
         ApplicationDbContext context,
         IAuthorizationService authorizationService,
-        ILibraryAccessService libraryAccess,
-        UserManager<IdentityUser> userManager)
+        ILibraryAccessService libraryAccess)
     {
         _context = context;
         _authorizationService = authorizationService;
         _libraryAccess = libraryAccess;
-        _userManager = userManager;
     }
 
     private string GetCurrentUserId()
@@ -297,7 +293,7 @@ public class LibraryController : ControllerBase
             }
         }
 
-        // Элементы внутри удаляемых папок (их контент и LibraryPermission снимаются каскадно).
+        // Элементы внутри удаляемых папок (их контент снимается каскадно).
         var items = await _context.LibraryItems
             .Where(d => d.FolderId != null && folderIds.Contains(d.FolderId.Value))
             .ToListAsync();
@@ -650,19 +646,8 @@ public class LibraryController : ControllerBase
             CreatedBy = userId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            // Пустой контент документа и полные права создателю — одной атомарной транзакцией.
-            DocumentContent = new DocumentContent { YjsState = null },
-            Permissions =
-            {
-                new LibraryPermission
-                {
-                    UserId = userId,
-                    CanView = true,
-                    CanEdit = true,
-                    CanManage = true,
-                    GrantedAt = DateTime.UtcNow
-                }
-            }
+            // Пустой контент документа — одной атомарной транзакцией.
+            DocumentContent = new DocumentContent { YjsState = null }
         };
 
         _context.LibraryItems.Add(item);
@@ -711,18 +696,7 @@ public class LibraryController : ControllerBase
             CreatedBy = userId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            BoardContent = new BoardContent { YjsState = null },
-            Permissions =
-            {
-                new LibraryPermission
-                {
-                    UserId = userId,
-                    CanView = true,
-                    CanEdit = true,
-                    CanManage = true,
-                    GrantedAt = DateTime.UtcNow
-                }
-            }
+            BoardContent = new BoardContent { YjsState = null }
         };
 
         _context.LibraryItems.Add(item);
@@ -818,161 +792,5 @@ public class LibraryController : ControllerBase
 
         return NoContent();
     }
-    #endregion
-
-    #region Permissions
-
-    [HttpGet("items/{id}/permissions")]
-    [EndpointName("GetItemPermissions")]
-    public async Task<ActionResult<IEnumerable<PermissionResponse>>> GetItemPermissions(int id)
-    {
-        var item = await _context.LibraryItems
-            .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == id);
-
-        if (item == null)
-        {
-            return NotFound();
-        }
-
-        var rights = await _libraryAccess.GetRightsAsync(User, item);
-        if (!rights.CanManage)
-        {
-            return Forbid();
-        }
-
-        var permissions = await _context.LibraryPermissions
-            .Where(p => p.LibraryItemId == id)
-            .Include(p => p.User)
-            .Select(p => new PermissionResponse
-            {
-                Id = p.Id,
-                LibraryItemId = p.LibraryItemId,
-                UserId = p.UserId,
-                UserEmail = p.User.Email ?? "",
-                CanView = p.CanView,
-                CanEdit = p.CanEdit,
-                CanManage = p.CanManage,
-                GrantedAt = p.GrantedAt
-            })
-            .ToListAsync();
-
-        return Ok(permissions);
-    }
-
-    [HttpPost("items/{id}/permissions")]
-    [EndpointName("SetItemPermission")]
-    public async Task<ActionResult<PermissionResponse>> SetItemPermission(int id, SetPermissionRequest request)
-    {
-        var item = await _context.LibraryItems
-            .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == id);
-
-        if (item == null)
-        {
-            return NotFound();
-        }
-
-        var rights = await _libraryAccess.GetRightsAsync(User, item);
-        if (!rights.CanManage)
-        {
-            return Forbid();
-        }
-
-        var user = await _userManager.FindByIdAsync(request.UserId);
-        if (user == null)
-        {
-            return BadRequest(new { message = "User not found" });
-        }
-
-        var permission = await _context.LibraryPermissions
-            .FirstOrDefaultAsync(p => p.LibraryItemId == id && p.UserId == request.UserId);
-
-        if (permission == null)
-        {
-            permission = new LibraryPermission
-            {
-                LibraryItemId = id,
-                UserId = request.UserId
-            };
-            _context.LibraryPermissions.Add(permission);
-        }
-
-        permission.CanView = request.CanView;
-        permission.CanEdit = request.CanEdit;
-        permission.CanManage = request.CanManage;
-        permission.GrantedAt = DateTime.UtcNow;
-
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateException)
-        {
-            // Параллельный запрос успел создать права с тем же (LibraryItemId, UserId)
-            // — упёрлись в уникальный индекс. Перечитываем актуальную запись и применяем значения к ней.
-            _context.Entry(permission).State = EntityState.Detached;
-
-            permission = await _context.LibraryPermissions
-                .FirstAsync(p => p.LibraryItemId == id && p.UserId == request.UserId);
-
-            permission.CanView = request.CanView;
-            permission.CanEdit = request.CanEdit;
-            permission.CanManage = request.CanManage;
-            permission.GrantedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-        }
-
-        var updatedPermission = await _context.LibraryPermissions
-            .Include(p => p.User)
-            .FirstOrDefaultAsync(p => p.LibraryItemId == id && p.UserId == request.UserId);
-
-        return Ok(new PermissionResponse
-        {
-            Id = updatedPermission!.Id,
-            LibraryItemId = updatedPermission.LibraryItemId,
-            UserId = updatedPermission.UserId,
-            UserEmail = updatedPermission.User.Email ?? "",
-            CanView = updatedPermission.CanView,
-            CanEdit = updatedPermission.CanEdit,
-            CanManage = updatedPermission.CanManage,
-            GrantedAt = updatedPermission.GrantedAt
-        });
-    }
-
-    [HttpDelete("items/{id}/permissions/{userId}")]
-    [EndpointName("RemoveItemPermission")]
-    public async Task<IActionResult> RemoveItemPermission(int id, string userId)
-    {
-        var item = await _context.LibraryItems
-            .Include(d => d.Project)
-            .FirstOrDefaultAsync(d => d.Id == id);
-
-        if (item == null)
-        {
-            return NotFound();
-        }
-
-        var rights = await _libraryAccess.GetRightsAsync(User, item);
-        if (!rights.CanManage)
-        {
-            return Forbid();
-        }
-
-        var permission = await _context.LibraryPermissions
-            .FirstOrDefaultAsync(p => p.LibraryItemId == id && p.UserId == userId);
-
-        if (permission == null)
-        {
-            return NotFound();
-        }
-
-        _context.LibraryPermissions.Remove(permission);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
-    }
-
     #endregion
 }

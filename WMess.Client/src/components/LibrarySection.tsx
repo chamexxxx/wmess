@@ -6,7 +6,6 @@ import { DocumentEditor } from './DocumentEditor'
 import { BoardEditor } from './BoardEditor'
 import { LibrarySidebar } from './LibrarySidebar'
 import { LibraryExplorer } from './LibraryExplorer'
-import { PermissionsPanel } from './PermissionsPanel'
 import { apiClient } from '../api'
 import { ArrowLeftIcon, PencilIcon } from '../workspace/icons'
 
@@ -62,7 +61,6 @@ function DocumentWorkspace({
   onBack: () => void
   onTitleUpdate: (title: string) => void
 }) {
-  const [showPermissions, setShowPermissions] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(doc.title)
   const [saving, setSaving] = useState(false)
@@ -147,23 +145,12 @@ function DocumentWorkspace({
         <div className="ml-auto flex items-center gap-3">
           <ConnectedUsers />
           <StatusBadge />
-          <button
-            type="button"
-            onClick={() => setShowPermissions(true)}
-            className="h-8 px-3 rounded-md border border-line bg-white text-muted text-[13px] font-medium hover:bg-sidebar cursor-pointer"
-          >
-            Доступ
-          </button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0">
         <DocumentEditor documentId={doc.id} />
       </div>
-
-      {showPermissions && (
-        <PermissionsPanel documentId={doc.id} onClose={() => setShowPermissions(false)} />
-      )}
     </div>
   )
 }
@@ -181,7 +168,6 @@ function BoardWorkspace({
   onTitleUpdate: (title: string) => void
 }) {
   const { users, isConnected, isSynced } = useBoard()
-  const [showPermissions, setShowPermissions] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState(board.title)
   const [saving, setSaving] = useState(false)
@@ -291,24 +277,12 @@ function BoardWorkspace({
           ) : (
             <span className="px-2 py-1 rounded-md bg-accent-soft text-accent text-[11.5px] font-medium">● Онлайн</span>
           )}
-
-          <button
-            type="button"
-            onClick={() => setShowPermissions(true)}
-            className="h-8 px-3 rounded-md border border-line bg-white text-muted text-[13px] font-medium hover:bg-sidebar cursor-pointer"
-          >
-            Доступ
-          </button>
         </div>
       </div>
 
       <div className="flex-1 min-h-0">
         <BoardEditor />
       </div>
-
-      {showPermissions && (
-        <PermissionsPanel documentId={board.id} onClose={() => setShowPermissions(false)} />
-      )}
     </div>
   )
 }

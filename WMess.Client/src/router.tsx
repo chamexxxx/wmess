@@ -11,6 +11,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/teams/:teamId', element: <HomePage /> },
+      { path: '/teams/:teamId/settings', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId/:section', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId/library/:itemId', element: <HomePage /> },

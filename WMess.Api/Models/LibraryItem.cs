@@ -6,7 +6,7 @@ namespace WMess.Api.Models;
 
 /// <summary>
 /// Элемент библиотеки проекта. Несёт общие поля для всех типов (размещение в папке,
-/// заголовок, автор, права). Контент, специфичный для типа, живёт в отдельной 1:1
+/// заголовок, автор). Контент, специфичный для типа, живёт в отдельной 1:1
 /// сущности (например <see cref="DocumentContent"/>).
 /// </summary>
 public class LibraryItem
@@ -42,8 +42,6 @@ public class LibraryItem
 
     [ForeignKey(nameof(CreatedBy))]
     public IdentityUser Creator { get; set; } = null!;
-
-    public ICollection<LibraryPermission> Permissions { get; set; } = new List<LibraryPermission>();
 
     // Контент типа Document (1:1, PK = FK). Для прочих типов появятся свои content-сущности.
     public DocumentContent? DocumentContent { get; set; }

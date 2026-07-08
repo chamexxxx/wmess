@@ -20,7 +20,6 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<DocumentContent> DocumentContents { get; set; }
     public DbSet<BoardContent> BoardContents { get; set; }
     public DbSet<LibraryFolder> LibraryFolders { get; set; }
-    public DbSet<LibraryPermission> LibraryPermissions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -97,24 +96,5 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             .WithOne(i => i.BoardContent)
             .HasForeignKey<BoardContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
-
-        // Конфигурация связи LibraryPermission -> LibraryItem
-        builder.Entity<LibraryPermission>()
-            .HasOne(dp => dp.Item)
-            .WithMany(d => d.Permissions)
-            .HasForeignKey(dp => dp.LibraryItemId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        // Конфигурация связи LibraryPermission -> User
-        builder.Entity<LibraryPermission>()
-            .HasOne(dp => dp.User)
-            .WithMany()
-            .HasForeignKey(dp => dp.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        // Уникальный индекс для предотвращения дублирования прав
-        builder.Entity<LibraryPermission>()
-            .HasIndex(dp => new { dp.LibraryItemId, dp.UserId })
-            .IsUnique();
     }
 }

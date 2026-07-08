@@ -67,7 +67,7 @@ export function ProjectSettings({ project, busy, canManage, onRename, onDelete }
               onClick={onDelete}
               className="shrink-0 h-9 px-4 rounded-[9px] border border-danger text-danger-deep text-[13px] font-semibold cursor-pointer hover:bg-danger hover:text-white disabled:opacity-60 font-ui bg-white"
             >
-              Удалить…
+              Удалить
             </button>
           </div>
         </>

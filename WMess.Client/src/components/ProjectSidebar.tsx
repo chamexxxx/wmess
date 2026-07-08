@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ProjectResponse, TeamResponse } from '../api/generated/data-contracts'
 import { colorFor } from '../workspace/theme'
-import { PencilIcon, PlusIcon, SearchIcon, TrashIcon, UsersIcon } from '../workspace/icons'
+import { PencilIcon, PlusIcon, SearchIcon, SettingsIcon, TrashIcon } from '../workspace/icons'
 import { sections } from '../workspace/sections'
 
 interface ProjectSidebarProps {
@@ -9,17 +9,16 @@ interface ProjectSidebarProps {
   projects: ProjectResponse[]
   selectedProjectId: number | null
   selectedSectionId: string | undefined
+  // Открыта страница настроек команды — подсветить кнопку.
+  teamSettingsActive: boolean
   onSelectProject: (id: number) => void
   onSelectSection: (sectionId: string) => void
   onCreateProject: () => void
   onEditProject: (project: ProjectResponse) => void
   onDeleteProject: (project: ProjectResponse) => void
-  onEditTeam: () => void
-  onDeleteTeam: () => void
-  onManageMembers: () => void
-  // Owner/Admin — управление командой и проектами; Owner — ещё и удаление команды.
+  onOpenTeamSettings: () => void
+  // Owner/Admin — управление командой и проектами.
   canManage: boolean
-  canDelete: boolean
 }
 
 const sectionLabel = 'font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest'
@@ -31,16 +30,14 @@ export function ProjectSidebar({
   projects,
   selectedProjectId,
   selectedSectionId,
+  teamSettingsActive,
   onSelectProject,
   onSelectSection,
   onCreateProject,
   onEditProject,
   onDeleteProject,
-  onEditTeam,
-  onDeleteTeam,
-  onManageMembers,
+  onOpenTeamSettings,
   canManage,
-  canDelete,
 }: ProjectSidebarProps) {
   const [query, setQuery] = useState('')
 
@@ -66,19 +63,14 @@ export function ProjectSidebar({
           <div className="text-sm font-bold text-ink truncate">{team.name}</div>
           <div className="text-[10.5px] text-faintest mt-px">{projects.length} проект(ов)</div>
         </div>
-        <button type="button" className={iconBtn} title="Участники команды" onClick={onManageMembers}>
-          <UsersIcon size={15} />
+        <button
+          type="button"
+          className={`${iconBtn} ${teamSettingsActive ? 'text-accent-deep bg-accent-soft' : ''}`}
+          title="Настройки команды"
+          onClick={onOpenTeamSettings}
+        >
+          <SettingsIcon size={15} />
         </button>
-        {canManage && (
-          <button type="button" className={iconBtn} title="Переименовать команду" onClick={onEditTeam}>
-            <PencilIcon size={15} />
-          </button>
-        )}
-        {canDelete && (
-          <button type="button" className={iconBtn} title="Удалить команду" onClick={onDeleteTeam}>
-            <TrashIcon size={15} />
-          </button>
-        )}
       </div>
 
       {/* Search */}
