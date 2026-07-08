@@ -1,16 +1,17 @@
 /**
  * TableEditor — совместная таблица (Excel-подобная) с синхронизацией через Yjs.
  *
+ * Сетка всегда заполняет всю видимую область: помимо реальных строк/колонок
+ * (что уже есть в документе) рисуются «фантомные» ячейки до краёв вьюпорта.
+ * Ввод в фантомную ячейку «материализует» недостающие строки/колонки в Yjs
+ * (модель Google Sheets), поэтому пустая таблица выглядит как готовый лист.
+ *
  * Структура данных в Yjs:
  * - columns: Y.Array<Y.Map>  — колонка: { id: string, title: string }.
- *   Y.Map (а не plain-объект), чтобы переименование заголовка мержилось между
- *   пользователями, а не перезаписывало колонку целиком.
- * - rows: Y.Array<Y.Map>     — строка: ключ = column.id, значение = содержимое ячейки.
+ * - rows: Y.Array<Y.Map>     — строка: ключ = column.id, значение = ячейка.
  *
  * Использование:
- * <TableProvider tableId={1}>
- *   <TableEditor />
- * </TableProvider>
+ * <TableProvider tableId={1}><TableEditor /></TableProvider>
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -18,7 +19,7 @@ import * as Y from 'yjs'
 import { useTable } from '../providers/TableProvider'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { PlusIcon, TrashIcon } from '../workspace/icons'
+import { TrashIcon } from '../workspace/icons'
 
 interface ColumnView {
   id: string
@@ -29,15 +30,22 @@ interface RowView {
   values: Record<string, string>
 }
 
+// Размеры ячеек сетки (px). Фиксированные — как в табличных редакторах.
+const CELL_W = 150
+const CELL_H = 32
+const ROWNUM_W = 44
+const HEADER_H = 33
+
+const genColId = () => `col_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+
 export function TableEditor() {
   const { doc, awareness, connect, disconnect, username, cursorColor } = useTable()
 
-  // Колонки могут быть либо Y.Map (текущий формат), либо plain-объектом {id,title}
+  // Колонки могут быть Y.Map (текущий формат) или plain-объектом {id,title}
   // (ранняя версия редактора). Тип — unknown, разбираем через readColumn().
   const yColumns = useMemo(() => doc.getArray<unknown>('columns'), [doc])
   const yRows = useMemo(() => doc.getArray<Y.Map<unknown>>('rows'), [doc])
 
-  // Читает колонку независимо от формата хранения (Y.Map или plain-объект).
   const readColumn = useCallback((c: unknown): ColumnView => {
     if (c instanceof Y.Map) {
       return { id: String(c.get('id') ?? ''), title: String(c.get('title') ?? '') }
@@ -49,12 +57,14 @@ export function TableEditor() {
   const [columns, setColumns] = useState<ColumnView[]>([])
   const [rows, setRows] = useState<RowView[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  // Буфер пустых строк/колонок за пределами видимой области — чтобы было куда
+  // прокручивать. Растёт при подходе к краю (см. handleScroll), давая «бесконечную» сетку.
+  const [extra, setExtra] = useState({ cols: 4, rows: 6 })
 
-  // Синхронизация Yjs → React-состояние + подключение к серверу на время жизни редактора.
+  // Синхронизация Yjs → React + подключение к серверу на время жизни редактора.
   useEffect(() => {
-    const syncColumns = () => {
-      setColumns(yColumns.map((c) => readColumn(c)))
-    }
+    const syncColumns = () => setColumns(yColumns.map((c) => readColumn(c)))
     const syncRows = () => {
       setRows(
         yRows.map((r) => {
@@ -80,63 +90,88 @@ export function TableEditor() {
     }
   }, [yColumns, yRows, connect, disconnect, readColumn])
 
-  // Транслируем свою личность (имя/цвет) в presence, когда известен реальный аккаунт.
+  // Presence: транслируем имя/цвет, когда известен реальный аккаунт.
   useEffect(() => {
     if (username) {
       awareness.setLocalStateField('user', { name: username, color: cursorColor })
     }
   }, [awareness, username, cursorColor])
 
-  // ---- Операции над таблицей (пишем в Yjs, UI обновится через observeDeep) ----
+  // Замер контейнера, чтобы понять, сколько строк/колонок нужно для заполнения области.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight })
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
-  const addColumn = useCallback(() => {
-    const col = new Y.Map<unknown>()
-    col.set('id', `col_${Date.now()}_${Math.floor(Math.random() * 1e6)}`)
-    col.set('title', `Колонка ${yColumns.length + 1}`)
-    yColumns.push([col])
-    // Если строк ещё нет — заводим первую, чтобы было куда вводить данные.
-    if (yRows.length === 0) {
-      yRows.push([new Y.Map<unknown>()])
-    }
-  }, [yColumns, yRows])
+  // ---- Операции над Yjs ----
 
-  const addRow = useCallback(() => {
-    yRows.push([new Y.Map<unknown>()])
-  }, [yRows])
-
-  const renameColumn = useCallback(
-    (index: number, title: string) => {
-      const col = yColumns.get(index)
-      if (col instanceof Y.Map) {
-        col.set('title', title)
-      } else if (col != null) {
-        // legacy plain-объект переименовать нельзя — заменяем его на Y.Map (миграция формата).
-        const { id } = readColumn(col)
-        const m = new Y.Map<unknown>()
-        m.set('id', id)
-        m.set('title', title)
-        doc.transact(() => {
-          yColumns.delete(index, 1)
-          yColumns.insert(index, [m])
-        })
+  // Гарантирует, что колонок хотя бы (index+1) и строк хотя бы (rowIndex+1).
+  // Недостающие создаются пустыми — так фантомная ячейка становится реальной.
+  const ensure = useCallback(
+    (rowIndex: number, colIndex: number) => {
+      while (yColumns.length <= colIndex) {
+        const col = new Y.Map<unknown>()
+        col.set('id', genColId())
+        col.set('title', '')
+        yColumns.push([col])
       }
+      while (yRows.length <= rowIndex) {
+        yRows.push([new Y.Map<unknown>()])
+      }
+    },
+    [yColumns, yRows],
+  )
+
+  const setCell = useCallback(
+    (rowIndex: number, colIndex: number, value: string) => {
+      doc.transact(() => {
+        ensure(rowIndex, colIndex)
+        const colId = readColumn(yColumns.get(colIndex)).id
+        yRows.get(rowIndex).set(colId, value)
+      })
+    },
+    [doc, ensure, yColumns, yRows, readColumn],
+  )
+
+  const setTitle = useCallback(
+    (colIndex: number, title: string) => {
+      doc.transact(() => {
+        // до нужной колонки создаём недостающие (материализация фантомного заголовка)
+        while (yColumns.length <= colIndex) {
+          const col = new Y.Map<unknown>()
+          col.set('id', genColId())
+          col.set('title', '')
+          yColumns.push([col])
+        }
+        const col = yColumns.get(colIndex)
+        if (col instanceof Y.Map) {
+          col.set('title', title)
+        } else if (col != null) {
+          // legacy plain-объект → заменяем на Y.Map (миграция формата)
+          const { id } = readColumn(col)
+          const m = new Y.Map<unknown>()
+          m.set('id', id)
+          m.set('title', title)
+          yColumns.delete(colIndex, 1)
+          yColumns.insert(colIndex, [m])
+        }
+      })
     },
     [doc, yColumns, readColumn],
   )
 
-  const setCell = useCallback(
-    (rowIndex: number, colId: string, value: string) => {
-      const row = yRows.get(rowIndex)
-      if (row) row.set(colId, value)
-    },
-    [yRows],
-  )
+  const addRow = useCallback(() => yRows.push([new Y.Map<unknown>()]), [yRows])
 
   const deleteColumn = useCallback(
     (index: number) => {
       const col = yColumns.get(index)
       const colId = col != null ? readColumn(col).id : null
-      // Одна транзакция: и колонка, и её ячейки во всех строках уходят атомарно.
       doc.transact(() => {
         yColumns.delete(index, 1)
         if (colId) {
@@ -149,14 +184,31 @@ export function TableEditor() {
     [doc, yColumns, yRows, readColumn],
   )
 
-  const deleteRow = useCallback(
-    (index: number) => {
-      yRows.delete(index, 1)
-    },
-    [yRows],
-  )
+  const deleteRow = useCallback((index: number) => yRows.delete(index, 1), [yRows])
 
-  // ---- Клавиатурная навигация по ячейкам (Enter/стрелки), как в Excel ----
+  // ---- Размеры сетки: max(реальные, сколько влезает в область) ----
+
+  const realCols = columns.length
+  const realRows = rows.length
+  const fillCols = size.w > 0 ? Math.ceil((size.w - ROWNUM_W) / CELL_W) : 8
+  const fillRows = size.h > 0 ? Math.ceil((size.h - HEADER_H) / CELL_H) : 20
+  // Показываем максимум из «реальных данных» и «сколько влезает в область», плюс буфер для прокрутки.
+  const displayCols = Math.max(realCols, fillCols, 1) + extra.cols
+  const displayRows = Math.max(realRows, fillRows, 1) + extra.rows
+
+  // При прокрутке к правому/нижнему краю доращиваем буфер — сетка «бесконечна» в обе стороны.
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - CELL_W * 2) {
+      setExtra((e) => ({ ...e, cols: e.cols + 4 }))
+    }
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - CELL_H * 3) {
+      setExtra((e) => ({ ...e, rows: e.rows + 10 }))
+    }
+  }, [])
+
+  // ---- Клавиатурная навигация (Enter / стрелки), как в Excel ----
 
   const inputsRef = useRef<Map<string, HTMLInputElement | null>>(new Map())
   const pendingFocus = useRef<{ r: number; c: number } | null>(null)
@@ -170,7 +222,6 @@ export function TableEditor() {
     }
   }, [])
 
-  // Фокус на ячейку, появившуюся после ре-рендера (например, новая строка по Enter).
   useEffect(() => {
     if (pendingFocus.current) {
       const { r, c } = pendingFocus.current
@@ -183,7 +234,7 @@ export function TableEditor() {
     (e: React.KeyboardEvent, r: number, c: number) => {
       if (e.key === 'Enter') {
         e.preventDefault()
-        if (r === rows.length - 1) {
+        if (r + 1 >= displayRows) {
           pendingFocus.current = { r: r + 1, c }
           addRow()
         } else {
@@ -191,150 +242,114 @@ export function TableEditor() {
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault()
-        focusCell(r + 1, c)
+        focusCell(Math.min(r + 1, displayRows - 1), c)
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        focusCell(r - 1, c)
+        focusCell(Math.max(r - 1, 0), c)
       }
     },
-    [rows.length, addRow, focusCell],
+    [displayRows, addRow, focusCell],
   )
 
-  // ---- Контекстные меню (правый клик по заголовку / номеру строки) ----
+  // ---- Контекстные меню (только для реальных строк/колонок) ----
 
   const openColumnMenu = (e: React.MouseEvent, index: number) => {
+    if (index >= realCols) return
     e.preventDefault()
     setMenu({
       x: e.clientX,
       y: e.clientY,
       items: [
-        {
-          label: 'Удалить колонку',
-          icon: <TrashIcon size={15} />,
-          danger: true,
-          onClick: () => deleteColumn(index),
-        },
+        { label: 'Удалить колонку', icon: <TrashIcon size={15} />, danger: true, onClick: () => deleteColumn(index) },
       ],
     })
   }
 
   const openRowMenu = (e: React.MouseEvent, index: number) => {
+    if (index >= realRows) return
     e.preventDefault()
     setMenu({
       x: e.clientX,
       y: e.clientY,
       items: [
-        {
-          label: 'Удалить строку',
-          icon: <TrashIcon size={15} />,
-          danger: true,
-          onClick: () => deleteRow(index),
-        },
+        { label: 'Удалить строку', icon: <TrashIcon size={15} />, danger: true, onClick: () => deleteRow(index) },
       ],
     })
   }
 
   // ---- Рендер ----
 
-  if (columns.length === 0) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-6">
-        <p className="text-[14px] text-muted">В таблице пока нет колонок</p>
-        <button
-          type="button"
-          onClick={addColumn}
-          className="h-9 px-4 rounded-[9px] bg-accent text-white text-[13px] font-semibold hover:bg-accent-deep cursor-pointer inline-flex items-center gap-1.5"
-        >
-          <PlusIcon size={15} strokeWidth={2} />
-          Добавить колонку
-        </button>
-      </div>
-    )
-  }
-
-  const cornerCls = 'sticky left-0 z-10 bg-sidebar border-b border-r border-line'
+  const colIndexes = Array.from({ length: displayCols }, (_, i) => i)
+  const rowIndexes = Array.from({ length: displayRows }, (_, i) => i)
+  const headerCls =
+    'sticky top-0 z-10 h-[33px] p-0 border-b border-r border-line bg-sidebar align-middle'
 
   return (
-    <div className="h-full overflow-auto bg-panel">
-      <table className="border-separate border-spacing-0 text-[13px] text-ink">
+    <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-auto bg-panel">
+      <table
+        className="table-fixed border-separate border-spacing-0 text-[13px] text-ink"
+        style={{ width: ROWNUM_W + displayCols * CELL_W }}
+      >
+        <colgroup>
+          <col style={{ width: ROWNUM_W }} />
+          {colIndexes.map((c) => (
+            <col key={c} style={{ width: CELL_W }} />
+          ))}
+        </colgroup>
+
         <thead>
           <tr>
             {/* Угловая ячейка над номерами строк */}
-            <th className={`${cornerCls} w-10 min-w-10`} />
-            {columns.map((col, ci) => (
-              <th
-                key={col.id}
-                onContextMenu={(e) => openColumnMenu(e, ci)}
-                className="min-w-[160px] p-0 border-b border-r border-line bg-sidebar"
-              >
-                <input
-                  type="text"
-                  value={col.title}
-                  onChange={(e) => renameColumn(ci, e.target.value)}
-                  placeholder="Без названия"
-                  title="Нажмите, чтобы переименовать · правый клик — удалить"
-                  className="w-full px-2.5 py-1.5 bg-transparent font-semibold text-ink text-left outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-accent placeholder:text-faint placeholder:font-normal"
-                />
-              </th>
-            ))}
-            {/* Кнопка добавления колонки */}
-            <th className="w-10 min-w-10 border-b border-line bg-sidebar p-0">
-              <button
-                type="button"
-                onClick={addColumn}
-                title="Добавить колонку"
-                className="w-full h-full flex items-center justify-center py-1.5 text-faint hover:text-accent hover:bg-hovered cursor-pointer"
-              >
-                <PlusIcon size={16} strokeWidth={2} />
-              </button>
-            </th>
+            <th className={`${headerCls} sticky left-0 z-20`} />
+            {colIndexes.map((c) => {
+              const title = c < realCols ? columns[c].title : ''
+              return (
+                <th key={c} onContextMenu={(e) => openColumnMenu(e, c)} className={headerCls}>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(c, e.target.value)}
+                    placeholder={c < realCols ? 'Без названия' : ''}
+                    title="Заголовок колонки · правый клик — удалить"
+                    className="w-full h-full px-2 bg-transparent font-semibold text-ink text-left outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-accent placeholder:text-faint placeholder:font-normal"
+                  />
+                </th>
+              )
+            })}
           </tr>
         </thead>
+
         <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri} className="group">
+          {rowIndexes.map((r) => (
+            <tr key={r} className="group" style={{ height: CELL_H }}>
               {/* Номер строки */}
               <td
-                onContextMenu={(e) => openRowMenu(e, ri)}
+                onContextMenu={(e) => openRowMenu(e, r)}
                 title="Правый клик — удалить строку"
-                className={`${cornerCls} border-b text-center text-[12px] text-faint select-none group-hover:bg-hovered`}
+                className="sticky left-0 z-10 border-b border-r border-line bg-sidebar text-center text-[12px] text-faint select-none group-hover:bg-hovered"
               >
-                {ri + 1}
+                {r + 1}
               </td>
-              {columns.map((col, ci) => (
-                <td key={col.id} className="p-0 border-b border-r border-line">
-                  <input
-                    ref={(el) => {
-                      inputsRef.current.set(cellKey(ri, ci), el)
-                    }}
-                    type="text"
-                    value={row.values[col.id] ?? ''}
-                    onChange={(e) => setCell(ri, col.id, e.target.value)}
-                    onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
-                    className="w-full px-2.5 py-1.5 bg-transparent outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-accent"
-                  />
-                </td>
-              ))}
-              <td className="border-b border-line" />
+              {colIndexes.map((c) => {
+                const colId = c < realCols ? columns[c].id : ''
+                const value = c < realCols && r < realRows ? rows[r].values[colId] ?? '' : ''
+                return (
+                  <td key={c} className="p-0 border-b border-r border-line">
+                    <input
+                      ref={(el) => {
+                        inputsRef.current.set(cellKey(r, c), el)
+                      }}
+                      type="text"
+                      value={value}
+                      onChange={(e) => setCell(r, c, e.target.value)}
+                      onKeyDown={(e) => handleCellKeyDown(e, r, c)}
+                      className="block w-full h-8 px-2 bg-transparent outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-accent"
+                    />
+                  </td>
+                )
+              })}
             </tr>
           ))}
-          {/* Строка добавления */}
-          <tr>
-            <td
-              colSpan={columns.length + 2}
-              className="border-b border-line p-0"
-            >
-              <button
-                type="button"
-                onClick={addRow}
-                title="Добавить строку"
-                className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[12.5px] text-faint hover:text-accent hover:bg-hovered cursor-pointer"
-              >
-                <PlusIcon size={15} strokeWidth={2} />
-                Строка
-              </button>
-            </td>
-          </tr>
         </tbody>
       </table>
 
