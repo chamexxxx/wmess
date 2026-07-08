@@ -92,6 +92,15 @@ export const FileIcon = (p: IconProps) => (
   </Svg>
 )
 
+// Загруженный файл-изображение — рамка с «горой» и солнцем.
+export const ImageIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+    <circle cx="8.8" cy="9" r="1.5" />
+    <path d="M20.5 15.5l-4.7-4.7L6 20.5" />
+  </Svg>
+)
+
 // Ссылка на внешний ресурс (ярлык) — стрелка из рамки. Для будущего типа элемента библиотеки.
 export const ExternalLinkIcon = (p: IconProps) => (
   <Svg {...p}>

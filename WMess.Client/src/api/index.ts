@@ -110,6 +110,14 @@ class WMessApiClient extends Bff {
     return this.library.instance.post('/api/library-items/files', form)
   }
 
+  // Байты загруженного файла как Blob (для предпросмотра изображений через object URL).
+  async fetchLibraryFile(id: number): Promise<Blob> {
+    const res = await this.library.instance.get(`/api/library-items/${id}/download`, {
+      responseType: 'blob',
+    })
+    return res.data as Blob
+  }
+
   // Скачивание загруженного файла: тянем blob и сохраняем под исходным именем.
   async downloadLibraryFile(id: number, fileName: string) {
     const res = await this.library.instance.get(`/api/library-items/${id}/download`, {

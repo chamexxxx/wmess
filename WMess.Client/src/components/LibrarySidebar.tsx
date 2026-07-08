@@ -3,7 +3,9 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, ChevronRightIcon, DocsIcon, FileIcon, FolderIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, ChevronRightIcon, DocsIcon, FileIcon, FolderIcon, ImageIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { ImagePreview, isImageFile } from './ImagePreview'
+import type { PreviewImage } from './ImagePreview'
 
 interface Folder {
   id: number
@@ -51,6 +53,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
   const [dropTarget, setDropTarget] = useState<{ kind: 'folder' | 'root'; id: number | null } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [preview, setPreview] = useState<{ images: PreviewImage[]; index: number } | null>(null)
 
   const loadData = async () => {
     try {
@@ -464,8 +467,9 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
     })
   }
 
-  // Иконка элемента по типу (документ/доска/таблица/файл); у выбранного — акцентный цвет.
-  const itemIcon = (type: string | undefined, isSelected: boolean) => {
+  // Иконка элемента по типу (документ/доска/таблица/файл; файл-изображение — своя иконка).
+  const itemIcon = (item: Doc, isSelected: boolean) => {
+    const { type, title } = item
     const cls = isSelected
       ? 'text-accent'
       : type === 'board'
@@ -477,17 +481,32 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
             : 'text-doc'
     if (type === 'board') return <BoardsIcon size={15} className={cls} />
     if (type === 'table') return <TablesIcon size={15} className={cls} />
-    if (type === 'file') return <FileIcon size={15} className={cls} />
+    if (type === 'file') {
+      if (isImageFile(title)) {
+        return <ImageIcon size={15} className={isSelected ? 'text-accent' : 'text-image'} />
+      }
+      return <FileIcon size={15} className={cls} />
+    }
     return <DocsIcon size={15} className={cls} />
   }
 
-  // Клик по элементу: файл — скачиваем, остальное — открываем в редакторе.
+  // Клик по элементу: изображение — открываем просмотрщик, прочий файл — скачиваем,
+  // остальные типы — открываем в редакторе.
   const openDoc = (doc: Doc) => {
-    if (doc.type === 'file') {
-      apiClient.downloadLibraryFile(doc.id, doc.title)
-    } else {
+    if (doc.type !== 'file') {
       onSelect(doc.id, doc.title)
+      return
     }
+    if (!isImageFile(doc.title)) {
+      apiClient.downloadLibraryFile(doc.id, doc.title)
+      return
+    }
+    // Галерея по изображениям той же папки.
+    const imgs = documents
+      .filter((x) => x.folderId === doc.folderId && x.type === 'file' && isImageFile(x.title))
+      .map((x) => ({ id: x.id, title: x.title }))
+    const idx = imgs.findIndex((x) => x.id === doc.id)
+    setPreview({ images: imgs, index: idx < 0 ? 0 : idx })
   }
 
   const renderDoc = (doc: Doc) => {
@@ -510,7 +529,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       >
         <span className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 w-3" aria-hidden="true" />
-          {itemIcon(doc.type, isSelected)}
+          {itemIcon(doc, isSelected)}
           <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
             {doc.title}
           </span>
@@ -676,7 +695,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
                     onClick={() => openDoc(d)}
                   >
                     <span className="flex items-center gap-2 min-w-0">
-                      {itemIcon(d.type, isSelected)}
+                      {itemIcon(d, isSelected)}
                       <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
                         {d.title}
                       </span>
@@ -788,6 +807,9 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
         />
       )}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+      {preview && (
+        <ImagePreview images={preview.images} index={preview.index} onClose={() => setPreview(null)} />
+      )}
     </div>
   )
 }

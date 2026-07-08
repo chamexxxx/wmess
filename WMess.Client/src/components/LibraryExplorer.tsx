@@ -3,7 +3,9 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, DocsIcon, FileIcon, FolderIcon, HomeIcon, PencilIcon, PlusIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, DocsIcon, FileIcon, FolderIcon, HomeIcon, ImageIcon, PencilIcon, PlusIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { ImagePreview, isImageFile } from './ImagePreview'
+import type { PreviewImage } from './ImagePreview'
 
 interface FolderItem {
   id: number
@@ -55,6 +57,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   const [dragItem, setDragItem] = useState<{ kind: 'folder' | 'doc'; id: number } | null>(null)
   const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [preview, setPreview] = useState<{ images: PreviewImage[]; index: number } | null>(null)
 
   const loadContents = async () => {
     // Намеренно НЕ ставим loading=true при переходах: иначе список на миг заменяется на
@@ -437,17 +440,32 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     )
   }
 
+  // Открытие элемента: изображение — галерея по текущему списку, прочий файл — скачать,
+  // остальные типы — редактор. fromFolder=false означает список результатов поиска.
+  const openItem = (d: DocItem, fromFolder: boolean) => {
+    if (d.type !== 'file') {
+      onOpenDocument(d.id, d.title, d.type)
+      return
+    }
+    if (!isImageFile(d.title)) {
+      apiClient.downloadLibraryFile(d.id, d.title)
+      return
+    }
+    const source = fromFolder ? documents : searchDocs
+    const imgs = source
+      .filter((x) => x.type === 'file' && isImageFile(x.title))
+      .map((x) => ({ id: x.id, title: x.title }))
+    const idx = imgs.findIndex((x) => x.id === d.id)
+    setPreview({ images: imgs, index: idx < 0 ? 0 : idx })
+  }
+
   const docRow = (d: DocItem, withMeta: boolean) => {
     const isDragging = dragItem?.kind === 'doc' && dragItem.id === d.id
     return (
     <div
       key={`d-${d.id}`}
       className={`${rowBase} ${isDragging ? 'opacity-50' : ''}`}
-      onClick={() =>
-        d.type === 'file'
-          ? apiClient.downloadLibraryFile(d.id, d.title)
-          : onOpenDocument(d.id, d.title, d.type)
-      }
+      onClick={() => openItem(d, withMeta)}
       onContextMenu={(e) => openDocMenu(e, d)}
       draggable={withMeta}
       onDragStart={
@@ -472,7 +490,11 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       ) : d.type === 'table' ? (
         <TablesIcon size={18} className="text-table shrink-0" />
       ) : d.type === 'file' ? (
-        <FileIcon size={18} className="text-ink shrink-0" />
+        isImageFile(d.title) ? (
+          <ImageIcon size={18} className="text-image shrink-0" />
+        ) : (
+          <FileIcon size={18} className="text-ink shrink-0" />
+        )
       ) : (
         <DocsIcon size={18} className="text-doc shrink-0" />
       )}
@@ -704,6 +726,9 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         />
       )}
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+      {preview && (
+        <ImagePreview images={preview.images} index={preview.index} onClose={() => setPreview(null)} />
+      )}
     </div>
   )
 }
