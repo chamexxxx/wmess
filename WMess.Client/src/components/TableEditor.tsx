@@ -24,17 +24,19 @@ import { TrashIcon } from '../workspace/icons'
 interface ColumnView {
   id: string
   title: string
+  width?: number
 }
 
 interface RowView {
   values: Record<string, string>
 }
 
-// Размеры ячеек сетки (px). Фиксированные — как в табличных редакторах.
+// Размеры ячеек сетки (px). CELL_W — ширина колонки по умолчанию (можно менять перетаскиванием).
 const CELL_W = 150
 const CELL_H = 32
 const ROWNUM_W = 44
 const HEADER_H = 33
+const MIN_COL_W = 56
 
 const genColId = () => `col_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
 
@@ -48,10 +50,19 @@ export function TableEditor() {
 
   const readColumn = useCallback((c: unknown): ColumnView => {
     if (c instanceof Y.Map) {
-      return { id: String(c.get('id') ?? ''), title: String(c.get('title') ?? '') }
+      const w = c.get('width')
+      return {
+        id: String(c.get('id') ?? ''),
+        title: String(c.get('title') ?? ''),
+        width: typeof w === 'number' ? w : undefined,
+      }
     }
-    const o = (c ?? {}) as { id?: unknown; title?: unknown }
-    return { id: String(o.id ?? ''), title: String(o.title ?? '') }
+    const o = (c ?? {}) as { id?: unknown; title?: unknown; width?: unknown }
+    return {
+      id: String(o.id ?? ''),
+      title: String(o.title ?? ''),
+      width: typeof o.width === 'number' ? o.width : undefined,
+    }
   }, [])
 
   const [columns, setColumns] = useState<ColumnView[]>([])
@@ -61,6 +72,8 @@ export function TableEditor() {
   // Буфер пустых строк/колонок за пределами видимой области — чтобы было куда
   // прокручивать. Растёт при подходе к краю (см. handleScroll), давая «бесконечную» сетку.
   const [extra, setExtra] = useState({ cols: 4, rows: 6 })
+  // Живое перетаскивание границы колонки: { индекс колонки, текущая ширина }. Запись в Yjs — на отпускании.
+  const [resize, setResize] = useState<{ col: number; width: number } | null>(null)
 
   // Синхронизация Yjs → React + подключение к серверу на время жизни редактора.
   useEffect(() => {
@@ -139,31 +152,42 @@ export function TableEditor() {
     [doc, ensure, yColumns, yRows, readColumn],
   )
 
+  // Возвращает Y.Map колонки по индексу, создавая недостающие (материализация фантомных)
+  // и мигрируя legacy plain-объект в Y.Map. Вызывать внутри doc.transact.
+  const ensureColumnMap = useCallback(
+    (colIndex: number): Y.Map<unknown> => {
+      while (yColumns.length <= colIndex) {
+        const col = new Y.Map<unknown>()
+        col.set('id', genColId())
+        col.set('title', '')
+        yColumns.push([col])
+      }
+      const cur = yColumns.get(colIndex)
+      if (cur instanceof Y.Map) return cur
+      const { id, title, width } = readColumn(cur)
+      const m = new Y.Map<unknown>()
+      m.set('id', id)
+      m.set('title', title)
+      if (width) m.set('width', width)
+      yColumns.delete(colIndex, 1)
+      yColumns.insert(colIndex, [m])
+      return m
+    },
+    [yColumns, readColumn],
+  )
+
   const setTitle = useCallback(
     (colIndex: number, title: string) => {
-      doc.transact(() => {
-        // до нужной колонки создаём недостающие (материализация фантомного заголовка)
-        while (yColumns.length <= colIndex) {
-          const col = new Y.Map<unknown>()
-          col.set('id', genColId())
-          col.set('title', '')
-          yColumns.push([col])
-        }
-        const col = yColumns.get(colIndex)
-        if (col instanceof Y.Map) {
-          col.set('title', title)
-        } else if (col != null) {
-          // legacy plain-объект → заменяем на Y.Map (миграция формата)
-          const { id } = readColumn(col)
-          const m = new Y.Map<unknown>()
-          m.set('id', id)
-          m.set('title', title)
-          yColumns.delete(colIndex, 1)
-          yColumns.insert(colIndex, [m])
-        }
-      })
+      doc.transact(() => ensureColumnMap(colIndex).set('title', title))
     },
-    [doc, yColumns, readColumn],
+    [doc, ensureColumnMap],
+  )
+
+  const setColumnWidth = useCallback(
+    (colIndex: number, width: number) => {
+      doc.transact(() => ensureColumnMap(colIndex).set('width', Math.max(MIN_COL_W, Math.round(width))))
+    },
+    [doc, ensureColumnMap],
   )
 
   const addRow = useCallback(() => yRows.push([new Y.Map<unknown>()]), [yRows])
@@ -195,6 +219,47 @@ export function TableEditor() {
   // Показываем максимум из «реальных данных» и «сколько влезает в область», плюс буфер для прокрутки.
   const displayCols = Math.max(realCols, fillCols, 1) + extra.cols
   const displayRows = Math.max(realRows, fillRows, 1) + extra.rows
+
+  // Ширина колонки: во время перетаскивания — живое значение, иначе сохранённая (или дефолт).
+  const columnWidth = useCallback(
+    (c: number) => {
+      if (resize && resize.col === c) return resize.width
+      if (c < realCols && columns[c].width) return columns[c].width!
+      return CELL_W
+    },
+    [resize, realCols, columns],
+  )
+
+  const tableWidth =
+    ROWNUM_W + Array.from({ length: displayCols }, (_, c) => columnWidth(c)).reduce((a, b) => a + b, 0)
+
+  // Старт перетаскивания правой границы колонки: слушаем мышь на окне до отпускания.
+  const startResize = useCallback(
+    (e: React.MouseEvent, colIndex: number) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const startX = e.clientX
+      const startW = columnWidth(colIndex)
+      let liveW = startW
+      const onMove = (ev: MouseEvent) => {
+        liveW = Math.max(MIN_COL_W, Math.round(startW + (ev.clientX - startX)))
+        setResize({ col: colIndex, width: liveW })
+      }
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove)
+        window.removeEventListener('mouseup', onUp)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+        setColumnWidth(colIndex, liveW)
+        setResize(null)
+      }
+      document.body.style.userSelect = 'none'
+      document.body.style.cursor = 'col-resize'
+      window.addEventListener('mousemove', onMove)
+      window.addEventListener('mouseup', onUp)
+    },
+    [columnWidth, setColumnWidth],
+  )
 
   // При прокрутке к правому/нижнему краю доращиваем буфер — сетка «бесконечна» в обе стороны.
   const handleScroll = useCallback(() => {
@@ -288,12 +353,12 @@ export function TableEditor() {
     <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-auto bg-panel">
       <table
         className="table-fixed border-separate border-spacing-0 text-[13px] text-ink"
-        style={{ width: ROWNUM_W + displayCols * CELL_W }}
+        style={{ width: tableWidth }}
       >
         <colgroup>
           <col style={{ width: ROWNUM_W }} />
           {colIndexes.map((c) => (
-            <col key={c} style={{ width: CELL_W }} />
+            <col key={c} style={{ width: columnWidth(c) }} />
           ))}
         </colgroup>
 
@@ -304,7 +369,7 @@ export function TableEditor() {
             {colIndexes.map((c) => {
               const title = c < realCols ? columns[c].title : ''
               return (
-                <th key={c} onContextMenu={(e) => openColumnMenu(e, c)} className={headerCls}>
+                <th key={c} onContextMenu={(e) => openColumnMenu(e, c)} className={`${headerCls} relative`}>
                   <input
                     type="text"
                     value={title}
@@ -312,6 +377,13 @@ export function TableEditor() {
                     placeholder={c < realCols ? 'Без названия' : ''}
                     title="Заголовок колонки · правый клик — удалить"
                     className="w-full h-full px-2 bg-transparent font-semibold text-ink text-left outline-none focus:bg-white focus:ring-2 focus:ring-inset focus:ring-accent placeholder:text-faint placeholder:font-normal"
+                  />
+                  {/* Ручка изменения ширины: тянем правую границу колонки */}
+                  <div
+                    onMouseDown={(e) => startResize(e, c)}
+                    onContextMenu={(e) => e.stopPropagation()}
+                    title="Потяните, чтобы изменить ширину"
+                    className="absolute top-0 right-0 z-20 h-full w-[6px] translate-x-1/2 cursor-col-resize hover:bg-accent/40"
                   />
                 </th>
               )
