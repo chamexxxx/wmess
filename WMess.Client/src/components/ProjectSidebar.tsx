@@ -21,6 +21,15 @@ interface ProjectSidebarProps {
   canManage: boolean
 }
 
+// Русское склонение по числу: pluralRu(1, 'проект', 'проекта', 'проектов') → 'проект'.
+function pluralRu(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few
+  return many
+}
+
 const sectionLabel = 'font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest'
 const iconBtn =
   'w-7 h-7 rounded-lg flex items-center justify-center text-faint cursor-pointer hover:bg-[#eae8e0]'
@@ -61,7 +70,9 @@ export function ProjectSidebar({
       <div className="flex items-center gap-2 px-[14px] pt-4 pb-3">
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold text-ink truncate">{team.name}</div>
-          <div className="text-[10.5px] text-faintest mt-px">{projects.length} проект(ов)</div>
+          <div className="text-[10.5px] text-faintest mt-px">
+            {projects.length} {pluralRu(projects.length, 'проект', 'проекта', 'проектов')}
+          </div>
         </div>
         <button
           type="button"
