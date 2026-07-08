@@ -58,3 +58,13 @@ nunit-*.xml
 
 # JetBrains IDEs
 .idea
+
+# Built SPA copied for DockerLocal (docker-up.cmd); do not commit assets/fonts
+WMess.Web/wwwroot/*
+!WMess.Web/wwwroot/.gitkeep
+
+# Local run state (PIDs, logs)
+.wmess/
+
+# Self-contained publish output (not for git)
+docker-out/

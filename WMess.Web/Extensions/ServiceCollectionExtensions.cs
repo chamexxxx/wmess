@@ -15,11 +15,15 @@ public static class ServiceCollectionExtensions
                 // В Development разрешаем доступ по локальной сети (http://<ip>:5173).
                 // Префикс __Host- и флаг Secure требуют secure-context/HTTPS (localhost — исключение),
                 // поэтому для dev их снимаем; в production остаётся строгий вариант.
-                var isDev = environment.IsDevelopment();
-                options.Cookie.Name = isDev ? "session" : "__Host-session";
+                var insecureCookies = configuration.GetValue("Bff:InsecureCookies", false)
+                    || environment.IsDevelopment()
+                    || environment.IsDockerLike();
+                options.Cookie.Name = insecureCookies ? "session" : "__Host-session";
                 options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = isDev ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
-                options.Cookie.SameSite = SameSiteMode.Strict;
+                options.Cookie.SecurePolicy = insecureCookies
+                    ? CookieSecurePolicy.SameAsRequest
+                    : CookieSecurePolicy.Always;
+                options.Cookie.SameSite = insecureCookies ? SameSiteMode.Lax : SameSiteMode.Strict;
                 options.Cookie.Path = "/";
                 options.SlidingExpiration = false;
                 options.Events.OnRedirectToLogin = context =>

@@ -1,0 +1,25 @@
+# PostgreSQL for WMess hybrid mode (docker-up.cmd).
+# Site: http://localhost:9080
+
+name: wmess-docker
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wmess
+      POSTGRES_PASSWORD: wmess
+      POSTGRES_DB: wmess
+    ports:
+      - '5434:5432'
+    volumes:
+      - wmess_docker_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U wmess -d wmess']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  wmess_docker_pg:

@@ -5,7 +5,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddBff(builder.Configuration, builder.Environment);
 builder.Services.AddControllers();
-builder.Services.AddSpaYarp();
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer<ApiProxyDocumentTransformer>();
@@ -14,9 +13,11 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
+var serveSpa = !app.Environment.IsDevelopment() || app.Environment.IsDockerLike();
+
 app.UseExceptionHandler();
 
-if (!app.Environment.IsDevelopment())
+if (serveSpa)
 {
     app.UseDefaultFiles();
     app.UseStaticFiles();
@@ -36,9 +37,7 @@ app.MapControllers();
 app.Map("/api/auth/{**rest}", () => Results.NotFound()).ExcludeFromDescription();
 app.MapReverseProxy();
 
-app.UseSpaYarp();
-
-if (!app.Environment.IsDevelopment())
+if (serveSpa)
 {
     app.MapFallbackToFile("index.html");
 }

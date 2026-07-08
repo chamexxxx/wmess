@@ -7,15 +7,7 @@
     <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)</OpenApiDocumentsDirectory>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <SpaRoot>..\WMess.Client\</SpaRoot>
-    <SpaClientUrl>http://localhost:5173</SpaClientUrl>
-    <SpaLaunchCommand>npm run dev</SpaLaunchCommand>
-    <SpaProxyTimeoutInSeconds>120</SpaProxyTimeoutInSeconds>
-  </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="AspNetCore.SpaYarp" Version="2.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -26,15 +18,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Remove="$(SpaRoot)**" />
-    <None Remove="$(SpaRoot)**" />
-    <None Include="$(SpaRoot)**" Exclude="$(SpaRoot)node_modules\**" />
+    <Content Remove="..\WMess.Client\**" />
+    <None Remove="..\WMess.Client\**" />
+    <None Include="..\WMess.Client\**" Exclude="..\WMess.Client\node_modules\**" />
   </ItemGroup>
 
-  <Target Name="PublishBuildSpa" AfterTargets="ComputeFilesToPublish">
-    <Exec WorkingDirectory="$(SpaRoot)" Command="npm run build" />
+  <Target Name="PublishBuildSpa" AfterTargets="ComputeFilesToPublish" Condition="'$(PublishBuildSpa)' != 'false'">
+    <Exec WorkingDirectory="..\WMess.Client" Command="npm run build" />
     <ItemGroup>
-      <DistFiles Include="$(SpaRoot)dist\**" />
+      <DistFiles Include="..\WMess.Client\dist\**" />
       <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
         <RelativePath>wwwroot\%(RecursiveDir)%(FileName)%(Extension)</RelativePath>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

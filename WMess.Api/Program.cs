@@ -151,6 +151,16 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 var app = builder.Build();
+
+if (builder.Configuration.GetValue("AutoMigrate", false)
+    || app.Environment.IsEnvironment("Docker")
+    || app.Environment.IsEnvironment("DockerLocal"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    db.Database.Migrate();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -160,7 +170,10 @@ if (app.Environment.IsDevelopment())
         options.WithTitle("WMess API");
     });
 }
-app.UseHttpsRedirection();
+if (!app.Environment.IsEnvironment("Docker") && !app.Environment.IsEnvironment("DockerLocal"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
