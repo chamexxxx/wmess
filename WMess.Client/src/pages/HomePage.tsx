@@ -22,12 +22,12 @@ export function HomePage() {
   const navigate = useNavigate()
 
   // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
-  // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/library/:docId
-  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, docId: docIdParam } = useParams()
+  // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/library/:itemId
+  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, itemId: itemIdParam } = useParams()
   const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
   // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Библиотека».
-  const sectionKey = docIdParam != null ? 'library' : sectionParam
+  const sectionKey = itemIdParam != null ? 'library' : sectionParam
 
   const [teams, setTeams] = useState<TeamResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])

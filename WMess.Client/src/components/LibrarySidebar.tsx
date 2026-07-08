@@ -221,9 +221,9 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
     }
   }
 
-  const moveDocument = async (docId: number, targetFolderId: number | null) => {
+  const moveDocument = async (itemId: number, targetFolderId: number | null) => {
     try {
-      await apiClient.library.moveItem(docId, { folderId: targetFolderId })
+      await apiClient.library.moveItem(itemId, { folderId: targetFolderId })
       await loadData()
       if (targetFolderId !== null) {
         setExpanded((prev) => new Set(prev).add(targetFolderId))

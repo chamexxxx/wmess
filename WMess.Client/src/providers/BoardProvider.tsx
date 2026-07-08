@@ -62,7 +62,7 @@ export function BoardProvider({ boardId, children }: BoardProviderProps) {
   // Так doc и awareness доступны из контекста ещё до подключения — это нужно BoardEditor,
   // который навешивает binding Excalidraw ↔ Yjs на маунте.
   const provider = useMemo(
-    () => new SignalRProvider(boardId, new Y.Doc(), '/hubs/board', 'boards'),
+    () => new SignalRProvider(boardId, new Y.Doc(), '/hubs/board'),
     [boardId],
   )
 

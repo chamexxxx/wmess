@@ -13,7 +13,7 @@ export const router = createBrowserRouter([
       { path: '/teams/:teamId', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId/:section', element: <HomePage /> },
-      { path: '/teams/:teamId/projects/:projectId/library/:docId', element: <HomePage /> },
+      { path: '/teams/:teamId/projects/:projectId/library/:itemId', element: <HomePage /> },
       // Временный роут для тестирования Excalidraw
       { path: '/excalidraw-test', element: <ExcalidrawTestPage /> },
     ],

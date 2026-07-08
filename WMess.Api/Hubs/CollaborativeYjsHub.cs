@@ -15,10 +15,11 @@ namespace WMess.Api.Hubs;
 /// задаётся наследником через <see cref="ItemType"/>, <see cref="GroupPrefix"/> и методы
 /// загрузки/сохранения снапшота.
 ///
-/// ВНИМАНИЕ: имена hub-методов (JoinDocument, SendUpdate, SaveDocumentState и т.д.) и событий
-/// (DocumentState, ReceiveUpdate…) — это общий проводной контракт. Клиентский SignalRProvider
-/// один на все типы (документы и доски), поэтому имена сохраняются историческими и менять их
-/// нельзя без синхронной правки клиента.
+/// ВНИМАНИЕ: имена hub-методов (JoinLibraryItem, SendUpdate, SaveLibraryItemState и т.д.) и событий
+/// (LibraryItemState, ReceiveUpdate…) — это общий проводной контракт клиента и сервера. Клиентский
+/// SignalRProvider один на все типы элементов библиотеки (документы, доски), поэтому имена
+/// нейтральны к типу элемента. Менять их можно только синхронно с SignalRProvider в одном
+/// коммите — иначе уже открытые вкладки со старым клиентом потеряют связь до перезагрузки.
 /// </summary>
 [Authorize]
 public abstract class CollaborativeYjsHub : Hub
@@ -83,7 +84,7 @@ public abstract class CollaborativeYjsHub : Hub
     /// <summary>Бросает <see cref="HubException"/>, если у соединения нет хотя бы права на просмотр.</summary>
     private async Task EnsureCanViewAsync(int itemId)
     {
-        // Право на редактирование кэшируется при JoinDocument и подразумевает просмотр;
+        // Право на редактирование кэшируется при JoinLibraryItem и подразумевает просмотр;
         // иначе перепроверяем доступ в БД.
         if (!CachedCanEdit(itemId) && !(await ResolveRightsAsync(itemId)).CanView)
         {
@@ -91,10 +92,10 @@ public abstract class CollaborativeYjsHub : Hub
         }
     }
 
-    public async Task JoinDocument(int documentId)
+    public async Task JoinLibraryItem(int itemId)
     {
         var userId = GetCurrentUserId();
-        var rights = await ResolveRightsAsync(documentId);
+        var rights = await ResolveRightsAsync(itemId);
 
         if (!rights.CanView)
         {
@@ -102,72 +103,72 @@ public abstract class CollaborativeYjsHub : Hub
         }
 
         // Запоминаем права на время жизни соединения, чтобы не ходить в БД на каждый апдейт.
-        Context.Items[EditRightKey(documentId)] = rights.CanEdit;
+        Context.Items[EditRightKey(itemId)] = rights.CanEdit;
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(documentId));
+        await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(itemId));
 
         // Отправляем сохранённый снапшот как стартовую базу (важно, если пользователь зашёл первым).
-        var snapshot = await LoadSnapshotAsync(documentId);
+        var snapshot = await LoadSnapshotAsync(itemId);
 
-        await Clients.Caller.SendAsync("DocumentState", snapshot ?? Array.Empty<byte>());
+        await Clients.Caller.SendAsync("LibraryItemState", snapshot ?? Array.Empty<byte>());
 
-        _logger.LogInformation("User {UserId} joined {ItemType} {ItemId} (canEdit={CanEdit})", userId, ItemType, documentId, rights.CanEdit);
+        _logger.LogInformation("User {UserId} joined {ItemType} {ItemId} (canEdit={CanEdit})", userId, ItemType, itemId, rights.CanEdit);
     }
 
-    public async Task LeaveDocument(int documentId)
+    public async Task LeaveLibraryItem(int itemId)
     {
-        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupName(documentId));
-        Context.Items.Remove(EditRightKey(documentId));
-        _logger.LogInformation("User {UserId} left {ItemType} {ItemId}", GetCurrentUserId(), ItemType, documentId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupName(itemId));
+        Context.Items.Remove(EditRightKey(itemId));
+        _logger.LogInformation("User {UserId} left {ItemType} {ItemId}", GetCurrentUserId(), ItemType, itemId);
     }
 
     /// <summary>Шаг 1 sync-протокола: рассылаем вектор состояния остальным, чтобы они прислали недостающее.</summary>
-    public async Task SyncStep1(int documentId, byte[] stateVector)
+    public async Task SyncStep1(int itemId, byte[] stateVector)
     {
-        await EnsureCanViewAsync(documentId);
+        await EnsureCanViewAsync(itemId);
 
-        await Clients.OthersInGroup(GroupName(documentId))
-            .SendAsync("ReceiveSyncStep1", documentId, stateVector, Context.ConnectionId);
+        await Clients.OthersInGroup(GroupName(itemId))
+            .SendAsync("ReceiveSyncStep1", itemId, stateVector, Context.ConnectionId);
     }
 
     /// <summary>Шаг 2 sync-протокола: адресный ответ конкретному соединению с недостающими апдейтами.</summary>
-    public async Task SyncStep2(int documentId, byte[] update, string targetConnectionId)
+    public async Task SyncStep2(int itemId, byte[] update, string targetConnectionId)
     {
-        await EnsureCanViewAsync(documentId);
+        await EnsureCanViewAsync(itemId);
 
-        await Clients.Client(targetConnectionId).SendAsync("ReceiveSyncStep2", documentId, update);
+        await Clients.Client(targetConnectionId).SendAsync("ReceiveSyncStep2", itemId, update);
     }
 
     /// <summary>Инкрементальный апдейт — широковещательно остальным участникам.</summary>
-    public async Task SendUpdate(int documentId, byte[] update)
+    public async Task SendUpdate(int itemId, byte[] update)
     {
-        if (!CachedCanEdit(documentId))
+        if (!CachedCanEdit(itemId))
         {
             throw new HubException("Edit access denied");
         }
 
-        await Clients.OthersInGroup(GroupName(documentId)).SendAsync("ReceiveUpdate", documentId, update);
+        await Clients.OthersInGroup(GroupName(itemId)).SendAsync("ReceiveUpdate", itemId, update);
     }
 
     /// <summary>Апдейт presence/курсоров (awareness) — широковещательно остальным участникам.</summary>
-    public async Task SendAwareness(int documentId, byte[] update)
+    public async Task SendAwareness(int itemId, byte[] update)
     {
-        await EnsureCanViewAsync(documentId);
+        await EnsureCanViewAsync(itemId);
 
-        await Clients.OthersInGroup(GroupName(documentId)).SendAsync("ReceiveAwareness", documentId, update);
+        await Clients.OthersInGroup(GroupName(itemId)).SendAsync("ReceiveAwareness", itemId, update);
     }
 
     /// <summary>Сохраняет снапшот состояния (клиент вызывает с дебаунсом).</summary>
-    public async Task SaveDocumentState(int documentId, byte[] state)
+    public async Task SaveLibraryItemState(int itemId, byte[] state)
     {
-        if (!CachedCanEdit(documentId))
+        if (!CachedCanEdit(itemId))
         {
             throw new HubException("Edit access denied");
         }
 
-        await SaveSnapshotAsync(documentId, state);
+        await SaveSnapshotAsync(itemId, state);
 
-        _logger.LogDebug("{ItemType} {ItemId} snapshot saved, size: {Size}", ItemType, documentId, state.Length);
+        _logger.LogDebug("{ItemType} {ItemId} snapshot saved, size: {Size}", ItemType, itemId, state.Length);
     }
 
     public override Task OnDisconnectedAsync(Exception? exception)

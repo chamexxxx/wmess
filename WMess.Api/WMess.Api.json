@@ -117,7 +117,7 @@
         ]
       }
     },
-    "/api/library/folders/project/{projectId}": {
+    "/api/library-items/folders/project/{projectId}": {
       "get": {
         "tags": [
           "Library"
@@ -176,7 +176,7 @@
         ]
       }
     },
-    "/api/library/folders/{id}": {
+    "/api/library-items/folders/{id}": {
       "get": {
         "tags": [
           "Library"
@@ -308,7 +308,7 @@
         ]
       }
     },
-    "/api/library/folders": {
+    "/api/library-items/folders": {
       "post": {
         "tags": [
           "Library"
@@ -363,7 +363,7 @@
         ]
       }
     },
-    "/api/library/folders/{id}/move": {
+    "/api/library-items/folders/{id}/move": {
       "put": {
         "tags": [
           "Library"
@@ -416,7 +416,7 @@
         ]
       }
     },
-    "/api/library/project/{projectId}/items": {
+    "/api/library-items/project/{projectId}/items": {
       "get": {
         "tags": [
           "Library"
@@ -482,7 +482,7 @@
         ]
       }
     },
-    "/api/library/project/{projectId}/contents": {
+    "/api/library-items/project/{projectId}/contents": {
       "get": {
         "tags": [
           "Library"
@@ -544,7 +544,7 @@
         ]
       }
     },
-    "/api/library/project/{projectId}/search": {
+    "/api/library-items/project/{projectId}/search": {
       "get": {
         "tags": [
           "Library"
@@ -601,7 +601,7 @@
         ]
       }
     },
-    "/api/library/items/{id}": {
+    "/api/library-items/items/{id}": {
       "get": {
         "tags": [
           "Library"
@@ -733,7 +733,7 @@
         ]
       }
     },
-    "/api/library/items/{id}/move": {
+    "/api/library-items/items/{id}/move": {
       "put": {
         "tags": [
           "Library"
@@ -786,7 +786,7 @@
         ]
       }
     },
-    "/api/library/documents": {
+    "/api/library-items/documents": {
       "post": {
         "tags": [
           "Library"
@@ -841,116 +841,7 @@
         ]
       }
     },
-    "/api/library/documents/{id}/content": {
-      "get": {
-        "tags": [
-          "Library"
-        ],
-        "operationId": "GetDocumentContent",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "format": "byte"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "format": "byte"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "string",
-                  "format": "byte"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/library/documents/{id}/state": {
-      "put": {
-        "tags": [
-          "Library"
-        ],
-        "operationId": "UpdateDocumentState",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "string",
-                "format": "byte"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "type": "string",
-                "format": "byte"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "type": "string",
-                "format": "byte"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/library/boards": {
+    "/api/library-items/boards": {
       "post": {
         "tags": [
           "Library"
@@ -1005,12 +896,12 @@
         ]
       }
     },
-    "/api/library/boards/{id}/content": {
+    "/api/library-items/{id}/content": {
       "get": {
         "tags": [
           "Library"
         ],
-        "operationId": "GetBoardContent",
+        "operationId": "GetLibraryItemContent",
         "parameters": [
           {
             "name": "id",
@@ -1058,12 +949,12 @@
         ]
       }
     },
-    "/api/library/boards/{id}/state": {
+    "/api/library-items/{id}/state": {
       "put": {
         "tags": [
           "Library"
         ],
-        "operationId": "UpdateBoardState",
+        "operationId": "UpdateLibraryItemState",
         "parameters": [
           {
             "name": "id",
@@ -1114,7 +1005,7 @@
         ]
       }
     },
-    "/api/library/items/{id}/permissions": {
+    "/api/library-items/items/{id}/permissions": {
       "get": {
         "tags": [
           "Library"
@@ -1241,7 +1132,7 @@
         ]
       }
     },
-    "/api/library/items/{id}/permissions/{userId}": {
+    "/api/library-items/items/{id}/permissions/{userId}": {
       "delete": {
         "tags": [
           "Library"

@@ -314,11 +314,11 @@ function BoardWorkspace({
 }
 
 export function LibrarySection({ projectId }: { projectId: number }) {
-  // Документ — в пути (/library/:docId), папка файлового менеджера — в ?folder.
-  const { teamId, docId: docIdParam } = useParams()
+  // Документ — в пути (/library/:itemId), папка файлового менеджера — в ?folder.
+  const { teamId, itemId: itemIdParam } = useParams()
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const docId = docIdParam ? Number(docIdParam) : null
+  const itemId = itemIdParam ? Number(itemIdParam) : null
   const folderParam = params.get('folder')
   const folderId = folderParam ? Number(folderParam) : null
 
@@ -332,18 +332,18 @@ export function LibrarySection({ projectId }: { projectId: number }) {
 
   // Резолвим документ при прямой загрузке/обновлении (id в пути; заголовок и папка ещё не известны).
   useEffect(() => {
-    if (docId == null) {
+    if (itemId == null) {
       setOpenDoc(null)
       return
     }
-    if (openDoc?.id === docId && openDoc.folderId !== undefined) return
+    if (openDoc?.id === itemId && openDoc.folderId !== undefined) return
     let cancelled = false
     apiClient.library
-      .getItem(docId)
+      .getItem(itemId)
       .then((res) => {
         if (!cancelled && res.data) {
           setOpenDoc({
-            id: docId,
+            id: itemId,
             title: res.data.title ?? 'Без названия',
             folderId: res.data.folderId == null ? null : Number(res.data.folderId),
             type: res.data.type,
@@ -355,7 +355,7 @@ export function LibrarySection({ projectId }: { projectId: number }) {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docId])
+  }, [itemId])
 
   const folderPath = (id: number | null) => (id == null ? libraryBase : `${libraryBase}?folder=${id}`)
 
@@ -404,8 +404,8 @@ export function LibrarySection({ projectId }: { projectId: number }) {
     }
   }, [isResizing])
 
-  if (docId != null) {
-    const doc = openDoc ?? { id: docId, title: 'Документ' }
+  if (itemId != null) {
+    const doc = openDoc ?? { id: itemId, title: 'Документ' }
     const isBoard = doc.type === 'board'
 
     return (

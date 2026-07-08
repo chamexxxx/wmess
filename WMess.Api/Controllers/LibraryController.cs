@@ -14,7 +14,7 @@ namespace WMess.Api.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("api/[controller]")]
+[Route("api/library-items")]
 public class LibraryController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -612,7 +612,7 @@ public class LibraryController : ControllerBase
 
     #endregion
 
-    #region Documents (тип-специфичный контент)
+    #region Documents (тип-специфичное создание)
 
     [HttpPost("documents")]
     [EndpointName("CreateDocument")]
@@ -671,65 +671,9 @@ public class LibraryController : ControllerBase
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
 
-    [HttpGet("documents/{id}/content")]
-    [EndpointName("GetDocumentContent")]
-    public async Task<ActionResult<byte[]>> GetDocumentContent(int id)
-    {
-        var item = await _context.LibraryItems
-            .Include(d => d.Project)
-            .Include(d => d.DocumentContent)
-            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Document);
-
-        if (item == null)
-        {
-            return NotFound();
-        }
-
-        var rights = await _libraryAccess.GetRightsAsync(User, item);
-        if (!rights.CanView)
-        {
-            return Forbid();
-        }
-
-        return Ok(item.DocumentContent?.YjsState ?? Array.Empty<byte>());
-    }
-
-    [HttpPut("documents/{id}/state")]
-    [EndpointName("UpdateDocumentState")]
-    public async Task<IActionResult> UpdateDocumentState(int id, [FromBody] byte[] state)
-    {
-        var item = await _context.LibraryItems
-            .Include(d => d.Project)
-            .Include(d => d.DocumentContent)
-            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Document);
-
-        if (item == null)
-        {
-            return NotFound();
-        }
-
-        var rights = await _libraryAccess.GetRightsAsync(User, item);
-        if (!rights.CanEdit)
-        {
-            return Forbid();
-        }
-
-        if (item.DocumentContent == null)
-        {
-            item.DocumentContent = new DocumentContent { LibraryItemId = item.Id };
-            _context.DocumentContents.Add(item.DocumentContent);
-        }
-
-        item.DocumentContent.YjsState = state;
-        item.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return NoContent();
-    }
     #endregion
 
-    #region Boards (тип-специфичный контент)
+    #region Boards (тип-специфичное создание)
 
     [HttpPost("boards")]
     [EndpointName("CreateBoard")]
@@ -787,14 +731,22 @@ public class LibraryController : ControllerBase
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
 
-    [HttpGet("boards/{id}/content")]
-    [EndpointName("GetBoardContent")]
-    public async Task<ActionResult<byte[]>> GetBoardContent(int id)
+    #endregion
+
+    #region Collaborative content (обобщённо по типам элемента)
+
+    // Content/state одинаковы для всех типов (просто байты Yjs-снапшота в своей таблице контента),
+    // поэтому один обобщённый маршрут `api/library-items/{id}` вместо дублей per-type. Ветвление по Type выбирает
+    // нужную таблицу. Парная точка — hub SaveLibraryItemState; этот REST — фолбэк на выгрузке страницы.
+    [HttpGet("{id}/content")]
+    [EndpointName("GetLibraryItemContent")]
+    public async Task<ActionResult<byte[]>> GetLibraryItemContent(int id)
     {
         var item = await _context.LibraryItems
             .Include(d => d.Project)
+            .Include(d => d.DocumentContent)
             .Include(d => d.BoardContent)
-            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Board);
+            .FirstOrDefaultAsync(d => d.Id == id);
 
         if (item == null)
         {
@@ -807,17 +759,25 @@ public class LibraryController : ControllerBase
             return Forbid();
         }
 
-        return Ok(item.BoardContent?.YjsState ?? Array.Empty<byte>());
+        var state = item.Type switch
+        {
+            LibraryItemType.Document => item.DocumentContent?.YjsState,
+            LibraryItemType.Board => item.BoardContent?.YjsState,
+            _ => null,
+        };
+
+        return Ok(state ?? Array.Empty<byte>());
     }
 
-    [HttpPut("boards/{id}/state")]
-    [EndpointName("UpdateBoardState")]
-    public async Task<IActionResult> UpdateBoardState(int id, [FromBody] byte[] state)
+    [HttpPut("{id}/state")]
+    [EndpointName("UpdateLibraryItemState")]
+    public async Task<IActionResult> UpdateLibraryItemState(int id, [FromBody] byte[] state)
     {
         var item = await _context.LibraryItems
             .Include(d => d.Project)
+            .Include(d => d.DocumentContent)
             .Include(d => d.BoardContent)
-            .FirstOrDefaultAsync(d => d.Id == id && d.Type == LibraryItemType.Board);
+            .FirstOrDefaultAsync(d => d.Id == id);
 
         if (item == null)
         {
@@ -830,13 +790,28 @@ public class LibraryController : ControllerBase
             return Forbid();
         }
 
-        if (item.BoardContent == null)
+        switch (item.Type)
         {
-            item.BoardContent = new BoardContent { LibraryItemId = item.Id };
-            _context.BoardContents.Add(item.BoardContent);
+            case LibraryItemType.Document:
+                if (item.DocumentContent == null)
+                {
+                    item.DocumentContent = new DocumentContent { LibraryItemId = item.Id };
+                    _context.DocumentContents.Add(item.DocumentContent);
+                }
+                item.DocumentContent.YjsState = state;
+                break;
+            case LibraryItemType.Board:
+                if (item.BoardContent == null)
+                {
+                    item.BoardContent = new BoardContent { LibraryItemId = item.Id };
+                    _context.BoardContents.Add(item.BoardContent);
+                }
+                item.BoardContent.YjsState = state;
+                break;
+            default:
+                return BadRequest($"Unsupported item type: {item.Type}");
         }
 
-        item.BoardContent.YjsState = state;
         item.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
