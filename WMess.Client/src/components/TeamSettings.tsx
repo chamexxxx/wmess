@@ -6,6 +6,7 @@ import type { TeamMemberResponse, TeamPermissions, TeamResponse } from '../api/g
 import { TrashIcon } from '../workspace/icons'
 import { ROLE_LABELS } from '../workspace/roles'
 import { RoleSelect } from './RoleSelect'
+import { ConfirmDialog } from './WorkspaceModals'
 
 const sectionLabel = 'font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest'
 
@@ -61,6 +62,8 @@ export function TeamSettings({
   const [adding, setAdding] = useState(false)
   const [updating, setUpdating] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  // Участник, которого хотят назначить владельцем (ждёт подтверждения передачи владения).
+  const [pendingOwner, setPendingOwner] = useState<TeamMemberResponse | null>(null)
 
   const canChangeRoles = permissions?.canChangeRoles ?? false
 
@@ -108,7 +111,7 @@ export function TeamSettings({
     }
   }
 
-  async function handleRoleChange(userId: string, newRole: number) {
+  async function applyRoleChange(userId: string, newRole: number) {
     setUpdating(userId)
     setError(null)
     try {
@@ -120,6 +123,21 @@ export function TeamSettings({
     } finally {
       setUpdating(null)
     }
+  }
+
+  function handleRoleChange(member: TeamMemberResponse, newRole: number) {
+    // Назначение владельцем — это передача владения, подтверждаем отдельным окном.
+    if (newRole === 2) {
+      setPendingOwner(member)
+      return
+    }
+    applyRoleChange(member.userId!, newRole)
+  }
+
+  async function confirmTransferOwnership() {
+    if (!pendingOwner) return
+    await applyRoleChange(pendingOwner.userId!, 2)
+    setPendingOwner(null)
   }
 
   async function handleRemoveMember(userId: string) {
@@ -219,11 +237,11 @@ export function TeamSettings({
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{member.email}</div>
                   </div>
-                  {canChangeRoles ? (
+                  {canChangeRoles && !isSelf ? (
                     <RoleSelect
                       value={member.role ?? 0}
                       disabled={updating === member.userId || deleting === member.userId}
-                      onChange={(role) => handleRoleChange(member.userId!, role)}
+                      onChange={(role) => handleRoleChange(member, role)}
                     />
                   ) : (
                     <span className="h-8 px-2 inline-flex items-center text-sm text-muted">
@@ -273,6 +291,22 @@ export function TeamSettings({
             </button>
           </div>
         </>
+      )}
+
+      {pendingOwner && (
+        <ConfirmDialog
+          title="Сделать владельцем?"
+          message={
+            <>
+              Назначить «{pendingOwner.email}» владельцем команды? Вы перестанете быть
+              владельцем и станете администратором.
+            </>
+          }
+          confirmLabel="Назначить владельцем"
+          busy={updating === pendingOwner.userId}
+          onConfirm={confirmTransferOwnership}
+          onClose={() => setPendingOwner(null)}
+        />
       )}
     </div>
   )

@@ -315,6 +315,15 @@ public class TeamsController : ControllerBase
             return Forbid();
         }
 
+        var userId = GetCurrentUserId();
+
+        // Свою роль менять нельзя. Владелец расстаётся с ролью только через передачу
+        // владения — назначив владельцем другого участника (ниже).
+        if (memberId == userId)
+        {
+            return BadRequest(new { message = "Нельзя изменить свою собственную роль" });
+        }
+
         var memberToUpdate = await _context.TeamUsers
             .FirstOrDefaultAsync(tu => tu.TeamId == id && tu.UserId == memberId);
 
@@ -323,9 +332,22 @@ public class TeamsController : ControllerBase
             return NotFound(new { message = "Member not found" });
         }
 
+        // Передача владения: назначаемый становится владельцем, текущий владелец — администратором.
+        // Владелец в команде всегда один.
+        if (request.Role == TeamRole.Owner)
+        {
+            var actor = await _context.TeamUsers
+                .FirstAsync(tu => tu.TeamId == id && tu.UserId == userId);
+
+            memberToUpdate.Role = TeamRole.Owner;
+            actor.Role = TeamRole.Admin;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
         // Нельзя понизить последнего Owner
         if (memberToUpdate.Role == TeamRole.Owner
-            && request.Role != TeamRole.Owner
             && await IsLastOwnerAsync(id))
         {
             return BadRequest(new { message = "Cannot downgrade the last owner. Transfer ownership first." });
