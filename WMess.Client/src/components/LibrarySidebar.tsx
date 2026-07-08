@@ -3,7 +3,7 @@ import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { ChevronRightIcon, DocsIcon, FolderIcon, PencilIcon, SearchIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, ChevronRightIcon, DocsIcon, FolderIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 
 interface Folder {
   id: number
@@ -15,6 +15,8 @@ interface Doc {
   id: number
   folderId: number | null
   title: string
+  // Тип элемента: "document" | "board" | "table" — определяет иконку.
+  type?: string
 }
 
 type DeleteTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
@@ -39,7 +41,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
 
-  const [createKind, setCreateKind] = useState<'folder' | 'doc' | null>(null)
+  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | null>(null)
   const [createInFolder, setCreateInFolder] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [renameFolder, setRenameFolder] = useState<{ id: number; name: string } | null>(null)
@@ -68,6 +70,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           id: Number(d.id),
           folderId: d.folderId == null ? null : Number(d.folderId),
           title: d.title ?? 'Без названия',
+          type: d.type,
         })),
       )
     } catch (error) {
@@ -158,6 +161,48 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to create document:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createBoard = async (title: string) => {
+    setBusy(true)
+    const folderId = createInFolder
+    try {
+      const res = await apiClient.library.createBoard({ projectId, folderId, title })
+      setCreateKind(null)
+      setCreateInFolder(null)
+      await loadData()
+      if (folderId !== null) {
+        setExpanded((prev) => new Set(prev).add(folderId))
+      }
+      if (res.data?.id != null) {
+        onSelect(Number(res.data.id), res.data.title ?? title)
+      }
+    } catch (error) {
+      console.error('Failed to create board:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createTable = async (title: string) => {
+    setBusy(true)
+    const folderId = createInFolder
+    try {
+      const res = await apiClient.library.createTable({ projectId, folderId, title })
+      setCreateKind(null)
+      setCreateInFolder(null)
+      await loadData()
+      if (folderId !== null) {
+        setExpanded((prev) => new Set(prev).add(folderId))
+      }
+      if (res.data?.id != null) {
+        onSelect(Number(res.data.id), res.data.title ?? title)
+      }
+    } catch (error) {
+      console.error('Failed to create table:', error)
     } finally {
       setBusy(false)
     }
@@ -281,10 +326,26 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       items: [
         {
           label: 'Создать документ',
-          icon: <DocsIcon size={15} />,
+          icon: <DocsIcon size={15} className="text-doc" />,
           onClick: () => {
             setCreateInFolder(folder.id)
             setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Создать доску',
+          icon: <BoardsIcon size={15} className="text-board" />,
+          onClick: () => {
+            setCreateInFolder(folder.id)
+            setCreateKind('board')
+          },
+        },
+        {
+          label: 'Создать таблицу',
+          icon: <TablesIcon size={15} className="text-table" />,
+          onClick: () => {
+            setCreateInFolder(folder.id)
+            setCreateKind('table')
           },
         },
         {
@@ -334,10 +395,26 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       items: [
         {
           label: 'Создать документ',
-          icon: <DocsIcon size={15} />,
+          icon: <DocsIcon size={15} className="text-doc" />,
           onClick: () => {
             setCreateInFolder(null)
             setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Создать доску',
+          icon: <BoardsIcon size={15} className="text-board" />,
+          onClick: () => {
+            setCreateInFolder(null)
+            setCreateKind('board')
+          },
+        },
+        {
+          label: 'Создать таблицу',
+          icon: <TablesIcon size={15} className="text-table" />,
+          onClick: () => {
+            setCreateInFolder(null)
+            setCreateKind('table')
           },
         },
         {
@@ -347,6 +424,14 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
         },
       ],
     })
+  }
+
+  // Иконка элемента по типу (документ/доска/таблица); у выбранного — акцентный цвет.
+  const itemIcon = (type: string | undefined, isSelected: boolean) => {
+    const cls = isSelected ? 'text-accent' : type === 'board' ? 'text-board' : type === 'table' ? 'text-table' : 'text-doc'
+    if (type === 'board') return <BoardsIcon size={15} className={cls} />
+    if (type === 'table') return <TablesIcon size={15} className={cls} />
+    return <DocsIcon size={15} className={cls} />
   }
 
   const renderDoc = (doc: Doc) => {
@@ -369,7 +454,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       >
         <span className="flex items-center gap-2 min-w-0">
           <span className="shrink-0 w-3" aria-hidden="true" />
-          <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-doc'} />
+          {itemIcon(doc.type, isSelected)}
           <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
             {doc.title}
           </span>
@@ -534,7 +619,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
                     onClick={() => onSelect(d.id, d.title)}
                   >
                     <span className="flex items-center gap-2 min-w-0">
-                      <DocsIcon size={15} className={isSelected ? 'text-accent' : 'text-doc'} />
+                      {itemIcon(d.type, isSelected)}
                       <span className={`text-[13px] truncate ${isSelected ? 'text-accent font-medium' : 'text-ink-soft'}`}>
                         {d.title}
                       </span>
@@ -575,6 +660,32 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           submitLabel="Создать"
           busy={busy}
           onSubmit={createDocument}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateInFolder(null)
+          }}
+        />
+      )}
+      {createKind === 'board' && (
+        <FormModal
+          title="Новая доска"
+          label="Название доски"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createBoard}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateInFolder(null)
+          }}
+        />
+      )}
+      {createKind === 'table' && (
+        <FormModal
+          title="Новая таблица"
+          label="Название таблицы"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createTable}
           onClose={() => {
             setCreateKind(null)
             setCreateInFolder(null)
