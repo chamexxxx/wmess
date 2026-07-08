@@ -57,7 +57,9 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
 
   const loadContents = async () => {
-    setLoading(true)
+    // Намеренно НЕ ставим loading=true при переходах: иначе список на миг заменяется на
+    // «Загрузка…» и контейнер дёргается. Лоадер показываем только для самой первой загрузки
+    // (loading инициализирован в true); дальше новый список плавно подменяет старый на месте.
     try {
       const res = await apiClient.library.getFolderContents(projectId, {
         folderId: folderId ?? undefined,
