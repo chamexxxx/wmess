@@ -3,6 +3,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ProfilePage } from './pages/ProfilePage'
 import { ExcalidrawTestPage } from './pages/ExcalidrawTestPage'
 
 export const router = createBrowserRouter([
@@ -10,6 +11,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       { path: '/', element: <HomePage /> },
+      { path: '/profile', element: <ProfilePage /> },
       { path: '/teams/:teamId', element: <HomePage /> },
       { path: '/teams/:teamId/settings', element: <HomePage /> },
       { path: '/teams/:teamId/projects/:projectId', element: <HomePage /> },

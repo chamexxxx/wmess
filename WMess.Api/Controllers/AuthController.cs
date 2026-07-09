@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
+using WMess.Api.Models;
 using WMess.Api.Models.DTO;
 using WMess.Api.Services;
 
@@ -9,10 +10,10 @@ namespace WMess.Api.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly UserManager<IdentityUser> _userManager;
+    private readonly UserManager<ApplicationUser> _userManager;
     private readonly ITokenService _tokenService;
 
-    public AuthController(UserManager<IdentityUser> userManager, ITokenService tokenService)
+    public AuthController(UserManager<ApplicationUser> userManager, ITokenService tokenService)
     {
         _userManager = userManager;
         _tokenService = tokenService;
@@ -21,17 +22,25 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        var existingUser = await _userManager.FindByEmailAsync(request.Email);
+        var existingByEmail = await _userManager.FindByEmailAsync(request.Email);
 
-        if (existingUser != null)
+        if (existingByEmail != null)
         {
             return Conflict(new { message = "User with this email already exists" });
         }
 
-        var user = new IdentityUser
+        var existingByLogin = await _userManager.FindByNameAsync(request.Login);
+
+        if (existingByLogin != null)
+        {
+            return Conflict(new { message = "User with this login already exists" });
+        }
+
+        var user = new ApplicationUser
         {
             Email = request.Email,
-            UserName = request.Email
+            UserName = request.Login,
+            DisplayName = request.DisplayName
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
@@ -47,7 +56,12 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var user = await _userManager.FindByEmailAsync(request.Email);
+        var identifier = request.EmailOrLogin.Trim();
+
+        // Вход возможен как по email, так и по логину (UserName).
+        var user = identifier.Contains('@')
+            ? await _userManager.FindByEmailAsync(identifier) ?? await _userManager.FindByNameAsync(identifier)
+            : await _userManager.FindByNameAsync(identifier) ?? await _userManager.FindByEmailAsync(identifier);
 
         if (user == null)
         {
@@ -61,15 +75,7 @@ public class AuthController : ControllerBase
             return Unauthorized();
         }
 
-        var token = _tokenService.GenerateToken(user);
-        var refreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
-
-        var response = new AuthResponse
-        {
-            Token = token,
-            RefreshToken = refreshToken,
-            Email = user.Email!
-        };
+        var response = await BuildAuthResponseAsync(user);
 
         return Ok(response);
     }
@@ -84,16 +90,25 @@ public class AuthController : ControllerBase
             return Unauthorized();
         }
 
-        var token = _tokenService.GenerateToken(user);
-        var newRefreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
-
-        var response = new AuthResponse
-        {
-            Token = token,
-            RefreshToken = newRefreshToken,
-            Email = user.Email!
-        };
+        var response = await BuildAuthResponseAsync(user);
 
         return Ok(response);
+    }
+
+    private async Task<AuthResponse> BuildAuthResponseAsync(ApplicationUser user)
+    {
+        var token = _tokenService.GenerateToken(user);
+        var refreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
+
+        return new AuthResponse
+        {
+            Token = token,
+            RefreshToken = refreshToken,
+            UserId = user.Id,
+            Email = user.Email!,
+            Login = user.UserName!,
+            DisplayName = user.DisplayName,
+            HasAvatar = user.AvatarData != null && user.AvatarData.Length > 0
+        };
     }
 }

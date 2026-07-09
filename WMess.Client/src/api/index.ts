@@ -5,6 +5,7 @@ import { Library } from './generated/Library'
 import { Projects } from './generated/Projects'
 import { Teams } from './generated/Teams'
 import { User } from './generated/User'
+import type { UserResponse } from './generated/data-contracts'
 import type { ApiConfig } from './generated/http-client'
 
 const AUTH_PATHS = ['/api/login', '/api/register']
@@ -108,6 +109,17 @@ class WMessApiClient extends Bff {
     }
     // Content-Type (multipart с boundary) axios выставит сам по FormData.
     return this.library.instance.post('/api/library-items/files', form)
+  }
+
+  // Загрузка аватарки (multipart). Не используем сгенерированный клиент: он выставляет
+  // заголовок Content-Type: multipart/form-data без boundary, из-за чего сервер не может
+  // разобрать тело и file приходит пустым. Здесь передаём FormData напрямую — axios сам
+  // проставит правильный Content-Type с boundary.
+  async uploadAvatar(file: Blob): Promise<UserResponse> {
+    const form = new FormData()
+    form.append('file', file, 'avatar.jpg')
+    const res = await this.user.instance.post<UserResponse>('/api/user/me/avatar', form)
+    return res.data
   }
 
   // Байты загруженного файла как Blob (для предпросмотра изображений через object URL).

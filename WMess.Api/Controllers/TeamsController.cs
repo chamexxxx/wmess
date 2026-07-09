@@ -18,12 +18,12 @@ public class TeamsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
-    private readonly UserManager<IdentityUser> _userManager;
+    private readonly UserManager<ApplicationUser> _userManager;
 
     public TeamsController(
         ApplicationDbContext context,
         IAuthorizationService authorizationService,
-        UserManager<IdentityUser> userManager)
+        UserManager<ApplicationUser> userManager)
     {
         _context = context;
         _authorizationService = authorizationService;

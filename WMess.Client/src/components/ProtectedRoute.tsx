@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { toUser } from '../context/user'
 
 export function ProtectedRoute() {
   const { user, setUser } = useAuth()
@@ -10,10 +11,13 @@ export function ProtectedRoute() {
   useEffect(() => {
     if (user) return
 
-    apiClient
-      .getUser()
+    // Тянем профиль напрямую из API (/api/user/me) — всегда свежие имя, логин и флаг
+    // аватарки (в отличие от данных в cookie-сессии BFF, которые не обновляются при
+    // редактировании профиля).
+    apiClient.user
+      .userMeList()
       .then((res) => {
-        setUser({ email: res.data.email! })
+        setUser(toUser(res.data))
         setLoading(false)
       })
       .catch(() => {

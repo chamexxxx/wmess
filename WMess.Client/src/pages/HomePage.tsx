@@ -233,7 +233,8 @@ export function HomePage() {
         selectedTeamId={selectedTeamId}
         onSelect={(id) => navigate(`/teams/${id}`)}
         onCreate={() => setCreateTeamOpen(true)}
-        userEmail={user?.email}
+        user={user}
+        onOpenProfile={() => navigate('/profile')}
         onLogout={handleLogout}
       />
 

@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using WMess.Api.Enums;
 
 namespace WMess.Api.Models;
@@ -15,5 +14,5 @@ public class TeamUser
 
     // Навигационные свойства
     public Team Team { get; set; } = null!;
-    public IdentityUser User { get; set; } = null!;
+    public ApplicationUser User { get; set; } = null!;
 }

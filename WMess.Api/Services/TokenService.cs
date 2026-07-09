@@ -12,9 +12,9 @@ namespace WMess.Api.Services;
 
 public interface ITokenService
 {
-    string GenerateToken(IdentityUser user);
+    string GenerateToken(ApplicationUser user);
     Task<string> GenerateRefreshTokenAsync(string userId);
-    Task<IdentityUser?> ValidateRefreshTokenAsync(string token);
+    Task<ApplicationUser?> ValidateRefreshTokenAsync(string token);
 }
 
 public class TokenService : ITokenService
@@ -28,7 +28,7 @@ public class TokenService : ITokenService
         _context = context;
     }
 
-    public string GenerateToken(IdentityUser user)
+    public string GenerateToken(ApplicationUser user)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var secretKey = jwtSettings["Secret"];
@@ -75,7 +75,7 @@ public class TokenService : ITokenService
         return token;
     }
 
-    public async Task<IdentityUser?> ValidateRefreshTokenAsync(string token)
+    public async Task<ApplicationUser?> ValidateRefreshTokenAsync(string token)
     {
         var refreshToken = await _context.RefreshTokens
             .Include(rt => rt.User)

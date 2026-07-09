@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import type { TeamResponse } from '../api/generated/data-contracts'
+import type { User } from '../context/AuthContext'
 import { initials } from '../workspace/theme'
-import { LogoutIcon } from '../workspace/icons'
+import { Avatar } from './Avatar'
+import { LogoutIcon, SettingsIcon } from '../workspace/icons'
 
 interface TeamRailProps {
   teams: TeamResponse[]
   selectedTeamId: number | null
   onSelect: (id: number) => void
   onCreate: () => void
-  userEmail: string | undefined
+  user: User | null
+  onOpenProfile: () => void
   onLogout: () => void
 }
 
@@ -20,10 +23,12 @@ export function TeamRail({
   selectedTeamId,
   onSelect,
   onCreate,
-  userEmail,
+  user,
+  onOpenProfile,
   onLogout,
 }: TeamRailProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const displayName = user?.displayName || user?.login || user?.email
 
   return (
     <div className="w-16 shrink-0 bg-rail border-r border-line flex flex-col items-center py-[14px] gap-2">
@@ -62,25 +67,49 @@ export function TeamRail({
       <div className="mt-auto relative">
         <button
           type="button"
-          title={userEmail}
+          title={displayName}
           onClick={() => setMenuOpen((v) => !v)}
-          className="w-[34px] h-[34px] rounded-full bg-[#3d6fc2] text-white flex items-center justify-center text-xs font-semibold cursor-pointer font-ui"
+          className="cursor-pointer"
         >
-          {initials(userEmail)}
+          <Avatar
+            userId={user?.id}
+            name={displayName}
+            hasAvatar={user?.hasAvatar}
+            version={user?.avatarVersion}
+            size={34}
+          />
         </button>
 
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
             <div className="absolute left-11 bottom-0 w-[220px] bg-white border border-line rounded-xl shadow-[0_14px_36px_rgba(43,42,38,.16)] p-2 z-[41]">
-              <div className="px-2 pt-1.5 pb-2.5">
-                <div className="font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest">
-                  Аккаунт
-                </div>
-                <div className="text-[13px] font-semibold text-ink mt-[3px] truncate">
-                  {userEmail}
+              <div className="flex items-center gap-2.5 px-2 pt-1.5 pb-2.5">
+                <Avatar
+                  userId={user?.id}
+                  name={displayName}
+                  hasAvatar={user?.hasAvatar}
+                  version={user?.avatarVersion}
+                  size={34}
+                />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold text-ink truncate">
+                    {user?.displayName || user?.login}
+                  </div>
+                  <div className="text-[11.5px] text-faint truncate">{user?.email}</div>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  onOpenProfile()
+                }}
+                className="w-full flex items-center gap-[9px] px-2 py-[9px] rounded-lg text-[13px] text-ink font-semibold cursor-pointer hover:bg-hovered font-ui"
+              >
+                <SettingsIcon size={16} />
+                Профиль
+              </button>
               <button
                 type="button"
                 onClick={onLogout}

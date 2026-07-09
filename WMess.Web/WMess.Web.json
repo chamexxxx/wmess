@@ -2044,6 +2044,230 @@
         ],
         "responses": {
           "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Редактирование профиля текущего пользователя: логин и отображаемое имя.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
+    "/api/user/me/avatar": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Загрузка (замена) аватарки текущего пользователя.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Удаление аватарки текущего пользователя.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
+    "/api/user/me/password": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Смена пароля текущего пользователя (требует текущий пароль).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
+    "/api/user/{id}/avatar": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Отдаёт аватарку пользователя по его идентификатору (для тега img в клиенте).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": "OK"
           }
         },
@@ -2128,8 +2352,20 @@
       "BffUserResponse": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string"
+          },
           "email": {
             "type": "string"
+          },
+          "login": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "hasAvatar": {
+            "type": "boolean"
           }
         }
       },
@@ -2149,6 +2385,22 @@
           }
         },
         "description": "Элемент пути (хлебных крошек) до текущей папки."
+      },
+      "ChangePasswordRequest": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "minLength": 6,
+            "type": "string"
+          }
+        }
       },
       "CreateDocumentRequest": {
         "type": "object",
@@ -2425,12 +2677,12 @@
       },
       "LoginRequest": {
         "required": [
-          "email",
+          "emailOrLogin",
           "password"
         ],
         "type": "object",
         "properties": {
-          "email": {
+          "emailOrLogin": {
             "type": "string"
           },
           "password": {
@@ -2536,11 +2788,21 @@
       "RegisterRequest": {
         "required": [
           "email",
+          "login",
+          "displayName",
           "password"
         ],
         "type": "object",
         "properties": {
           "email": {
+            "type": "string"
+          },
+          "login": {
+            "pattern": "^[a-zA-Z0-9_-]{3,32}$",
+            "type": "string"
+          },
+          "displayName": {
+            "maxLength": 100,
             "type": "string"
           },
           "password": {
@@ -2671,6 +2933,23 @@
         },
         "description": "Запрос на изменение роли участника"
       },
+      "UpdateProfileRequest": {
+        "required": [
+          "login",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "login": {
+            "pattern": "^[a-zA-Z0-9_-]{3,32}$",
+            "type": "string"
+          },
+          "displayName": {
+            "maxLength": 100,
+            "type": "string"
+          }
+        }
+      },
       "UpdateProjectRequest": {
         "required": [
           "name",
@@ -2712,6 +2991,15 @@
           },
           "email": {
             "type": "string"
+          },
+          "login": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "hasAvatar": {
+            "type": "boolean"
           }
         }
       }

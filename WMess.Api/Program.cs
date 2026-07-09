@@ -8,6 +8,7 @@ using Scalar.AspNetCore;
 using System.Text;
 using WMess.Api.Data;
 using WMess.Api.Infrastructure;
+using WMess.Api.Models;
 using WMess.Api.Services;
 using WMess.Api.Authorization;
 
@@ -29,13 +30,17 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Configure Identity
-builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength = 6;
+
+    // Логин (UserName) уникален и ограничен латиницей, цифрами, дефисом и подчёркиванием.
+    options.User.RequireUniqueEmail = true;
+    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();

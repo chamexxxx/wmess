@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.AspNetCore.Identity;
 
 namespace WMess.Api.Models;
 
@@ -41,7 +40,7 @@ public class LibraryItem
     public LibraryFolder? Folder { get; set; }
 
     [ForeignKey(nameof(CreatedBy))]
-    public IdentityUser Creator { get; set; } = null!;
+    public ApplicationUser Creator { get; set; } = null!;
 
     // Контент типа Document (1:1, PK = FK). Для прочих типов появятся свои content-сущности.
     public DocumentContent? DocumentContent { get; set; }
