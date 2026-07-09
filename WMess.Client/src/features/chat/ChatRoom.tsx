@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { apiClient } from '../../api'
 import { ChatProvider, useChatConnection } from '../../providers/ChatProvider'
@@ -8,7 +8,7 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { PinnedPanel } from './PinnedPanel'
 import { ThreadPanel } from './ThreadPanel'
-import { isThreadMessage, type ChatMessage } from './types'
+import { isThreadMessage, isFlatReply, type ChatMessage } from './types'
 import type { MessageResponse } from '../../api/generated/data-contracts'
 
 interface Props {
@@ -28,22 +28,44 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
   }, [])
 
   const messages = useChatStore((s) => s.messagesByChat[chatId] ?? EMPTY_ARRAY)
+  const threadMessagesByRoot = useChatStore((s) => s.threadMessagesByRoot)
+  const mainMessages = useMemo(() => {
+    const threadIds = new Set<number>()
+    for (const list of Object.values(threadMessagesByRoot)) {
+      for (const m of list) threadIds.add(Number(m.id))
+    }
+    return messages.filter((m) => {
+      const msg = m as ChatMessage
+      if (isThreadMessage(msg)) return false
+      if (isFlatReply(msg) && msg.parentMessageId != null && threadIds.has(Number(msg.parentMessageId))) {
+        return false
+      }
+      return true
+    })
+  }, [messages, threadMessagesByRoot])
   const canManage = useChatStore((s) => s.canManage)
   const pinnedIds = useChatStore((s) => s.pinnedMessageIds[chatId] ?? EMPTY_ARRAY)
   const typingUsers = useChatStore((s) => s.typingByChat[chatId] ?? EMPTY_ARRAY)
   const replyTarget = useChatStore((s) => s.replyTarget)
   const quoteTarget = useChatStore((s) => s.quoteTarget)
   const threadRootId = useChatStore((s) => s.threadRootId)
+  const threadReplyCounts = useChatStore((s) => s.threadReplyCounts)
 
   const setReplyTarget = useChatStore((s) => s.setReplyTarget)
   const setQuoteTarget = useChatStore((s) => s.setQuoteTarget)
   const setThreadRootId = useChatStore((s) => s.setThreadRootId)
+  const setThreadReplyCount = useChatStore((s) => s.setThreadReplyCount)
+  const prependMessages = useChatStore((s) => s.prependMessages)
+  const addMessage = useChatStore((s) => s.addMessage)
+
+  const fetchedThreadCounts = useRef(new Set<number>())
 
 
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [pinnedMessages, setPinnedMessages] = useState<MessageResponse[]>([])
   const [startingCall, setStartingCall] = useState(false)
+  const [editTarget, setEditTarget] = useState<MessageResponse | null>(null)
 
   const loadMessages = useCallback(async () => {
     const res = await apiClient.chats.getMessages(chatId, { limit: 50 })
@@ -62,6 +84,21 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
       setPinnedMessages(pins.map((p) => p.message).filter(Boolean) as MessageResponse[])
     })
   }, [chatId, loadMessages])
+
+  useEffect(() => {
+    fetchedThreadCounts.current.clear()
+  }, [chatId])
+
+  useEffect(() => {
+    for (const m of mainMessages) {
+      const id = Number(m.id)
+      if (fetchedThreadCounts.current.has(id)) continue
+      fetchedThreadCounts.current.add(id)
+      void apiClient.chats.getThreadInfo(chatId, id).then((res) => {
+        setThreadReplyCount(id, res.data?.replyCount ?? 0)
+      })
+    }
+  }, [mainMessages, chatId, setThreadReplyCount])
 
   const messageById = useMemo(() => {
     const map = new Map<number, MessageResponse>()
@@ -107,13 +144,10 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
 
     if (voiceWaveform && msg.id != null) {
       await apiClient.chats.updateWaveform(chatId, Number(msg.id), { waveformData: voiceWaveform })
+      msg = { ...msg, waveformData: voiceWaveform }
     }
 
-    useChatStore.getState().addMessage(chatId, msg)
-    
-    if (mode === 'Thread' && parentId != null) {
-      setThreadRootId(parentId)
-    }
+    addMessage(chatId, msg)
   }
 
   const handleReaction = async (messageId: number, emoji: string) => {
@@ -128,10 +162,21 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
     await apiClient.chats.unpinMessage(chatId, messageId)
   }
 
-  const handleEdit = async (message: MessageResponse) => {
-    const next = window.prompt('Новый текст', message.content ?? '')
-    if (next == null) return
-    await apiClient.chats.updateMessage(chatId, Number(message.id), { content: next })
+  const handleEdit = (message: MessageResponse) => {
+    setEditTarget(message)
+    setReplyTarget(null)
+    setQuoteTarget(null)
+  }
+
+  const handleSaveEdit = async (text: string) => {
+    if (!editTarget) return
+    await apiClient.chats.updateMessage(chatId, Number(editTarget.id), { content: text || null })
+    useChatStore.getState().updateMessage(chatId, {
+      ...editTarget,
+      content: text || null,
+      editedAt: new Date().toISOString(),
+    })
+    setEditTarget(null)
   }
 
   const handleStartCall = async (video: boolean) => {
@@ -190,28 +235,29 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
           canManage={canManage}
           pinnedIds={pinnedIds}
           messageById={messageById}
+          threadReplyCounts={threadReplyCounts}
           loadingMore={loadingMore}
           hasMore={hasMore}
           onLoadMore={() => void handleLoadMore()}
-          onReply={(m, flat) => {
-            setReplyTarget({ message: m, mode: flat ? 'Flat' : 'Thread' })
-            if (!flat) setThreadRootId(Number(m.id))
-          }}
+          onReply={(m) => setReplyTarget({ message: m, mode: 'Flat' })}
           onQuote={setQuoteTarget}
           onOpenThread={(m) => setThreadRootId(Number(m.id))}
           onReaction={(id, emoji) => void handleReaction(id, emoji)}
           onPin={(id) => void handlePin(id)}
           onUnpin={(id) => void handleUnpin(id)}
-          onEdit={(m) => void handleEdit(m)}
+          onEdit={handleEdit}
         />
 
         <MessageInput
           replyTarget={replyTarget}
           quoteTarget={quoteTarget}
+          editTarget={editTarget}
           onSend={handleSend}
+          onSaveEdit={handleSaveEdit}
           onTyping={sendTyping}
           onClearReply={() => setReplyTarget(null)}
           onClearQuote={() => setQuoteTarget(null)}
+          onClearEdit={() => setEditTarget(null)}
         />
       </div>
 
@@ -223,7 +269,10 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
           canManage={canManage}
           pinnedIds={pinnedIds}
           onClose={() => setThreadRootId(null)}
+          onTyping={sendTyping}
           onReaction={(id, emoji) => void handleReaction(id, emoji)}
+          onPin={(id) => void handlePin(id)}
+          onUnpin={(id) => void handleUnpin(id)}
         />
       )}
     </div>

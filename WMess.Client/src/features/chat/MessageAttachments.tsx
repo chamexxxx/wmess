@@ -39,11 +39,7 @@ export function MessageAttachments({ attachments }: Props) {
           )
         }
         if (isAudio(a.contentType)) {
-          return (
-            <div key={id} className="flex flex-col gap-1">
-              <audio src={url} controls className="w-full max-w-md" />
-            </div>
-          )
+          return null
         }
         return (
           <a

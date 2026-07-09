@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ChatResponse, MessageResponse } from '../api/generated/data-contracts'
 import type { ReplyMode } from '../features/chat/chatApi'
-import { isThreadMessage, threadRootId, type ChatMessage } from '../features/chat/types'
+import { belongsToThread, isFlatReply, isThreadMessage, threadRootId, type ChatMessage } from '../features/chat/types'
 
 export interface ReplyTarget {
   message: MessageResponse
@@ -19,6 +19,7 @@ interface ChatState {
   replyTarget: ReplyTarget | null
   quoteTarget: MessageResponse | null
   threadRootId: number | null
+  threadReplyCounts: Record<number, number>
   setChats: (chats: ChatResponse[]) => void
   setActiveChat: (chatId: number | null, canManage?: boolean) => void
   setMessages: (chatId: number, messages: MessageResponse[]) => void
@@ -35,6 +36,7 @@ interface ChatState {
   setReplyTarget: (target: ReplyTarget | null) => void
   setQuoteTarget: (message: MessageResponse | null) => void
   setThreadRootId: (id: number | null) => void
+  setThreadReplyCount: (rootId: number, count: number) => void
   applyReaction: (
     chatId: number,
     messageId: number,
@@ -42,6 +44,26 @@ interface ChatState {
     emoji: string,
     added: boolean,
   ) => void
+}
+
+function applyReactionToList(
+  messages: MessageResponse[],
+  messageId: number,
+  userId: string,
+  emoji: string,
+  added: boolean,
+): MessageResponse[] {
+  return messages.map((m) => {
+    if (Number(m.id) !== messageId) return m
+    const reactions = [...(m.reactions ?? [])]
+    const idx = reactions.findIndex((r) => r.userId === userId && r.emoji === emoji)
+    if (added && idx === -1) {
+      reactions.push({ messageId, userId, emoji, createdAt: new Date().toISOString() })
+    } else if (!added && idx !== -1) {
+      reactions.splice(idx, 1)
+    }
+    return { ...m, reactions }
+  })
 }
 
 function upsertMessage(list: MessageResponse[], message: MessageResponse): MessageResponse[] {
@@ -66,6 +88,7 @@ export const useChatStore = create<ChatState>((set) => ({
   replyTarget: null,
   quoteTarget: null,
   threadRootId: null,
+  threadReplyCounts: {},
 
   setChats: (chats) => set({ chats }),
 
@@ -76,7 +99,10 @@ export const useChatStore = create<ChatState>((set) => ({
     set((s) => ({ messagesByChat: { ...s.messagesByChat, [chatId]: messages } })),
 
   setThreadMessages: (rootId, messages) =>
-    set((s) => ({ threadMessagesByRoot: { ...s.threadMessagesByRoot, [rootId]: messages } })),
+    set((s) => ({
+      threadMessagesByRoot: { ...s.threadMessagesByRoot, [rootId]: messages },
+      threadReplyCounts: { ...s.threadReplyCounts, [rootId]: messages.length },
+    })),
 
   prependMessages: (chatId, messages) =>
     set((s) => ({
@@ -92,13 +118,33 @@ export const useChatStore = create<ChatState>((set) => ({
       if (isThreadMessage(msg)) {
         const rootId = threadRootId(msg)
         if (rootId == null) return s
+        const prev = s.threadMessagesByRoot[rootId] ?? []
+        const next = upsertMessage(prev, message)
+        const isNew = !prev.some((m) => Number(m.id) === Number(message.id))
         return {
-          threadMessagesByRoot: {
-            ...s.threadMessagesByRoot,
-            [rootId]: upsertMessage(s.threadMessagesByRoot[rootId] ?? [], message),
-          },
+          threadMessagesByRoot: { ...s.threadMessagesByRoot, [rootId]: next },
+          threadReplyCounts: isNew
+            ? { ...s.threadReplyCounts, [rootId]: (s.threadReplyCounts[rootId] ?? prev.length) + 1 }
+            : s.threadReplyCounts,
         }
       }
+
+      if (isFlatReply(msg)) {
+        for (const [rootIdStr, list] of Object.entries(s.threadMessagesByRoot)) {
+          const rootId = Number(rootIdStr)
+          const ids = new Set(list.map((m) => Number(m.id)))
+          if (!belongsToThread(msg, ids, rootId)) continue
+          const next = upsertMessage(list, message)
+          const isNew = !list.some((m) => Number(m.id) === Number(message.id))
+          return {
+            threadMessagesByRoot: { ...s.threadMessagesByRoot, [rootId]: next },
+            threadReplyCounts: isNew
+              ? { ...s.threadReplyCounts, [rootId]: (s.threadReplyCounts[rootId] ?? list.length) + 1 }
+              : s.threadReplyCounts,
+          }
+        }
+      }
+
       return {
         messagesByChat: {
           ...s.messagesByChat,
@@ -108,20 +154,40 @@ export const useChatStore = create<ChatState>((set) => ({
     }),
 
   addThreadMessage: (rootId, message) =>
-    set((s) => ({
-      threadMessagesByRoot: {
-        ...s.threadMessagesByRoot,
-        [rootId]: upsertMessage(s.threadMessagesByRoot[rootId] ?? [], message),
-      },
-    })),
+    set((s) => {
+      const prev = s.threadMessagesByRoot[rootId] ?? []
+      const next = upsertMessage(prev, message)
+      const isNew = !prev.some((m) => Number(m.id) === Number(message.id))
+      return {
+        threadMessagesByRoot: { ...s.threadMessagesByRoot, [rootId]: next },
+        threadReplyCounts: isNew
+          ? { ...s.threadReplyCounts, [rootId]: (s.threadReplyCounts[rootId] ?? prev.length) + 1 }
+          : s.threadReplyCounts,
+      }
+    }),
 
   updateMessage: (chatId, message) =>
-    set((s) => ({
-      messagesByChat: {
-        ...s.messagesByChat,
-        [chatId]: upsertMessage(s.messagesByChat[chatId] ?? [], message),
-      },
-    })),
+    set((s) => {
+      const messageId = Number(message.id)
+      const main = s.messagesByChat[chatId] ?? []
+      if (main.some((m) => Number(m.id) === messageId)) {
+        return {
+          messagesByChat: {
+            ...s.messagesByChat,
+            [chatId]: upsertMessage(main, message),
+          },
+        }
+      }
+
+      const nextThread = { ...s.threadMessagesByRoot }
+      for (const [rootId, list] of Object.entries(nextThread)) {
+        if (list.some((m) => Number(m.id) === messageId)) {
+          nextThread[Number(rootId)] = upsertMessage(list, message)
+          return { threadMessagesByRoot: nextThread }
+        }
+      }
+      return s
+    }),
 
   removeMessage: (chatId, messageId) =>
     set((s) => ({
@@ -160,21 +226,28 @@ export const useChatStore = create<ChatState>((set) => ({
   setReplyTarget: (replyTarget) => set({ replyTarget }),
   setQuoteTarget: (quoteTarget) => set({ quoteTarget }),
   setThreadRootId: (threadRootId) => set({ threadRootId }),
+  setThreadReplyCount: (rootId, count) =>
+    set((s) => ({ threadReplyCounts: { ...s.threadReplyCounts, [rootId]: count } })),
 
   applyReaction: (chatId, messageId, userId, emoji, added) =>
     set((s) => {
-      const messages = s.messagesByChat[chatId] ?? []
-      const next = messages.map((m) => {
-        if (Number(m.id) !== messageId) return m
-        const reactions = [...(m.reactions ?? [])]
-        const idx = reactions.findIndex((r) => r.userId === userId && r.emoji === emoji)
-        if (added && idx === -1) {
-          reactions.push({ messageId, userId, emoji, createdAt: new Date().toISOString() })
-        } else if (!added && idx !== -1) {
-          reactions.splice(idx, 1)
+      const main = s.messagesByChat[chatId] ?? []
+      if (main.some((m) => Number(m.id) === messageId)) {
+        return {
+          messagesByChat: {
+            ...s.messagesByChat,
+            [chatId]: applyReactionToList(main, messageId, userId, emoji, added),
+          },
         }
-        return { ...m, reactions }
-      })
-      return { messagesByChat: { ...s.messagesByChat, [chatId]: next } }
+      }
+
+      const nextThread = { ...s.threadMessagesByRoot }
+      for (const [rootId, list] of Object.entries(nextThread)) {
+        if (list.some((m) => Number(m.id) === messageId)) {
+          nextThread[Number(rootId)] = applyReactionToList(list, messageId, userId, emoji, added)
+          return { threadMessagesByRoot: nextThread }
+        }
+      }
+      return s
     }),
 }))

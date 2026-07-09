@@ -48,3 +48,10 @@ export async function sendMessageWithFiles(
 export function attachmentUrl(attachmentId: number): string {
   return `/api/chats/attachments/${attachmentId}`
 }
+
+export async function fetchAttachmentBlob(attachmentId: number): Promise<Blob> {
+  const res = await api.get<Blob>(`/api/chats/attachments/${attachmentId}`, {
+    responseType: 'blob',
+  })
+  return res.data
+}

@@ -165,6 +165,65 @@ public class ChatsController : ControllerBase
         return depth;
     }
 
+    private async Task<bool> IsInThreadContextAsync(int chatId, int parentMessageId)
+    {
+        var cursor = await _context.Messages.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Id == parentMessageId && m.ChatId == chatId);
+        while (cursor != null)
+        {
+            if (cursor.ReplyMode == ReplyMode.Thread) return true;
+            if (!cursor.ParentMessageId.HasValue) return false;
+            cursor = await _context.Messages.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == cursor.ParentMessageId.Value && m.ChatId == chatId);
+        }
+        return false;
+    }
+
+    private async Task<List<Message>> LoadThreadMessagesAsync(int chatId, int rootId, int? before, int limit)
+    {
+        var threadIds = new HashSet<int> { rootId };
+        var all = new List<Message>();
+
+        var direct = await _context.Messages
+            .Where(m => m.ChatId == chatId && m.ParentMessageId == rootId && m.ReplyMode == ReplyMode.Thread)
+            .Include(m => m.Author)
+            .Include(m => m.Attachments)
+            .Include(m => m.Reactions)
+            .ToListAsync();
+        foreach (var m in direct)
+        {
+            all.Add(m);
+            threadIds.Add(m.Id);
+        }
+
+        var added = true;
+        while (added)
+        {
+            added = false;
+            var flats = await _context.Messages
+                .Where(m => m.ChatId == chatId
+                    && m.ReplyMode == ReplyMode.Flat
+                    && m.ParentMessageId != null
+                    && threadIds.Contains(m.ParentMessageId.Value))
+                .Include(m => m.Author)
+                .Include(m => m.Attachments)
+                .Include(m => m.Reactions)
+                .ToListAsync();
+            foreach (var m in flats)
+            {
+                if (threadIds.Add(m.Id))
+                {
+                    all.Add(m);
+                    added = true;
+                }
+            }
+        }
+
+        IEnumerable<Message> ordered = all.OrderByDescending(m => m.CreatedAt);
+        if (before.HasValue) ordered = ordered.Where(m => m.Id < before.Value);
+        return ordered.Take(limit).Reverse().ToList();
+    }
+
     private async Task<(int? ResolvedParentId, ActionResult? Error)> ResolveParentAsync(
         int chatId,
         Chat chat,
@@ -541,33 +600,43 @@ public class ChatsController : ControllerBase
 
         limit = Math.Clamp(limit, 1, 100);
 
-        var query = _context.Messages.Where(m => m.ChatId == id);
-
         if (parentMessageId.HasValue)
         {
-            query = query.Where(m => m.ParentMessageId == parentMessageId.Value && m.ReplyMode == ReplyMode.Thread);
-        }
-        else
-        {
-            query = query.Where(m =>
-                m.ParentMessageId == null ||
-                m.ReplyMode == ReplyMode.Flat);
+            var threadMessages = await LoadThreadMessagesAsync(id, parentMessageId.Value, before, limit);
+            var threadResult = new List<MessageResponse>();
+            foreach (var m in threadMessages) threadResult.Add(await MapMessageAsync(m));
+            return Ok(threadResult);
         }
 
-        if (before.HasValue)
-        {
-            query = query.Where(m => m.Id < before.Value);
-        }
-
-        var messages = await query
+        var candidates = await _context.Messages
+            .Where(m => m.ChatId == id && (m.ParentMessageId == null || m.ReplyMode == ReplyMode.Flat))
             .Include(m => m.Author)
             .Include(m => m.Attachments)
             .Include(m => m.Reactions)
             .OrderByDescending(m => m.CreatedAt)
-            .Take(limit)
+            .Take(limit * 3)
             .ToListAsync();
 
-        messages.Reverse();
+        var filtered = new List<Message>();
+        foreach (var m in candidates)
+        {
+            if (m.ParentMessageId == null || m.ReplyMode != ReplyMode.Flat)
+            {
+                filtered.Add(m);
+                continue;
+            }
+            if (!await IsInThreadContextAsync(id, m.ParentMessageId.Value))
+                filtered.Add(m);
+        }
+
+        if (before.HasValue)
+            filtered = filtered.Where(m => m.Id < before.Value).ToList();
+
+        var messages = filtered
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(limit)
+            .Reverse()
+            .ToList();
         var result = new List<MessageResponse>();
         foreach (var m in messages) result.Add(await MapMessageAsync(m));
         return Ok(result);
@@ -584,16 +653,10 @@ public class ChatsController : ControllerBase
             .FirstOrDefaultAsync(m => m.Id == messageId && m.ChatId == id);
         if (root == null) return NotFound();
 
-        var replies = await _context.Messages
-            .Where(m => m.ChatId == id && m.ParentMessageId == messageId && m.ReplyMode == ReplyMode.Thread)
-            .Include(m => m.Author)
-            .Include(m => m.Attachments)
-            .Include(m => m.Reactions)
-            .OrderByDescending(m => m.CreatedAt)
-            .ToListAsync();
+        var replies = await LoadThreadMessagesAsync(id, messageId, null, 1000);
 
         MessageResponse? last = null;
-        if (replies.Count > 0) last = await MapMessageAsync(replies[0]);
+        if (replies.Count > 0) last = await MapMessageAsync(replies[^1]);
 
         return Ok(new ThreadInfoResponse
         {

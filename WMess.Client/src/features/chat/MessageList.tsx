@@ -8,10 +8,11 @@ interface Props {
   canManage: boolean
   pinnedIds: number[]
   messageById: Map<number, MessageResponse>
+  threadReplyCounts?: Record<number, number>
   loadingMore: boolean
   hasMore: boolean
   onLoadMore: () => void
-  onReply: (message: MessageResponse, flat: boolean) => void
+  onReply: (message: MessageResponse) => void
   onQuote: (message: MessageResponse) => void
   onOpenThread: (message: MessageResponse) => void
   onReaction: (messageId: number, emoji: string) => void
@@ -26,6 +27,7 @@ export function MessageList({
   canManage,
   pinnedIds,
   messageById,
+  threadReplyCounts = {},
   loadingMore,
   hasMore,
   onLoadMore,
@@ -74,7 +76,8 @@ export function MessageList({
             currentUserId={currentUserId}
             canManage={canManage}
             isPinned={pinnedIds.includes(msgId)}
-            onReply={(flat) => onReply(m, flat)}
+            threadReplyCount={threadReplyCounts[msgId] ?? 0}
+            onReply={() => onReply(m)}
             onQuote={() => onQuote(m)}
             onOpenThread={() => onOpenThread(m)}
             onReaction={(emoji) => onReaction(msgId, emoji)}
