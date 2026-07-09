@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '../api'
 import { FormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, DocsIcon, FileIcon, FolderIcon, HomeIcon, ImageIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, DocsIcon, FileIcon, FilterIcon, FolderIcon, HomeIcon, ImageIcon, LayersIcon, PencilIcon, SearchIcon, SortIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 import { ImagePreview, isImageFile } from './ImagePreview'
 import type { PreviewImage } from './ImagePreview'
 
@@ -18,6 +18,8 @@ interface DocItem {
   title: string
   type?: string
   updatedAt?: string
+  // Заполняется только в плоском режиме (getProjectItems) — для фильтрации по поддереву папок.
+  folderId?: number | null
 }
 
 type RenameTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
@@ -28,6 +30,23 @@ interface LibraryExplorerProps {
   folderId: number | null
   onNavigateFolder: (id: number | null) => void
   onOpenDocument: (id: number, title: string, type?: string) => void
+}
+
+// Подписи фильтра по типу (значение → текст на кнопке).
+const FILTER_LABELS: Record<string, string> = {
+  all: 'Все',
+  document: 'Документы',
+  board: 'Доски',
+  table: 'Таблицы',
+  file: 'Файлы',
+}
+
+// Короткие подписи сортировки для кнопки.
+const SORT_LABELS: Record<string, string> = {
+  'name-asc': 'Имя ↑',
+  'name-desc': 'Имя ↓',
+  'date-desc': 'Дата ↓',
+  'date-asc': 'Дата ↑',
 }
 
 function formatDate(value?: string): string {
@@ -47,6 +66,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   const [searchFolders, setSearchFolders] = useState<FolderItem[]>([])
   const [searchDocs, setSearchDocs] = useState<DocItem[]>([])
   const searching = query.trim().length > 0
+  const [searchLoading, setSearchLoading] = useState(false)
 
   const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | null>(null)
   // Папка, в которой создаётся документ (через контекстное меню папки); null — текущая папка.
@@ -58,6 +78,14 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const [preview, setPreview] = useState<{ images: PreviewImage[]; index: number } | null>(null)
+  // Фильтр по типу элемента: 'all' | 'document' | 'board' | 'table' | 'file'.
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  // Сортировка: 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc'.
+  const [sort, setSort] = useState<string>('name-asc')
+  // Плоский режим: элементы текущей папки и всех вложенных одним списком, без разбивки по папкам.
+  const [flat, setFlat] = useState(false)
+  const [allItems, setAllItems] = useState<DocItem[]>([])
+  const [allFolders, setAllFolders] = useState<{ id: number; parentFolderId: number | null }[]>([])
 
   const loadContents = async () => {
     // Намеренно НЕ ставим loading=true при переходах: иначе список на миг заменяется на
@@ -110,14 +138,71 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, folderId])
 
+  // Плоский режим: подгружаем все элементы и папки проекта, чтобы собрать поддерево текущей папки.
+  useEffect(() => {
+    if (!flat) return
+    let cancelled = false
+    Promise.all([
+      apiClient.library.getProjectItems(projectId),
+      apiClient.library.getProjectFolders(projectId),
+    ])
+      .then(([itemsRes, foldersRes]) => {
+        if (cancelled) return
+        setAllItems(
+          (itemsRes.data ?? []).map((d) => ({
+            id: Number(d.id),
+            title: d.title ?? 'Без названия',
+            type: d.type,
+            updatedAt: d.updatedAt,
+            folderId: d.folderId == null ? null : Number(d.folderId),
+          })),
+        )
+        setAllFolders(
+          (foldersRes.data ?? []).map((f) => ({
+            id: Number(f.id),
+            parentFolderId: f.parentFolderId == null ? null : Number(f.parentFolderId),
+          })),
+        )
+      })
+      .catch((error) => console.error('Failed to load project tree:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [flat, projectId])
+
+  // Элементы поддерева текущей папки (сама папка + все вложенные). В корне (folderId=null) — весь проект.
+  const flatItems = useMemo(() => {
+    if (!flat) return []
+    if (folderId == null) return allItems
+    const childrenOf = new Map<number, number[]>()
+    for (const f of allFolders) {
+      if (f.parentFolderId != null) {
+        const arr = childrenOf.get(f.parentFolderId) ?? []
+        arr.push(f.id)
+        childrenOf.set(f.parentFolderId, arr)
+      }
+    }
+    const subtree = new Set<number>()
+    const stack = [folderId]
+    while (stack.length) {
+      const id = stack.pop()!
+      if (subtree.has(id)) continue
+      subtree.add(id)
+      for (const child of childrenOf.get(id) ?? []) stack.push(child)
+    }
+    return allItems.filter((it) => it.folderId != null && subtree.has(it.folderId))
+  }, [flat, folderId, allItems, allFolders])
+
   // Поиск по проекту с дебаунсом (серверный).
   useEffect(() => {
     const q = query.trim()
     if (!q) {
       setSearchFolders([])
       setSearchDocs([])
+      setSearchLoading(false)
       return
     }
+    setSearchLoading(true)
     const timer = setTimeout(async () => {
       try {
         const res = await apiClient.library.searchLibrary(projectId, { query: q })
@@ -125,6 +210,8 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         setSearchDocs((res.data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type })))
       } catch (error) {
         console.error('Failed to search:', error)
+      } finally {
+        setSearchLoading(false)
       }
     }, 250)
     return () => clearTimeout(timer)
@@ -439,8 +526,8 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   }
 
   // Открытие элемента: изображение — галерея по текущему списку, прочий файл — скачать,
-  // остальные типы — редактор. fromFolder=false означает список результатов поиска.
-  const openItem = (d: DocItem, fromFolder: boolean) => {
+  // остальные типы — редактор.
+  const openItem = (d: DocItem) => {
     if (d.type !== 'file') {
       onOpenDocument(d.id, d.title, d.type)
       return
@@ -449,7 +536,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       apiClient.downloadLibraryFile(d.id, d.title)
       return
     }
-    const source = fromFolder ? documents : searchDocs
+    const source = searching ? searchDocs : flat ? flatItems : documents
     const imgs = source
       .filter((x) => x.type === 'file' && isImageFile(x.title))
       .map((x) => ({ id: x.id, title: x.title }))
@@ -463,7 +550,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     <div
       key={`d-${d.id}`}
       className={`${rowBase} ${isDragging ? 'opacity-50' : ''}`}
-      onClick={() => openItem(d, withMeta)}
+      onClick={() => openItem(d)}
       onContextMenu={(e) => openDocMenu(e, d)}
       draggable={withMeta}
       onDragStart={
@@ -502,8 +589,69 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     )
   }
 
-  const isEmpty = !searching && folders.length === 0 && documents.length === 0
-  const noResults = searching && searchFolders.length === 0 && searchDocs.length === 0
+  // Компараторы для сортировки (по имени/дате). Даты в ISO — сравниваем как строки.
+  const docCmp = (a: DocItem, b: DocItem) => {
+    if (sort === 'name-desc') return b.title.localeCompare(a.title, 'ru')
+    if (sort === 'date-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+    if (sort === 'date-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
+    return a.title.localeCompare(b.title, 'ru')
+  }
+  const folderCmp = (a: FolderItem, b: FolderItem) => {
+    if (sort === 'name-desc') return b.name.localeCompare(a.name, 'ru')
+    if (sort === 'date-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+    if (sort === 'date-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
+    return a.name.localeCompare(b.name, 'ru')
+  }
+
+  const matchesType = (d: DocItem) => typeFilter === 'all' || d.type === typeFilter
+
+  // Что показываем: поиск → результаты; плоский режим → все элементы проекта; иначе — текущая папка.
+  // Папки скрываем в поиске и в плоском режиме.
+  const listFolders = searching || flat ? [] : [...folders].sort(folderCmp)
+  const listDocs = (searching ? searchDocs : flat ? flatItems : documents)
+    .filter(matchesType)
+    .sort(docCmp)
+  const searchFoldersSorted = searching ? [...searchFolders].sort(folderCmp) : []
+
+  const isEmpty = !searching && !flat && folders.length === 0 && documents.length === 0
+  // Есть ли что показать в режиме поиска (учитывая «протухшие» результаты прошлого запроса).
+  const hasSearchContent = searchFoldersSorted.length > 0 || listDocs.length > 0
+
+  // Выпадашка фильтра — переиспользуем ContextMenu, открывая её под кнопкой.
+  const openFilterMenu = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setMenu({
+      x: rect.left,
+      y: rect.bottom + 4,
+      items: [
+        { label: 'Все', icon: <FilterIcon size={15} className="text-muted" />, onClick: () => setTypeFilter('all') },
+        { label: 'Документы', icon: <DocsIcon size={15} className="text-doc" />, onClick: () => setTypeFilter('document') },
+        { label: 'Доски', icon: <BoardsIcon size={15} className="text-board" />, onClick: () => setTypeFilter('board') },
+        { label: 'Таблицы', icon: <TablesIcon size={15} className="text-table" />, onClick: () => setTypeFilter('table') },
+        { label: 'Файлы', icon: <FileIcon size={15} className="text-ink" />, onClick: () => setTypeFilter('file') },
+      ],
+    })
+  }
+
+  // Выпадашка сортировки.
+  const openSortMenu = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const item = (label: string, value: string) => ({
+      label,
+      icon: <SortIcon size={15} className="text-muted" />,
+      onClick: () => setSort(value),
+    })
+    setMenu({
+      x: rect.left,
+      y: rect.bottom + 4,
+      items: [
+        item('По названию (А–Я)', 'name-asc'),
+        item('По названию (Я–А)', 'name-desc'),
+        item('По дате (новые)', 'date-desc'),
+        item('По дате (старые)', 'date-asc'),
+      ],
+    })
+  }
 
   // Крошки как зоны сброса: перенос в предка (c.id) или в корень (Home → null).
   const breadcrumbDnd = (target: number | 'root') => ({
@@ -570,6 +718,40 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openFilterMenu}
+            title="Фильтр по типу"
+            className={`h-8 px-2.5 rounded-[9px] border text-[13px] flex items-center gap-1.5 cursor-pointer transition-colors ${
+              typeFilter === 'all'
+                ? 'border-line bg-white text-muted hover:border-accent'
+                : 'border-accent/40 bg-accent-soft text-accent'
+            }`}
+          >
+            <FilterIcon size={15} />
+            {FILTER_LABELS[typeFilter]}
+          </button>
+          <button
+            type="button"
+            onClick={openSortMenu}
+            title="Сортировка"
+            className="h-8 px-2.5 rounded-[9px] border border-line bg-white text-[13px] text-muted flex items-center gap-1.5 cursor-pointer hover:border-accent transition-colors"
+          >
+            <SortIcon size={15} />
+            {SORT_LABELS[sort]}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFlat((v) => !v)}
+            title="Показать элементы этой папки и всех вложенных одним списком"
+            className={`h-8 w-8 rounded-[9px] border flex items-center justify-center cursor-pointer transition-colors ${
+              flat
+                ? 'border-accent/40 bg-accent-soft text-accent'
+                : 'border-line bg-white text-muted hover:border-accent'
+            }`}
+          >
+            <LayersIcon size={16} />
+          </button>
           <div className="relative">
             <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
             <input
@@ -586,13 +768,21 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         {loading ? (
           <div className="px-3 py-4 text-[13px] text-faint">Загрузка…</div>
         ) : searching ? (
-          noResults ? (
-            <div className="px-3 py-4 text-[13px] text-faint">Ничего не найдено</div>
-          ) : (
+          hasSearchContent ? (
             <>
-              {searchFolders.map((f) => folderRow(f, false))}
-              {searchDocs.map((d) => docRow(d, false))}
+              {searchFoldersSorted.map((f) => folderRow(f, false))}
+              {listDocs.map((d) => docRow(d, false))}
             </>
+          ) : searchLoading ? (
+            <div className="px-3 py-4 text-[13px] text-faint">Поиск…</div>
+          ) : (
+            <div className="px-3 py-4 text-[13px] text-faint">Ничего не найдено</div>
+          )
+        ) : flat ? (
+          listDocs.length === 0 ? (
+            <div className="px-3 py-4 text-[13px] text-faint">Нет элементов выбранного типа</div>
+          ) : (
+            <>{listDocs.map((d) => docRow(d, true))}</>
           )
         ) : isEmpty ? (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-8">
@@ -605,8 +795,8 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           </div>
         ) : (
           <>
-            {folders.map((f) => folderRow(f, true))}
-            {documents.map((d) => docRow(d, true))}
+            {listFolders.map((f) => folderRow(f, true))}
+            {listDocs.map((d) => docRow(d, true))}
           </>
         )}
       </div>

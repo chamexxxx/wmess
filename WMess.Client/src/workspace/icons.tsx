@@ -92,6 +92,29 @@ export const FileIcon = (p: IconProps) => (
   </Svg>
 )
 
+// Фильтр — воронка.
+export const FilterIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 5.5h16l-6.2 7.4V20l-3.6-1.8v-5.3z" />
+  </Svg>
+)
+
+// Сортировка — строки разной длины.
+export const SortIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 7h14M5 12h9M5 17h5" />
+  </Svg>
+)
+
+// Слои — режим «все папки одним списком».
+export const LayersIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3l8.5 4.5L12 12 3.5 7.5 12 3z" />
+    <path d="M3.5 12L12 16.5 20.5 12" />
+    <path d="M3.5 16.5L12 21l8.5-4.5" />
+  </Svg>
+)
+
 // Загруженный файл-изображение — рамка с «горой» и солнцем.
 export const ImageIcon = (p: IconProps) => (
   <Svg {...p}>
