@@ -3314,7 +3314,11 @@
         }
       },
       "ChatType": {
-        "type": "integer",
+        "enum": [
+          "Team",
+          "Project",
+          "Direct"
+        ],
         "description": "Тип чата. Определяет, к какой сущности привязан чат и как вычисляются права."
       },
       "CreateChatRequest": {
@@ -3676,6 +3680,16 @@
             ],
             "format": "int32"
           },
+          "replyMode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReplyMode"
+              }
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -3960,6 +3974,12 @@
           }
         }
       },
+      "ReplyMode": {
+        "enum": [
+          "Thread",
+          "Flat"
+        ]
+      },
       "SetPermissionRequest": {
         "type": "object",
         "properties": {
@@ -4076,7 +4096,11 @@
         }
       },
       "TeamRole": {
-        "type": "integer",
+        "enum": [
+          "Member",
+          "Admin",
+          "Owner"
+        ],
         "description": "Роль пользователя в команде.\r\nЗначения упорядочены от наименьших прав к наибольшим, чтобы значение по умолчанию (0)\r\nсоответствовало наименее привилегированной роли (fail-safe)."
       },
       "ThreadInfoResponse": {

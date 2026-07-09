@@ -110,14 +110,7 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
     }
 
     useChatStore.getState().addMessage(chatId, msg)
-  }
-
-
-    if (voiceWaveform && msg.id != null) {
-      await apiClient.chats.updateWaveform(chatId, Number(msg.id), { waveformData: voiceWaveform })
-    }
-
-    addMessage(chatId, msg as ChatMessage)
+    
     if (mode === 'Thread' && parentId != null) {
       setThreadRootId(parentId)
     }
