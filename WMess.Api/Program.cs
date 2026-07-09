@@ -96,6 +96,14 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 // Register Document Access Service (единый источник вычисления прав на документ)
 builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
 
+// Register Chat Access Service (единый источник вычисления прав на чат)
+builder.Services.AddScoped<IChatAccessService, ChatAccessService>();
+
+// Register Transcription Service (заглушка под будущий Whisper)
+builder.Services.AddScoped<ITranscriptionService, StubTranscriptionService>();
+
+// Register Task Resolver (заглушка под #{номер} задач)
+builder.Services.AddScoped<ITaskResolver, StubTaskResolver>();
 // Register Authorization Handlers
 builder.Services.AddScoped<IAuthorizationHandler, TeamMemberHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, TeamManageHandler>();
@@ -132,4 +140,5 @@ app.MapControllers();
 
 // Map SignalR Hubs
 app.MapHub<WMess.Api.Hubs.DocumentHub>("/hubs/document");
+app.MapHub<WMess.Api.Hubs.ChatHub>("/hubs/chat");
 app.Run();

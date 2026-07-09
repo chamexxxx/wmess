@@ -10,6 +10,7 @@ import { ProjectSettings } from '../components/ProjectSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
 import { TeamMembersModal } from '../components/TeamMembersModal'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
+import { ChatsSection } from '../features/chat/ChatsSection'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
 
 type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
@@ -23,11 +24,11 @@ export function HomePage() {
 
   // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
   // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/docs/:docId
-  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, docId: docIdParam } = useParams()
+  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, docId: docIdParam, chatId: chatIdParam } = useParams()
   const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
   // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Документы».
-  const sectionKey = docIdParam != null ? 'docs' : sectionParam
+  const sectionKey = docIdParam != null ? 'docs' : chatIdParam != null ? 'chats' : sectionParam
 
   const [teams, setTeams] = useState<TeamResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])
@@ -311,6 +312,8 @@ export function HomePage() {
             />
           ) : section?.id === 'docs' ? (
             <DocumentsSection projectId={selectedProjectId!} />
+          ) : section?.id === 'chats' ? (
+            <ChatsSection projectId={selectedProjectId!} teamId={selectedTeamId!} />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}
