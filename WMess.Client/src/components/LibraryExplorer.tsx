@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '../api'
-import { FormModal, ConfirmDialog } from './WorkspaceModals'
+import { FormModal, LinkFormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, DocsIcon, FileIcon, FilterIcon, FolderIcon, HomeIcon, ImageIcon, LayersIcon, PencilIcon, SearchIcon, SortIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, DocsIcon, ExternalLinkIcon, FileIcon, FilterIcon, FolderIcon, HomeIcon, ImageIcon, LayersIcon, PencilIcon, SearchIcon, SortIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 import { ImagePreview, isImageFile } from './ImagePreview'
 import type { PreviewImage } from './ImagePreview'
 
@@ -18,6 +18,8 @@ interface DocItem {
   title: string
   type?: string
   updatedAt?: string
+  // Адрес внешнего ресурса — только для элементов типа 'link'.
+  url?: string | null
   // Заполняется только в плоском режиме (getProjectItems) — для фильтрации по поддереву папок.
   folderId?: number | null
 }
@@ -39,6 +41,7 @@ const FILTER_LABELS: Record<string, string> = {
   board: 'Доски',
   table: 'Таблицы',
   file: 'Файлы',
+  link: 'Ссылки',
 }
 
 // Короткие подписи сортировки для кнопки.
@@ -68,7 +71,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   const searching = query.trim().length > 0
   const [searchLoading, setSearchLoading] = useState(false)
 
-  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | null>(null)
+  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | 'link' | null>(null)
   // Папка, в которой создаётся документ (через контекстное меню папки); null — текущая папка.
   const [createDocFolderId, setCreateDocFolderId] = useState<number | null>(null)
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
@@ -98,7 +101,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       const data = res.data
       setFolders((data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '', updatedAt: f.updatedAt })))
       setDocuments(
-        (data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type, updatedAt: d.updatedAt })),
+        (data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type, updatedAt: d.updatedAt, url: d.url })),
       )
       setPath((data?.path ?? []).map((p) => ({ id: Number(p.id), name: p.name ?? '' })))
     } catch (error) {
@@ -154,6 +157,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
             title: d.title ?? 'Без названия',
             type: d.type,
             updatedAt: d.updatedAt,
+            url: d.url,
             folderId: d.folderId == null ? null : Number(d.folderId),
           })),
         )
@@ -207,7 +211,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       try {
         const res = await apiClient.library.searchLibrary(projectId, { query: q })
         setSearchFolders((res.data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '' })))
-        setSearchDocs((res.data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type })))
+        setSearchDocs((res.data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type, url: d.url })))
       } catch (error) {
         console.error('Failed to search:', error)
       } finally {
@@ -273,6 +277,20 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       }
     } catch (error) {
       console.error('Failed to create table:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createLink = async (title: string, url: string) => {
+    setBusy(true)
+    try {
+      await apiClient.library.createLink({ projectId, folderId: createDocFolderId, title, url })
+      setCreateKind(null)
+      setCreateDocFolderId(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to create link:', error)
     } finally {
       setBusy(false)
     }
@@ -369,6 +387,14 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           },
         },
         {
+          label: 'Добавить ссылку',
+          icon: <ExternalLinkIcon size={15} className="text-link" />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('link')
+          },
+        },
+        {
           label: 'Загрузить файлы',
           icon: <FileIcon size={15} className="text-ink" />,
           onClick: () => startUpload(f.id),
@@ -445,6 +471,14 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           onClick: () => {
             setCreateDocFolderId(folderId)
             setCreateKind('table')
+          },
+        },
+        {
+          label: 'Добавить ссылку',
+          icon: <ExternalLinkIcon size={15} className="text-link" />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('link')
           },
         },
         {
@@ -528,6 +562,12 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   // Открытие элемента: изображение — галерея по текущему списку, прочий файл — скачать,
   // остальные типы — редактор.
   const openItem = (d: DocItem) => {
+    if (d.type === 'link') {
+      if (d.url) {
+        window.open(d.url, '_blank', 'noopener,noreferrer')
+      }
+      return
+    }
     if (d.type !== 'file') {
       onOpenDocument(d.id, d.title, d.type)
       return
@@ -574,6 +614,8 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         <BoardsIcon size={18} className="text-board shrink-0" />
       ) : d.type === 'table' ? (
         <TablesIcon size={18} className="text-table shrink-0" />
+      ) : d.type === 'link' ? (
+        <ExternalLinkIcon size={18} className="text-link shrink-0" />
       ) : d.type === 'file' ? (
         isImageFile(d.title) ? (
           <ImageIcon size={18} className="text-image shrink-0" />
@@ -629,6 +671,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
         { label: 'Доски', icon: <BoardsIcon size={15} className="text-board" />, onClick: () => setTypeFilter('board') },
         { label: 'Таблицы', icon: <TablesIcon size={15} className="text-table" />, onClick: () => setTypeFilter('table') },
         { label: 'Файлы', icon: <FileIcon size={15} className="text-ink" />, onClick: () => setTypeFilter('file') },
+        { label: 'Ссылки', icon: <ExternalLinkIcon size={15} className="text-link" />, onClick: () => setTypeFilter('link') },
       ],
     })
   }
@@ -844,6 +887,18 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
           submitLabel="Создать"
           busy={busy}
           onSubmit={createTable}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
+        />
+      )}
+      {createKind === 'link' && (
+        <LinkFormModal
+          title="Новая ссылка"
+          submitLabel="Добавить"
+          busy={busy}
+          onSubmit={createLink}
           onClose={() => {
             setCreateKind(null)
             setCreateDocFolderId(null)

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiClient } from '../api'
-import { FormModal, ConfirmDialog } from './WorkspaceModals'
+import { FormModal, LinkFormModal, ConfirmDialog } from './WorkspaceModals'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuItem } from './ContextMenu'
-import { BoardsIcon, ChevronRightIcon, DocsIcon, FileIcon, FolderIcon, ImageIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { BoardsIcon, ChevronRightIcon, DocsIcon, ExternalLinkIcon, FileIcon, FolderIcon, ImageIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 import { ImagePreview, isImageFile } from './ImagePreview'
 import type { PreviewImage } from './ImagePreview'
 
@@ -17,8 +17,10 @@ interface Doc {
   id: number
   folderId: number | null
   title: string
-  // Тип элемента: "document" | "board" | "table" — определяет иконку.
+  // Тип элемента: "document" | "board" | "table" | "file" | "link" — определяет иконку.
   type?: string
+  // Адрес внешнего ресурса — только для элементов типа 'link'.
+  url?: string | null
 }
 
 type DeleteTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
@@ -43,7 +45,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
 
-  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | null>(null)
+  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | 'link' | null>(null)
   const [createInFolder, setCreateInFolder] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [renameFolder, setRenameFolder] = useState<{ id: number; name: string } | null>(null)
@@ -74,6 +76,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           folderId: d.folderId == null ? null : Number(d.folderId),
           title: d.title ?? 'Без названия',
           type: d.type,
+          url: d.url,
         })),
       )
     } catch (error) {
@@ -239,6 +242,24 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
     }
   }
 
+  const createLink = async (title: string, url: string) => {
+    setBusy(true)
+    const folderId = createInFolder
+    try {
+      await apiClient.library.createLink({ projectId, folderId, title, url })
+      setCreateKind(null)
+      setCreateInFolder(null)
+      await loadData()
+      if (folderId !== null) {
+        setExpanded((prev) => new Set(prev).add(folderId))
+      }
+    } catch (error) {
+      console.error('Failed to create link:', error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const confirmDelete = async () => {
     if (!deleteTarget) return
     setBusy(true)
@@ -380,6 +401,14 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           },
         },
         {
+          label: 'Добавить ссылку',
+          icon: <ExternalLinkIcon size={15} className="text-link" />,
+          onClick: () => {
+            setCreateInFolder(folder.id)
+            setCreateKind('link')
+          },
+        },
+        {
           label: 'Загрузить файлы',
           icon: <FileIcon size={15} className="text-ink" />,
           onClick: () => startUpload(folder.id),
@@ -454,6 +483,14 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           },
         },
         {
+          label: 'Добавить ссылку',
+          icon: <ExternalLinkIcon size={15} className="text-link" />,
+          onClick: () => {
+            setCreateInFolder(null)
+            setCreateKind('link')
+          },
+        },
+        {
           label: 'Загрузить файлы',
           icon: <FileIcon size={15} className="text-ink" />,
           onClick: () => startUpload(null),
@@ -476,11 +513,14 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
         ? 'text-board'
         : type === 'table'
           ? 'text-table'
-          : type === 'file'
-            ? 'text-ink'
-            : 'text-doc'
+          : type === 'link'
+            ? 'text-link'
+            : type === 'file'
+              ? 'text-ink'
+              : 'text-doc'
     if (type === 'board') return <BoardsIcon size={15} className={cls} />
     if (type === 'table') return <TablesIcon size={15} className={cls} />
+    if (type === 'link') return <ExternalLinkIcon size={15} className={cls} />
     if (type === 'file') {
       if (isImageFile(title)) {
         return <ImageIcon size={15} className={isSelected ? 'text-accent' : 'text-image'} />
@@ -493,6 +533,12 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
   // Клик по элементу: изображение — открываем просмотрщик, прочий файл — скачиваем,
   // остальные типы — открываем в редакторе.
   const openDoc = (doc: Doc) => {
+    if (doc.type === 'link') {
+      if (doc.url) {
+        window.open(doc.url, '_blank', 'noopener,noreferrer')
+      }
+      return
+    }
     if (doc.type !== 'file') {
       onSelect(doc.id, doc.title)
       return
@@ -762,6 +808,18 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
           submitLabel="Создать"
           busy={busy}
           onSubmit={createTable}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateInFolder(null)
+          }}
+        />
+      )}
+      {createKind === 'link' && (
+        <LinkFormModal
+          title="Новая ссылка"
+          submitLabel="Добавить"
+          busy={busy}
+          onSubmit={createLink}
           onClose={() => {
             setCreateKind(null)
             setCreateInFolder(null)

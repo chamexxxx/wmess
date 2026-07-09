@@ -1200,6 +1200,62 @@
         ]
       }
     },
+    "/api/library-items/links": {
+      "post": {
+        "tags": [
+          "Library"
+        ],
+        "operationId": "CreateLink",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLinkRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLinkRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryItemResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryItemResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryItemResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
     "/api/library-items/{id}/content": {
       "get": {
         "tags": [
@@ -2144,6 +2200,34 @@
           }
         }
       },
+      "CreateLinkRequest": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "folderId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "CreateProjectRequest": {
         "required": [
           "name",
@@ -2293,7 +2377,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Тип элемента: \"document\" | \"board\" | \"table\"."
+            "description": "Тип элемента: \"document\" | \"board\" | \"table\" | \"file\" | \"link\"."
           },
           "title": {
             "type": "string"
@@ -2308,6 +2392,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Адрес внешнего ресурса — заполняется только для элементов типа \"link\"."
           }
         }
       },

@@ -54,4 +54,7 @@ public class LibraryItem
 
     // Контент типа File (1:1, PK = FK) — загруженный файл.
     public FileContent? FileContent { get; set; }
+
+    // Контент типа Link (1:1, PK = FK) — ссылка на внешний ресурс.
+    public LinkContent? LinkContent { get; set; }
 }

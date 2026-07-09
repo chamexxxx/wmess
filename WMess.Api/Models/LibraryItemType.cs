@@ -11,4 +11,5 @@ public enum LibraryItemType
     Board = 1,
     Table = 2,
     File = 3,
+    Link = 4,
 }

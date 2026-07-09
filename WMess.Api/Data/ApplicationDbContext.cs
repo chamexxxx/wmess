@@ -21,6 +21,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<BoardContent> BoardContents { get; set; }
     public DbSet<TableContent> TableContents { get; set; }
     public DbSet<FileContent> FileContents { get; set; }
+    public DbSet<LinkContent> LinkContents { get; set; }
     public DbSet<LibraryFolder> LibraryFolders { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -111,6 +112,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             .HasOne(c => c.Item)
             .WithOne(i => i.FileContent)
             .HasForeignKey<FileContent>(c => c.LibraryItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Контент типа Link (1:1, PK = FK); удаляется вместе с элементом
+        builder.Entity<LinkContent>()
+            .HasOne(c => c.Item)
+            .WithOne(i => i.LinkContent)
+            .HasForeignKey<LinkContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

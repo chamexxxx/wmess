@@ -92,6 +92,78 @@ export function FormModal({
   )
 }
 
+interface LinkFormModalProps {
+  title: string
+  submitLabel: string
+  initialName?: string
+  initialUrl?: string
+  busy?: boolean
+  onSubmit: (name: string, url: string) => void
+  onClose: () => void
+}
+
+/** Create/edit dialog for an external link: name + URL. Enter submits, both fields required. */
+export function LinkFormModal({
+  title,
+  submitLabel,
+  initialName = '',
+  initialUrl = '',
+  busy,
+  onSubmit,
+  onClose,
+}: LinkFormModalProps) {
+  const [name, setName] = useState(initialName)
+  const [url, setUrl] = useState(initialUrl)
+  const trimmedName = name.trim()
+  const trimmedUrl = url.trim()
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!trimmedName || !trimmedUrl || busy) return
+    onSubmit(trimmedName, trimmedUrl)
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <h2 className="text-[17px] font-bold m-0">{title}</h2>
+      <form onSubmit={submit}>
+        <label className="block font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest mt-[18px] mb-[7px]">
+          Название
+        </label>
+        <input
+          autoFocus
+          value={name}
+          maxLength={100}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full h-10 px-3 rounded-[9px] border border-line bg-panel text-sm text-ink font-ui focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/20"
+        />
+        <label className="block font-ui font-semibold text-[10.5px] tracking-[.06em] uppercase text-faintest mt-[14px] mb-[7px]">
+          Ссылка
+        </label>
+        <input
+          value={url}
+          maxLength={2000}
+          placeholder="https://"
+          onChange={(e) => setUrl(e.target.value)}
+          className="w-full h-10 px-3 rounded-[9px] border border-line bg-panel text-sm text-ink font-ui placeholder:text-faint focus:outline-none focus:border-accent focus:ring-[3px] focus:ring-accent/20"
+        />
+        <div className="flex justify-end gap-2.5 mt-[22px]">
+          <button type="button" className={ghostBtn} onClick={onClose}>
+            Отмена
+          </button>
+          <button
+            type="submit"
+            className={`${actionBtn} bg-accent hover:bg-accent-deep`}
+            disabled={!trimmedName || !trimmedUrl || busy}
+          >
+            {submitLabel}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 interface ConfirmDialogProps {
   title: string
   message: ReactNode

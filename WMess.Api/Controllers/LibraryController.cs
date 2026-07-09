@@ -42,6 +42,7 @@ public class LibraryController : ControllerBase
         LibraryItemType.Board => "board",
         LibraryItemType.Table => "table",
         LibraryItemType.File => "file",
+        LibraryItemType.Link => "link",
         _ => type.ToString().ToLowerInvariant(),
     };
 
@@ -54,7 +55,8 @@ public class LibraryController : ControllerBase
         Title = item.Title,
         CreatedBy = item.CreatedBy,
         CreatedAt = item.CreatedAt,
-        UpdatedAt = item.UpdatedAt
+        UpdatedAt = item.UpdatedAt,
+        Url = item.LinkContent?.Url
     };
 
     #region Folders
@@ -347,7 +349,8 @@ public class LibraryController : ControllerBase
                 Title = d.Title,
                 CreatedBy = d.CreatedBy,
                 CreatedAt = d.CreatedAt,
-                UpdatedAt = d.UpdatedAt
+                UpdatedAt = d.UpdatedAt,
+                Url = d.LinkContent != null ? d.LinkContent.Url : null
             })
             .ToListAsync();
 
@@ -413,7 +416,8 @@ public class LibraryController : ControllerBase
                 Title = d.Title,
                 CreatedBy = d.CreatedBy,
                 CreatedAt = d.CreatedAt,
-                UpdatedAt = d.UpdatedAt
+                UpdatedAt = d.UpdatedAt,
+                Url = d.LinkContent != null ? d.LinkContent.Url : null
             })
             .ToListAsync();
 
@@ -489,7 +493,8 @@ public class LibraryController : ControllerBase
                 Title = d.Title,
                 CreatedBy = d.CreatedBy,
                 CreatedAt = d.CreatedAt,
-                UpdatedAt = d.UpdatedAt
+                UpdatedAt = d.UpdatedAt,
+                Url = d.LinkContent != null ? d.LinkContent.Url : null
             })
             .ToListAsync();
 
@@ -502,6 +507,7 @@ public class LibraryController : ControllerBase
     {
         var item = await _context.LibraryItems
             .Include(d => d.Project)
+            .Include(d => d.LinkContent)
             .FirstOrDefaultAsync(d => d.Id == id);
 
         if (item == null)
@@ -876,6 +882,65 @@ public class LibraryController : ControllerBase
         }
 
         return File(item.FileContent.Data, item.FileContent.ContentType, item.FileContent.FileName);
+    }
+
+    #endregion
+
+    #region Links (тип-специфичное создание)
+
+    [HttpPost("links")]
+    [EndpointName("CreateLink")]
+    public async Task<ActionResult<LibraryItemResponse>> CreateLink(CreateLinkRequest request)
+    {
+        var project = await _context.Projects.FindAsync(request.ProjectId);
+        if (project == null)
+        {
+            return BadRequest(new { message = "Project not found" });
+        }
+
+        var result = await _authorizationService.AuthorizeAsync(User, project, Policies.ProjectManage);
+        if (!result.Succeeded)
+        {
+            return Forbid();
+        }
+
+        if (request.FolderId.HasValue)
+        {
+            var folder = await _context.LibraryFolders.FindAsync(request.FolderId.Value);
+            if (folder == null || folder.ProjectId != request.ProjectId)
+            {
+                return BadRequest(new { message = "Folder not found or doesn't belong to this project" });
+            }
+        }
+
+        var url = (request.Url ?? string.Empty).Trim();
+        if (url.Length == 0)
+        {
+            return BadRequest(new { message = "URL is required" });
+        }
+        if (url.Length > 2000)
+        {
+            return BadRequest(new { message = "URL is too long" });
+        }
+
+        var userId = GetCurrentUserId();
+
+        var item = new LibraryItem
+        {
+            ProjectId = request.ProjectId,
+            FolderId = request.FolderId,
+            Type = LibraryItemType.Link,
+            Title = request.Title,
+            CreatedBy = userId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            LinkContent = new LinkContent { Url = url }
+        };
+
+        _context.LibraryItems.Add(item);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
 
     #endregion
