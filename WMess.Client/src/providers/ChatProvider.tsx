@@ -33,22 +33,45 @@ export function ChatProvider({ chatId, children }: ChatProviderProps) {
   const removePinned = useChatStore((s) => s.removePinned)
   const setTyping = useChatStore((s) => s.setTyping)
 
+  // Используем ref для функций, чтобы useEffect не перезапускался при их (маловероятном) изменении
+  const handlersRef = useRef({
+    addMessage,
+    updateMessage,
+    removeMessage,
+    applyReaction,
+    addPinned,
+    removePinned,
+    setTyping,
+  })
+
+  useEffect(() => {
+    handlersRef.current = {
+      addMessage,
+      updateMessage,
+      removeMessage,
+      applyReaction,
+      addPinned,
+      removePinned,
+      setTyping,
+    }
+  }, [addMessage, updateMessage, removeMessage, applyReaction, addPinned, removePinned, setTyping])
+
   useEffect(() => {
     const conn = new ChatSignalRConnection({
       onMessage: (msg) => {
-        if (msg.chatId != null) addMessage(Number(msg.chatId), msg)
+        if (msg.chatId != null) handlersRef.current.addMessage(Number(msg.chatId), msg)
       },
       onMessageUpdated: (msg) => {
-        if (msg.chatId != null) updateMessage(Number(msg.chatId), msg)
+        if (msg.chatId != null) handlersRef.current.updateMessage(Number(msg.chatId), msg)
       },
-      onMessageDeleted: (cId, messageId) => removeMessage(cId, messageId),
+      onMessageDeleted: (cId, messageId) => handlersRef.current.removeMessage(cId, messageId),
       onReaction: (cId, messageId, userId, emoji, added) =>
-        applyReaction(cId, messageId, userId, emoji, added),
-      onPinned: (cId, messageId) => addPinned(cId, messageId),
-      onUnpinned: (cId, messageId) => removePinned(cId, messageId),
+        handlersRef.current.applyReaction(cId, messageId, userId, emoji, added),
+      onPinned: (cId, messageId) => handlersRef.current.addPinned(cId, messageId),
+      onUnpinned: (cId, messageId) => handlersRef.current.removePinned(cId, messageId),
       onTyping: (cId, userId) => {
-        setTyping(cId, userId, true)
-        setTimeout(() => setTyping(cId, userId, false), 3000)
+        handlersRef.current.setTyping(cId, userId, true)
+        setTimeout(() => handlersRef.current.setTyping(cId, userId, false), 3000)
       },
       onStatus: setIsConnected,
     })
@@ -58,16 +81,7 @@ export function ChatProvider({ chatId, children }: ChatProviderProps) {
       conn.disconnect()
       connRef.current = null
     }
-  }, [
-    chatId,
-    addMessage,
-    updateMessage,
-    removeMessage,
-    applyReaction,
-    addPinned,
-    removePinned,
-    setTyping,
-  ])
+  }, [chatId]) // Теперь только chatId в зависимостях
 
   const sendTyping = useCallback(() => {
     void connRef.current?.sendTyping()

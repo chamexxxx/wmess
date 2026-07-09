@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { apiClient } from '../../api'
 import { ChatProvider, useChatConnection } from '../../providers/ChatProvider'
-import { useChatStore } from '../../store/chatStore'
+import { useChatStore, EMPTY_ARRAY } from '../../store/chatStore'
 import { sendMessageWithFiles, sendTextMessage, getCurrentUserId } from './chatApi'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -26,10 +26,10 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
     void getCurrentUserId().then(setUserId)
   }, [])
 
-  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? [])
+  const messages = useChatStore((s) => s.messagesByChat[chatId] ?? EMPTY_ARRAY)
   const canManage = useChatStore((s) => s.canManage)
-  const pinnedIds = useChatStore((s) => s.pinnedMessageIds[chatId] ?? [])
-  const typingUsers = useChatStore((s) => s.typingByChat[chatId] ?? [])
+  const pinnedIds = useChatStore((s) => s.pinnedMessageIds[chatId] ?? EMPTY_ARRAY)
+  const typingUsers = useChatStore((s) => s.typingByChat[chatId] ?? EMPTY_ARRAY)
   const replyTarget = useChatStore((s) => s.replyTarget)
   const quoteTarget = useChatStore((s) => s.quoteTarget)
   const threadRootId = useChatStore((s) => s.threadRootId)
@@ -62,7 +62,8 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
       setPinnedIds(chatId, ids)
       setPinnedMessages(pins.map((p) => p.message).filter(Boolean) as MessageResponse[])
     })
-  }, [chatId, loadMessages, setPinnedIds])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]) // Запускаем только при смене chatId
 
   const messageById = useMemo(() => {
     const map = new Map<number, MessageResponse>()

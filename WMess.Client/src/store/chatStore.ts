@@ -49,6 +49,8 @@ function upsertMessage(list: MessageResponse[], message: MessageResponse): Messa
   return next
 }
 
+export const EMPTY_ARRAY: any[] = []
+
 export const useChatStore = create<ChatState>((set) => ({
   chats: [],
   activeChatId: null,
