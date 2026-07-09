@@ -63,7 +63,7 @@ public class AuthController : ControllerBase
             ? await _userManager.FindByEmailAsync(identifier) ?? await _userManager.FindByNameAsync(identifier)
             : await _userManager.FindByNameAsync(identifier) ?? await _userManager.FindByEmailAsync(identifier);
 
-        if (user == null)
+        if (user == null || user.IsDeleted)
         {
             return Unauthorized();
         }
@@ -85,7 +85,7 @@ public class AuthController : ControllerBase
     {
         var user = await _tokenService.ValidateRefreshTokenAsync(request.RefreshToken);
 
-        if (user is null)
+        if (user is null || user.IsDeleted)
         {
             return Unauthorized();
         }

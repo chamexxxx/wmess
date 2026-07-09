@@ -1,34 +1,58 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { apiClient } from '../api'
 import { initials, colorFor } from '../workspace/theme'
 
 interface AvatarProps {
   userId: string | undefined
   name: string | undefined
   hasAvatar: boolean | undefined
-  // Меняется при обновлении аватарки — сбрасывает кэш <img>.
+  // Меняется при обновлении аватарки — форсирует перезагрузку.
   version?: number
   size?: number
   className?: string
 }
 
 /**
- * Аватар пользователя: показывает загруженную картинку (через /api/user/{id}/avatar),
- * а при её отсутствии или ошибке загрузки — цветную плитку с инициалами имени.
+ * Аватар пользователя: тянет картинку через axios (blob → object URL), чтобы работали
+ * авторизация и X-CSRF; при отсутствии/ошибке показывает цветную плитку с инициалами.
  */
 export function Avatar({ userId, name, hasAvatar, version = 0, size = 34, className = '' }: AvatarProps) {
-  // Запоминаем URL, который не загрузился, а не булев флаг: при смене userId/version
-  // src меняется и картинка снова пробует загрузиться — без эффекта-сброса.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const [url, setUrl] = useState<string | null>(null)
+  const urlRef = useRef<string | null>(null)
 
-  const src = userId ? `/api/user/${userId}/avatar?v=${version}` : null
-  const showImage = !!src && !!hasAvatar && failedSrc !== src
+  useEffect(() => {
+    if (!userId || !hasAvatar) return
+    let cancelled = false
+    apiClient
+      .fetchUserAvatar(userId)
+      .then((blob) => {
+        if (cancelled) return
+        const next = URL.createObjectURL(blob)
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+        urlRef.current = next
+        setUrl(next)
+      })
+      .catch(() => {
+        // 404/ошибка — остаёмся на инициалах.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [userId, hasAvatar, version])
 
-  if (showImage) {
+  // Освобождаем последний object URL при размонтировании.
+  useEffect(
+    () => () => {
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+    },
+    [],
+  )
+
+  if (hasAvatar && url) {
     return (
       <img
-        src={src}
+        src={url}
         alt={name ?? ''}
-        onError={() => setFailedSrc(src)}
         className={`rounded-full object-cover ${className}`}
         style={{ width: size, height: size }}
       />

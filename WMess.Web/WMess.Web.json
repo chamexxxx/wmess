@@ -2075,7 +2075,7 @@
         "tags": [
           "User"
         ],
-        "summary": "Редактирование профиля текущего пользователя: логин и отображаемое имя.",
+        "summary": "Редактирование профиля текущего пользователя: email, логин и отображаемое имя.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2116,6 +2116,23 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Мягкое удаление аккаунта текущего пользователя: помечаем удалённым и отзываем\r\nrefresh-токены. Запись и авторский контент (элементы библиотеки) сохраняются.",
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         },
         "security": [
@@ -2935,11 +2952,15 @@
       },
       "UpdateProfileRequest": {
         "required": [
+          "email",
           "login",
           "displayName"
         ],
         "type": "object",
         "properties": {
+          "email": {
+            "type": "string"
+          },
           "login": {
             "pattern": "^[a-zA-Z0-9_-]{3,32}$",
             "type": "string"

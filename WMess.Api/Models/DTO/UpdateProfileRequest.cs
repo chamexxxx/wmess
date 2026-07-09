@@ -4,6 +4,10 @@ namespace WMess.Api.Models.DTO;
 
 public class UpdateProfileRequest
 {
+    [Required(ErrorMessage = "Email is required")]
+    [EmailAddress(ErrorMessage = "Invalid email format")]
+    public string Email { get; set; } = string.Empty;
+
     [Required(ErrorMessage = "Login is required")]
     [RegularExpression("^[a-zA-Z0-9_-]{3,32}$", ErrorMessage = "Login must be 3-32 characters: letters, digits, '_' or '-'")]
     public string Login { get; set; } = string.Empty;

@@ -27,4 +27,15 @@ public class ApplicationUser : IdentityUser
     /// </summary>
     [MaxLength(100)]
     public string? AvatarContentType { get; set; }
+
+    /// <summary>
+    /// Мягкое удаление: пользователь помечен удалённым, но запись сохраняется (вместе с
+    /// авторством контента). Такой пользователь не может войти и скрыт из поиска.
+    /// </summary>
+    public bool IsDeleted { get; set; }
+
+    /// <summary>
+    /// Момент мягкого удаления (UTC), либо null для активного пользователя.
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
 }

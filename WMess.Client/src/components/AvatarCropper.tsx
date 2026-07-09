@@ -7,80 +7,120 @@ interface AvatarCropperProps {
   onConfirm: (blob: Blob) => void
 }
 
-const VIEW = 300 // размер квадратной области кадрирования (px)
+const MAX_VIEW = 400 // максимальная сторона отображаемой картинки (px)
 const OUTPUT = 256 // размер итоговой картинки (px)
+const MIN_SIZE = 48 // минимальный диаметр круга (px, в координатах отображения)
+
+type Corner = 'tl' | 'tr' | 'bl' | 'br'
+type DragMode = 'move' | Corner
 
 interface Loaded {
   img: HTMLImageElement
-  baseScale: number // масштаб, при котором картинка покрывает область (zoom = 1)
+  dw: number // отображаемая ширина
+  dh: number // отображаемая высота
 }
 
+interface Crop {
+  x: number
+  y: number
+  size: number // диаметр = сторона квадрата, в который вписан круг
+}
+
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+
 /**
- * Модальный кадрировщик аватарки: пользователь двигает и масштабирует картинку
- * внутри круга, затем результат вырезается в квадрат OUTPUT×OUTPUT и отдаётся как blob.
+ * Кадрировщик аватарки: картинка показывается целиком, поверх — круг выделения,
+ * который двигают и ресайзят за угловые маркеры. Итог вырезается в квадрат OUTPUT×OUTPUT.
  */
 export function AvatarCropper({ file, busy, onCancel, onConfirm }: AvatarCropperProps) {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
-  const [zoom, setZoom] = useState(1)
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const dragRef = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null)
+  const [crop, setCrop] = useState<Crop>({ x: 0, y: 0, size: 0 })
+  const areaRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ mode: DragMode; px: number; py: number; start: Crop; rect: DOMRect } | null>(null)
 
-  // Загрузка выбранного файла в объект Image (setState — в колбэке onload, не в теле эффекта).
+  // Загрузка файла через FileReader (data URL): без object URL — нет гонок и ошибок
+  // ERR_FILE_NOT_FOUND при повторном запуске эффекта в StrictMode.
   useEffect(() => {
-    const url = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      const baseScale = Math.max(VIEW / img.width, VIEW / img.height)
-      const dw = img.width * baseScale
-      const dh = img.height * baseScale
-      setLoaded({ img, baseScale })
-      setZoom(1)
-      setOffset({ x: (VIEW - dw) / 2, y: (VIEW - dh) / 2 }) // по центру
+    let cancelled = false
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (cancelled) return
+      const img = new Image()
+      img.onload = () => {
+        if (cancelled) return
+        const scale = Math.min(MAX_VIEW / img.width, MAX_VIEW / img.height)
+        const dw = img.width * scale
+        const dh = img.height * scale
+        const size = Math.min(dw, dh) // круг по умолчанию — во всю меньшую сторону
+        setLoaded({ img, dw, dh })
+        setCrop({ x: (dw - size) / 2, y: (dh - size) / 2, size })
+      }
+      img.src = reader.result as string
     }
-    img.src = url
-    return () => URL.revokeObjectURL(url)
+    reader.readAsDataURL(file)
+    return () => {
+      cancelled = true
+    }
   }, [file])
 
-  const scale = loaded ? loaded.baseScale * zoom : 1
-  const dw = loaded ? loaded.img.width * scale : 0
-  const dh = loaded ? loaded.img.height * scale : 0
-
-  // Ограничиваем смещение так, чтобы круг всегда был покрыт картинкой.
-  function clamp(x: number, y: number, w: number, h: number) {
-    return {
-      x: Math.min(0, Math.max(VIEW - w, x)),
-      y: Math.min(0, Math.max(VIEW - h, y)),
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!loaded || !areaRef.current) return
+    e.stopPropagation()
+    areaRef.current.setPointerCapture(e.pointerId)
+    dragRef.current = {
+      mode: e.currentTarget.dataset.mode as DragMode,
+      px: e.clientX,
+      py: e.clientY,
+      start: crop,
+      rect: areaRef.current.getBoundingClientRect(),
     }
-  }
-
-  function changeZoom(nextZoom: number) {
-    if (!loaded) return
-    const nextScale = loaded.baseScale * nextZoom
-    // Держим точку в центре круга на месте при зуме.
-    const cxImg = (VIEW / 2 - offset.x) / scale
-    const cyImg = (VIEW / 2 - offset.y) / scale
-    const nx = VIEW / 2 - cxImg * nextScale
-    const ny = VIEW / 2 - cyImg * nextScale
-    setZoom(nextZoom)
-    setOffset(clamp(nx, ny, loaded.img.width * nextScale, loaded.img.height * nextScale))
-  }
-
-  function onPointerDown(e: React.PointerEvent) {
-    if (!loaded) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = { px: e.clientX, py: e.clientY, ox: offset.x, oy: offset.y }
   }
 
   function onPointerMove(e: React.PointerEvent) {
     const d = dragRef.current
-    if (!d) return
-    setOffset(clamp(d.ox + (e.clientX - d.px), d.oy + (e.clientY - d.py), dw, dh))
+    if (!d || !loaded) return
+    const px = e.clientX - d.rect.left
+    const py = e.clientY - d.rect.top
+    const { dw, dh } = loaded
+    const s = d.start
+
+    if (d.mode === 'move') {
+      setCrop({
+        x: clamp(s.x + (e.clientX - d.px), 0, dw - s.size),
+        y: clamp(s.y + (e.clientY - d.py), 0, dh - s.size),
+        size: s.size,
+      })
+      return
+    }
+
+    // Ресайз: противоположный угол зафиксирован, круг остаётся квадратным.
+    if (d.mode === 'br') {
+      const ax = s.x
+      const ay = s.y
+      const size = clamp(Math.max(px - ax, py - ay), MIN_SIZE, Math.min(dw - ax, dh - ay))
+      setCrop({ x: ax, y: ay, size })
+    } else if (d.mode === 'tl') {
+      const ax = s.x + s.size
+      const ay = s.y + s.size
+      const size = clamp(Math.max(ax - px, ay - py), MIN_SIZE, Math.min(ax, ay))
+      setCrop({ x: ax - size, y: ay - size, size })
+    } else if (d.mode === 'tr') {
+      const ax = s.x
+      const ay = s.y + s.size
+      const size = clamp(Math.max(px - ax, ay - py), MIN_SIZE, Math.min(dw - ax, ay))
+      setCrop({ x: ax, y: ay - size, size })
+    } else if (d.mode === 'bl') {
+      const ax = s.x + s.size
+      const ay = s.y
+      const size = clamp(Math.max(ax - px, py - ay), MIN_SIZE, Math.min(ax, dh - ay))
+      setCrop({ x: ax - size, y: ay, size })
+    }
   }
 
   function onPointerUp(e: React.PointerEvent) {
     dragRef.current = null
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId)
+    if (areaRef.current?.hasPointerCapture(e.pointerId)) {
+      areaRef.current.releasePointerCapture(e.pointerId)
     }
   }
 
@@ -92,71 +132,77 @@ export function AvatarCropper({ file, busy, onCancel, onConfirm }: AvatarCropper
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Область круга в координатах исходной картинки.
-    const sSize = VIEW / scale
-    const sx = -offset.x / scale
-    const sy = -offset.y / scale
-    ctx.drawImage(loaded.img, sx, sy, sSize, sSize, 0, 0, OUTPUT, OUTPUT)
-
-    canvas.toBlob(
-      (blob) => {
-        if (blob) onConfirm(blob)
-      },
-      'image/jpeg',
-      0.9,
+    const toSource = loaded.img.width / loaded.dw // отображение → исходные пиксели
+    ctx.drawImage(
+      loaded.img,
+      crop.x * toSource,
+      crop.y * toSource,
+      crop.size * toSource,
+      crop.size * toSource,
+      0,
+      0,
+      OUTPUT,
+      OUTPUT,
     )
+
+    canvas.toBlob((blob) => blob && onConfirm(blob), 'image/jpeg', 0.9)
   }
 
+  const handle =
+    'absolute w-3.5 h-3.5 rounded-full bg-white border-2 border-accent shadow-[0_1px_3px_rgba(0,0,0,.4)]'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 font-ui">
-      <div className="bg-white border border-line rounded-2xl shadow-[0_24px_60px_rgba(43,42,38,.2)] p-6 animate-[wmPop_.14s_ease]">
-        <h2 className="text-[17px] font-extrabold tracking-[-.3px] text-ink mb-4 text-center">
-          Кадрирование
-        </h2>
-
-        <div
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          className="relative overflow-hidden rounded-lg bg-[#1c1b19] cursor-grab active:cursor-grabbing select-none touch-none"
-          style={{ width: VIEW, height: VIEW }}
-        >
-          {loaded && (
-            <img
-              src={loaded.img.src}
-              alt=""
-              draggable={false}
-              className="absolute max-w-none pointer-events-none"
-              style={{ left: offset.x, top: offset.y, width: dw, height: dh }}
-            />
-          )}
-          {/* Затемнение вне круга + белое кольцо. */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 font-ui">
+      <div className="bg-[#201f1c] rounded-2xl shadow-[0_24px_70px_rgba(0,0,0,.55)] p-4 flex flex-col gap-4">
+        {loaded && (
           <div
-            className="absolute inset-0 pointer-events-none rounded-full"
-            style={{ boxShadow: '0 0 0 2000px rgba(0,0,0,.5)', outline: '2px solid rgba(255,255,255,.85)' }}
-          />
-        </div>
+            ref={areaRef}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            className="relative select-none touch-none"
+            style={{ width: loaded.dw, height: loaded.dh }}
+          >
+            {/* Картинка + затемнение вне круга (клипуется по размеру картинки). */}
+            <div className="absolute inset-0 overflow-hidden rounded-xl">
+              <img
+                src={loaded.img.src}
+                alt=""
+                draggable={false}
+                className="absolute inset-0 w-full h-full pointer-events-none"
+              />
+              <div
+                className="absolute rounded-full pointer-events-none"
+                style={{
+                  left: crop.x,
+                  top: crop.y,
+                  width: crop.size,
+                  height: crop.size,
+                  boxShadow: '0 0 0 2000px rgba(0,0,0,.55)',
+                }}
+              />
+            </div>
 
-        <div className="flex items-center gap-3 mt-4">
-          <span className="text-[12px] text-faint">−</span>
-          <input
-            type="range"
-            min={1}
-            max={3}
-            step={0.01}
-            value={zoom}
-            onChange={(e) => changeZoom(Number(e.target.value))}
-            className="flex-1 accent-accent cursor-pointer"
-          />
-          <span className="text-[12px] text-faint">+</span>
-        </div>
+            {/* Круг выделения: перетаскивание + угловые маркеры для ресайза. */}
+            <div
+              data-mode="move"
+              onPointerDown={handlePointerDown}
+              className="absolute rounded-full border-2 border-white/90 cursor-move"
+              style={{ left: crop.x, top: crop.y, width: crop.size, height: crop.size }}
+            >
+              <div data-mode="tl" className={`${handle} -left-1.5 -top-1.5 cursor-nwse-resize`} onPointerDown={handlePointerDown} />
+              <div data-mode="tr" className={`${handle} -right-1.5 -top-1.5 cursor-nesw-resize`} onPointerDown={handlePointerDown} />
+              <div data-mode="bl" className={`${handle} -left-1.5 -bottom-1.5 cursor-nesw-resize`} onPointerDown={handlePointerDown} />
+              <div data-mode="br" className={`${handle} -right-1.5 -bottom-1.5 cursor-nwse-resize`} onPointerDown={handlePointerDown} />
+            </div>
+          </div>
+        )}
 
-        <div className="flex justify-end gap-2 mt-5">
+        <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="h-[38px] px-4 rounded-[10px] border border-line bg-panel text-sm font-medium text-ink cursor-pointer hover:bg-hovered disabled:opacity-50 disabled:cursor-default"
+            className="h-[38px] px-4 rounded-[10px] text-[13px] font-semibold text-white/80 cursor-pointer hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-default"
           >
             Отмена
           </button>
@@ -164,9 +210,9 @@ export function AvatarCropper({ file, busy, onCancel, onConfirm }: AvatarCropper
             type="button"
             onClick={handleConfirm}
             disabled={busy || !loaded}
-            className="h-[38px] px-5 rounded-[10px] bg-accent text-white font-semibold text-sm cursor-pointer hover:bg-accent-deep disabled:opacity-50 disabled:cursor-default"
+            className="h-[38px] px-5 rounded-[10px] bg-accent text-white font-semibold text-[13px] cursor-pointer hover:bg-accent-deep transition disabled:opacity-50 disabled:cursor-default"
           >
-            {busy ? 'Загрузка…' : 'Сохранить'}
+            {busy ? 'Загрузка…' : 'Готово'}
           </button>
         </div>
       </div>

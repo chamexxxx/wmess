@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using WMess.Api.Data;
 using WMess.Api.Infrastructure;
 using WMess.Api.Models;
 using WMess.Api.Models.DTO;
@@ -18,10 +19,12 @@ public class UserController : ControllerBase
     private const long MaxAvatarBytes = 2 * 1024 * 1024;
 
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ApplicationDbContext _context;
 
-    public UserController(UserManager<ApplicationUser> userManager)
+    public UserController(UserManager<ApplicationUser> userManager, ApplicationDbContext context)
     {
         _userManager = userManager;
+        _context = context;
     }
 
     [HttpGet("me")]
@@ -38,7 +41,7 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
-    /// Редактирование профиля текущего пользователя: логин и отображаемое имя.
+    /// Редактирование профиля текущего пользователя: email, логин и отображаемое имя.
     /// </summary>
     [HttpPut("me")]
     [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
@@ -51,6 +54,7 @@ public class UserController : ControllerBase
         }
 
         var login = request.Login.Trim();
+        var email = request.Email.Trim();
 
         // Логин уникален: если он изменился, проверяем, что не занят другим пользователем.
         if (!string.Equals(login, user.UserName, StringComparison.OrdinalIgnoreCase))
@@ -58,13 +62,29 @@ public class UserController : ControllerBase
             var existing = await _userManager.FindByNameAsync(login);
             if (existing != null && existing.Id != user.Id)
             {
-                return Conflict(new { message = "User with this login already exists" });
+                return Conflict(new { message = "User with this login already exists", code = "LoginTaken" });
             }
 
             var setName = await _userManager.SetUserNameAsync(user, login);
             if (!setName.Succeeded)
             {
                 return BadRequest(new { message = "Failed to update login", errors = setName.Errors.Select(e => e.Description) });
+            }
+        }
+
+        // Email тоже уникален (RequireUniqueEmail): проверяем занятость при изменении.
+        if (!string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var existingEmail = await _userManager.FindByEmailAsync(email);
+            if (existingEmail != null && existingEmail.Id != user.Id)
+            {
+                return Conflict(new { message = "User with this email already exists", code = "EmailTaken" });
+            }
+
+            var setEmail = await _userManager.SetEmailAsync(user, email);
+            if (!setEmail.Succeeded)
+            {
+                return BadRequest(new { message = "Failed to update email", errors = setEmail.Errors.Select(e => e.Description) });
             }
         }
 
@@ -148,6 +168,36 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
+    /// Мягкое удаление аккаунта текущего пользователя: помечаем удалённым и отзываем
+    /// refresh-токены. Запись и авторский контент (элементы библиотеки) сохраняются.
+    /// </summary>
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeleteAccount()
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null)
+        {
+            return Unauthorized();
+        }
+
+        user.IsDeleted = true;
+        user.DeletedAt = DateTime.UtcNow;
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            return BadRequest(new { message = "Failed to delete account", errors = result.Errors.Select(e => e.Description) });
+        }
+
+        // Отзываем активные refresh-токены, чтобы сессию нельзя было продлить после удаления.
+        await _context.RefreshTokens
+            .Where(rt => rt.UserId == user.Id && !rt.IsRevoked)
+            .ExecuteUpdateAsync(s => s.SetProperty(rt => rt.IsRevoked, true));
+
+        return Ok();
+    }
+
+    /// <summary>
     /// Смена пароля текущего пользователя (требует текущий пароль).
     /// </summary>
     [HttpPost("me/password")]
@@ -180,7 +230,7 @@ public class UserController : ControllerBase
     public async Task<IActionResult> GetAvatar(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user?.AvatarData == null || user.AvatarData.Length == 0)
+        if (user == null || user.IsDeleted || user.AvatarData == null || user.AvatarData.Length == 0)
         {
             return NotFound();
         }
@@ -203,7 +253,7 @@ public class UserController : ControllerBase
         var pattern = SearchPattern.Contains(email.Trim());
 
         var users = await _userManager.Users
-            .Where(u => u.Email != null && EF.Functions.ILike(u.Email, pattern, SearchPattern.EscapeChar))
+            .Where(u => !u.IsDeleted && u.Email != null && EF.Functions.ILike(u.Email, pattern, SearchPattern.EscapeChar))
             .OrderBy(u => u.Email)
             .Take(10)
             .Select(u => new UserResponse
@@ -219,15 +269,17 @@ public class UserController : ControllerBase
         return Ok(users);
     }
 
-    private Task<ApplicationUser?> GetCurrentUserAsync()
+    private async Task<ApplicationUser?> GetCurrentUserAsync()
     {
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (userId == null)
         {
-            return Task.FromResult<ApplicationUser?>(null);
+            return null;
         }
 
-        return _userManager.FindByIdAsync(userId);
+        var user = await _userManager.FindByIdAsync(userId);
+        // Мягко удалённый пользователь считается неаутентифицированным.
+        return user is { IsDeleted: false } ? user : null;
     }
 
     private static UserResponse ToResponse(ApplicationUser user) => new()

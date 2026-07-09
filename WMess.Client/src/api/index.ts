@@ -122,6 +122,15 @@ class WMessApiClient extends Bff {
     return res.data
   }
 
+  // Аватарка пользователя как Blob. Через axios (X-CSRF + куки), а не <img src>, иначе
+  // antiforgery-middleware BFF отклоняет запрос без заголовка X-CSRF (401).
+  async fetchUserAvatar(userId: string): Promise<Blob> {
+    const res = await this.user.instance.get(`/api/user/${userId}/avatar`, {
+      responseType: 'blob',
+    })
+    return res.data as Blob
+  }
+
   // Байты загруженного файла как Blob (для предпросмотра изображений через object URL).
   async fetchLibraryFile(id: number): Promise<Blob> {
     const res = await this.library.instance.get(`/api/library-items/${id}/download`, {
