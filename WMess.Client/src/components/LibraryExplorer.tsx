@@ -6,6 +6,8 @@ import type { ContextMenuItem } from './ContextMenu'
 import { BoardsIcon, DocsIcon, ExternalLinkIcon, FileIcon, FilterIcon, FolderIcon, HomeIcon, ImageIcon, LayersIcon, PencilIcon, SearchIcon, SortIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 import { ImagePreview, isImageFile } from './ImagePreview'
 import type { PreviewImage } from './ImagePreview'
+import { toast } from '../store/toastStore'
+import { describeError } from '../api/errorMessage'
 
 interface FolderItem {
   id: number
@@ -32,6 +34,8 @@ interface LibraryExplorerProps {
   folderId: number | null
   onNavigateFolder: (id: number | null) => void
   onOpenDocument: (id: number, title: string, type?: string) => void
+  // Realtime-сигнал: при изменении перезапрашиваем текущий вид (кто-то поменял библиотеку проекта).
+  refreshSignal?: number
 }
 
 // Подписи фильтра по типу (значение → текст на кнопке).
@@ -59,7 +63,7 @@ function formatDate(value?: string): string {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenDocument }: LibraryExplorerProps) {
+export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenDocument, refreshSignal = 0 }: LibraryExplorerProps) {
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [documents, setDocuments] = useState<DocItem[]>([])
   const [path, setPath] = useState<{ id: number; name: string }[]>([])
@@ -131,6 +135,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       await loadContents()
     } catch (error) {
       console.error('Failed to upload files:', error)
+      toast.error(describeError(error, 'Не удалось загрузить файлы'))
     } finally {
       setBusy(false)
     }
@@ -139,7 +144,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
   useEffect(() => {
     loadContents()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, folderId])
+  }, [projectId, folderId, refreshSignal])
 
   // Плоский режим: подгружаем все элементы и папки проекта, чтобы собрать поддерево текущей папки.
   useEffect(() => {
@@ -172,7 +177,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
     return () => {
       cancelled = true
     }
-  }, [flat, projectId])
+  }, [flat, projectId, refreshSignal])
 
   // Элементы поддерева текущей папки (сама папка + все вложенные). В корне (folderId=null) — весь проект.
   const flatItems = useMemo(() => {
@@ -229,6 +234,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       await loadContents()
     } catch (error) {
       console.error('Failed to create folder:', error)
+      toast.error(describeError(error, 'Не удалось создать папку'))
     } finally {
       setBusy(false)
     }
@@ -245,6 +251,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       }
     } catch (error) {
       console.error('Failed to create document:', error)
+      toast.error(describeError(error, 'Не удалось создать документ'))
     } finally {
       setBusy(false)
     }
@@ -261,6 +268,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       }
     } catch (error) {
       console.error('Failed to create board:', error)
+      toast.error(describeError(error, 'Не удалось создать доску'))
     } finally {
       setBusy(false)
     }
@@ -277,6 +285,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       }
     } catch (error) {
       console.error('Failed to create table:', error)
+      toast.error(describeError(error, 'Не удалось создать таблицу'))
     } finally {
       setBusy(false)
     }
@@ -291,6 +300,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       await loadContents()
     } catch (error) {
       console.error('Failed to create link:', error)
+      toast.error(describeError(error, 'Не удалось добавить ссылку'))
     } finally {
       setBusy(false)
     }
@@ -309,6 +319,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       await loadContents()
     } catch (error) {
       console.error('Failed to rename:', error)
+      toast.error(describeError(error, 'Не удалось переименовать'))
     } finally {
       setBusy(false)
     }
@@ -327,6 +338,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       await loadContents()
     } catch (error) {
       console.error('Failed to delete:', error)
+      toast.error(describeError(error, 'Не удалось удалить'))
     } finally {
       setBusy(false)
     }
@@ -348,6 +360,7 @@ export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenD
       await loadContents()
     } catch (error) {
       console.error('Failed to move:', error)
+      toast.error(describeError(error, 'Не удалось переместить'))
     }
   }
 

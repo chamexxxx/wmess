@@ -149,4 +149,5 @@ app.MapControllers();
 app.MapHub<WMess.Api.Hubs.DocumentHub>("/hubs/document");
 app.MapHub<WMess.Api.Hubs.BoardHub>("/hubs/board");
 app.MapHub<WMess.Api.Hubs.TableHub>("/hubs/table");
+app.MapHub<WMess.Api.Hubs.LibraryHub>("/hubs/library");
 app.Run();

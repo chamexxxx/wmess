@@ -6,6 +6,8 @@ import type { ContextMenuItem } from './ContextMenu'
 import { BoardsIcon, ChevronRightIcon, DocsIcon, ExternalLinkIcon, FileIcon, FolderIcon, ImageIcon, PencilIcon, SearchIcon, TablesIcon, TrashIcon } from '../workspace/icons'
 import { ImagePreview, isImageFile } from './ImagePreview'
 import type { PreviewImage } from './ImagePreview'
+import { toast } from '../store/toastStore'
+import { describeError } from '../api/errorMessage'
 
 interface Folder {
   id: number
@@ -109,6 +111,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to upload files:', error)
+      toast.error(describeError(error, 'Не удалось загрузить файлы'))
     } finally {
       setBusy(false)
     }
@@ -139,6 +142,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       await loadData()
     } catch (error) {
       console.error('Failed to create folder:', error)
+      toast.error(describeError(error, 'Не удалось создать папку'))
     } finally {
       setBusy(false)
     }
@@ -153,6 +157,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       await loadData()
     } catch (error) {
       console.error('Failed to rename folder:', error)
+      toast.error(describeError(error, 'Не удалось переименовать папку'))
     } finally {
       setBusy(false)
     }
@@ -174,6 +179,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to rename document:', error)
+      toast.error(describeError(error, 'Не удалось переименовать элемент'))
     } finally {
       setBusy(false)
     }
@@ -195,6 +201,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to create document:', error)
+      toast.error(describeError(error, 'Не удалось создать документ'))
     } finally {
       setBusy(false)
     }
@@ -216,6 +223,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to create board:', error)
+      toast.error(describeError(error, 'Не удалось создать доску'))
     } finally {
       setBusy(false)
     }
@@ -237,6 +245,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to create table:', error)
+      toast.error(describeError(error, 'Не удалось создать таблицу'))
     } finally {
       setBusy(false)
     }
@@ -255,6 +264,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to create link:', error)
+      toast.error(describeError(error, 'Не удалось добавить ссылку'))
     } finally {
       setBusy(false)
     }
@@ -274,6 +284,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       await loadData()
     } catch (error) {
       console.error('Failed to delete:', error)
+      toast.error(describeError(error, 'Не удалось удалить'))
     } finally {
       setBusy(false)
     }
@@ -315,6 +326,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to move folder:', error)
+      toast.error(describeError(error, 'Не удалось переместить папку'))
     }
   }
 
@@ -327,6 +339,7 @@ export function LibrarySidebar({ projectId, selectedId, onSelect, onDeleted, onT
       }
     } catch (error) {
       console.error('Failed to move document:', error)
+      toast.error(describeError(error, 'Не удалось переместить элемент'))
     }
   }
 

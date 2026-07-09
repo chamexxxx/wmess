@@ -5,6 +5,7 @@ import './fonts.css'
 import './index.css'
 import { router } from './router.tsx'
 import { AuthProvider } from './context/AuthContext.tsx'
+import { ToastHost } from './components/ToastHost.tsx'
 
 // Путь для динамически подгружаемых шрифтов Excalidraw — задаём глобально (до рендера),
 // чтобы он действовал для доски в любом месте приложения, а не только на тестовой странице.
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <RouterProvider router={router} />
+      <ToastHost />
     </AuthProvider>
   </StrictMode>,
 )

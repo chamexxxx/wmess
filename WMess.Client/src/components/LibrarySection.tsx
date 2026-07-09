@@ -8,7 +8,10 @@ import { BoardEditor } from './BoardEditor'
 import { TableEditor } from './TableEditor'
 import { LibrarySidebar } from './LibrarySidebar'
 import { LibraryExplorer } from './LibraryExplorer'
+import { useLibraryLive } from '../providers/useLibraryLive'
 import { apiClient } from '../api'
+import { toast } from '../store/toastStore'
+import { describeError } from '../api/errorMessage'
 import { ArrowLeftIcon, PencilIcon } from '../workspace/icons'
 
 interface SelectedDoc {
@@ -94,6 +97,7 @@ function DocumentWorkspace({
       onTitleUpdate(newTitle)
     } catch (error) {
       console.error('Failed to update title:', error)
+      toast.error(describeError(error, 'Не удалось переименовать'))
     } finally {
       setSaving(false)
     }
@@ -201,6 +205,7 @@ function BoardWorkspace({
       onTitleUpdate(newTitle)
     } catch (error) {
       console.error('Failed to update title:', error)
+      toast.error(describeError(error, 'Не удалось переименовать'))
     } finally {
       setSaving(false)
     }
@@ -331,6 +336,7 @@ function TableWorkspace({
       onTitleUpdate(newTitle)
     } catch (error) {
       console.error('Failed to update title:', error)
+      toast.error(describeError(error, 'Не удалось переименовать'))
     } finally {
       setSaving(false)
     }
@@ -429,6 +435,8 @@ export function LibrarySection({ projectId }: { projectId: number }) {
 
   const [openDoc, setOpenDoc] = useState<SelectedDoc | null>(null)
   const [docsRefresh, setDocsRefresh] = useState(0)
+  // Realtime-сигнал: увеличивается, когда кто-то (или мы сами) меняет структуру библиотеки проекта.
+  const liveSignal = useLibraryLive(projectId)
   const [sidebarWidth, setSidebarWidth] = useState(256)
   const [sidebarHidden, setSidebarHidden] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
@@ -590,7 +598,7 @@ export function LibrarySection({ projectId }: { projectId: number }) {
             onTitleUpdated={(id, title) => {
               if (id === doc.id) setOpenDoc((prev) => (prev ? { ...prev, title } : { id, title }))
             }}
-            refreshSignal={docsRefresh}
+            refreshSignal={docsRefresh + liveSignal}
             onToggleVisibility={() => setSidebarHidden(true)}
           />
         )}
@@ -621,6 +629,7 @@ export function LibrarySection({ projectId }: { projectId: number }) {
       folderId={folderId}
       onNavigateFolder={navigateFolder}
       onOpenDocument={openDocument}
+      refreshSignal={liveSignal}
     />
   )
 }

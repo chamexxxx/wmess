@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using WMess.Api.Authorization;
 using WMess.Api.Data;
+using WMess.Api.Hubs;
 using WMess.Api.Infrastructure;
 using WMess.Api.Models;
 using WMess.Api.Models.DTO.Library;
@@ -19,21 +21,42 @@ public class LibraryController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
     private readonly ILibraryAccessService _libraryAccess;
+    private readonly IHubContext<LibraryHub> _libraryHub;
 
     public LibraryController(
         ApplicationDbContext context,
         IAuthorizationService authorizationService,
-        ILibraryAccessService libraryAccess)
+        ILibraryAccessService libraryAccess,
+        IHubContext<LibraryHub> libraryHub)
     {
         _context = context;
         _authorizationService = authorizationService;
         _libraryAccess = libraryAccess;
+        _libraryHub = libraryHub;
     }
 
     private string GetCurrentUserId()
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new UnauthorizedAccessException("User ID not found in token");
+    }
+
+    /// <summary>
+    /// Уведомляет участников проекта, что структура библиотеки изменилась — по этому сигналу
+    /// клиенты перезапрашивают текущий вид. Рассылка не должна влиять на результат мутации,
+    /// поэтому ошибки хаба проглатываются.
+    /// </summary>
+    private async Task NotifyLibraryChangedAsync(int projectId)
+    {
+        try
+        {
+            await _libraryHub.Clients.Group(LibraryHub.ProjectGroup(projectId))
+                .SendAsync("LibraryChanged", projectId);
+        }
+        catch
+        {
+            // Realtime — best-effort; недоставленное событие компенсируется перезапросом на реконнекте.
+        }
     }
 
     private static string TypeName(LibraryItemType type) => type switch
@@ -159,6 +182,7 @@ public class LibraryController : ControllerBase
 
         _context.LibraryFolders.Add(folder);
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(folder.ProjectId);
 
         var response = new FolderResponse
         {
@@ -198,6 +222,7 @@ public class LibraryController : ControllerBase
         folder.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(folder.ProjectId);
 
         return NoContent();
     }
@@ -251,6 +276,7 @@ public class LibraryController : ControllerBase
         folder.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(folder.ProjectId);
 
         return NoContent();
     }
@@ -308,6 +334,7 @@ public class LibraryController : ControllerBase
         _context.LibraryFolders.RemoveRange(folders);
 
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(folder.ProjectId);
 
         return NoContent();
     }
@@ -548,6 +575,7 @@ public class LibraryController : ControllerBase
         item.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(item.ProjectId);
 
         return NoContent();
     }
@@ -584,6 +612,7 @@ public class LibraryController : ControllerBase
         item.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(item.ProjectId);
 
         return NoContent();
     }
@@ -609,6 +638,7 @@ public class LibraryController : ControllerBase
 
         _context.LibraryItems.Remove(item);
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(item.ProjectId);
 
         return NoContent();
     }
@@ -659,6 +689,7 @@ public class LibraryController : ControllerBase
 
         _context.LibraryItems.Add(item);
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(item.ProjectId);
 
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
@@ -708,6 +739,7 @@ public class LibraryController : ControllerBase
 
         _context.LibraryItems.Add(item);
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(item.ProjectId);
 
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
@@ -757,6 +789,7 @@ public class LibraryController : ControllerBase
 
         _context.LibraryItems.Add(item);
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(item.ProjectId);
 
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
@@ -856,6 +889,7 @@ public class LibraryController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(projectId);
 
         return Ok(created.Select(ToItemResponse));
     }
@@ -939,6 +973,7 @@ public class LibraryController : ControllerBase
 
         _context.LibraryItems.Add(item);
         await _context.SaveChangesAsync();
+        await NotifyLibraryChangedAsync(item.ProjectId);
 
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, ToItemResponse(item));
     }
