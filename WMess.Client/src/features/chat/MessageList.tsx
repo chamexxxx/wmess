@@ -87,7 +87,8 @@ export function MessageList({
           currentUserId={currentUserId}
           canManage={canManage}
           isPinned={pinnedIds.includes(msgId)}
-          onReply={(flat) => onReply(m, flat)}
+          threadReplyCount={threadReplyCounts[msgId] ?? 0}
+          onReply={() => onReply(m)}
           onQuote={() => onQuote(m)}
           onOpenThread={() => onOpenThread(m)}
           onReaction={(emoji) => onReaction(msgId, emoji)}
@@ -117,11 +118,6 @@ export function MessageList({
         </div>
       )}
       {renderMessages()}
-      <div ref={bottomRef} />
-    </div>
-  )
-
-      })}
       <div ref={bottomRef} />
     </div>
   )
