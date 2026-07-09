@@ -7,7 +7,14 @@ import { UserAvatar } from './UserAvatar'
 
 function formatTime(iso?: string) {
   if (!iso) return ''
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  const date = new Date(iso)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+
+  const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return timeStr
+
+  return `${date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} ${timeStr}`
 }
 
 function hasAudioAttachment(message: MessageResponse): boolean {
