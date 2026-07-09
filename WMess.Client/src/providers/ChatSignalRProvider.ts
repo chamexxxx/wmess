@@ -4,8 +4,8 @@ import {
   HubConnectionState,
   HttpTransportType,
 } from '@microsoft/signalr'
-import { MessagePackHubProtocol } from '@microsoft/signalr-protocol-msgpack'
 import type { MessageResponse } from '../api/generated/data-contracts'
+import { normalizeMessageResponse } from '../features/chat/signalrUtils'
 
 export type ChatHubEvents = {
   onMessage: (message: MessageResponse) => void
@@ -29,12 +29,16 @@ export class ChatSignalRConnection {
       .withUrl('/hubs/chat', {
         transport: HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents,
       })
-      .withHubProtocol(new MessagePackHubProtocol())
       .withAutomaticReconnect()
       .build()
 
-    this.connection.on('ReceiveMessage', (msg: MessageResponse) => this.events.onMessage(msg))
-    this.connection.on('MessageUpdated', (msg: MessageResponse) => this.events.onMessageUpdated(msg))
+    const onMsg = (raw: MessageResponse) =>
+      this.events.onMessage(normalizeMessageResponse(raw as unknown as Record<string, unknown>))
+
+    this.connection.on('ReceiveMessage', onMsg)
+    this.connection.on('MessageUpdated', (raw: MessageResponse) =>
+      this.events.onMessageUpdated(normalizeMessageResponse(raw as unknown as Record<string, unknown>)),
+    )
     this.connection.on('MessageDeleted', (chatId: number, messageId: number) =>
       this.events.onMessageDeleted(chatId, messageId),
     )

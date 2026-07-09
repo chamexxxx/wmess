@@ -59,10 +59,12 @@ export function ChatProvider({ chatId, children }: ChatProviderProps) {
   useEffect(() => {
     const conn = new ChatSignalRConnection({
       onMessage: (msg) => {
-        if (msg.chatId != null) handlersRef.current.addMessage(Number(msg.chatId), msg)
+        const cId = msg.chatId != null ? Number(msg.chatId) : chatId
+        handlersRef.current.addMessage(cId, msg)
       },
       onMessageUpdated: (msg) => {
-        if (msg.chatId != null) handlersRef.current.updateMessage(Number(msg.chatId), msg)
+        const cId = msg.chatId != null ? Number(msg.chatId) : chatId
+        handlersRef.current.updateMessage(cId, msg)
       },
       onMessageDeleted: (cId, messageId) => handlersRef.current.removeMessage(cId, messageId),
       onReaction: (cId, messageId, userId, emoji, added) =>
