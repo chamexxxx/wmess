@@ -8,6 +8,7 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { PinnedPanel } from './PinnedPanel'
 import { ThreadPanel } from './ThreadPanel'
+import { isThreadMessage, type ChatMessage } from './types'
 import type { MessageResponse } from '../../api/generated/data-contracts'
 
 interface Props {
@@ -33,13 +34,11 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
   const replyTarget = useChatStore((s) => s.replyTarget)
   const quoteTarget = useChatStore((s) => s.quoteTarget)
   const threadRootId = useChatStore((s) => s.threadRootId)
-  const setMessages = useChatStore((s) => s.setMessages)
-  const prependMessages = useChatStore((s) => s.prependMessages)
-  const addMessage = useChatStore((s) => s.addMessage)
-  const setPinnedIds = useChatStore((s) => s.setPinnedIds)
+
   const setReplyTarget = useChatStore((s) => s.setReplyTarget)
   const setQuoteTarget = useChatStore((s) => s.setQuoteTarget)
   const setThreadRootId = useChatStore((s) => s.setThreadRootId)
+
 
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -49,9 +48,9 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
   const loadMessages = useCallback(async () => {
     const res = await apiClient.chats.getMessages(chatId, { limit: 50 })
     const data = res.data ?? []
-    setMessages(chatId, data)
+    useChatStore.getState().setMessages(chatId, data)
     setHasMore(data.length >= 50)
-  }, [chatId, setMessages])
+  }, [chatId])
 
   useEffect(() => {
     void loadMessages()
@@ -59,23 +58,22 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
     void apiClient.chats.getPinnedMessages(chatId).then((res) => {
       const pins = res.data ?? []
       const ids = pins.map((p) => Number(p.messageId))
-      setPinnedIds(chatId, ids)
+      useChatStore.getState().setPinnedIds(chatId, ids)
       setPinnedMessages(pins.map((p) => p.message).filter(Boolean) as MessageResponse[])
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatId]) // Запускаем только при смене chatId
+  }, [chatId, loadMessages])
 
   const messageById = useMemo(() => {
     const map = new Map<number, MessageResponse>()
-    for (const m of messages) map.set(Number(m.id), m)
+    for (const m of mainMessages) map.set(Number(m.id), m)
     return map
-  }, [messages])
+  }, [mainMessages])
 
   const handleLoadMore = async () => {
-    if (!messages.length) return
+    if (!mainMessages.length) return
     setLoadingMore(true)
     try {
-      const before = Number(messages[0].id)
+      const before = Number(mainMessages[0].id)
       const res = await apiClient.chats.getMessages(chatId, { before, limit: 50 })
       const data = res.data ?? []
       prependMessages(chatId, data)
@@ -111,7 +109,18 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
       await apiClient.chats.updateWaveform(chatId, Number(msg.id), { waveformData: voiceWaveform })
     }
 
-    addMessage(chatId, msg)
+    useChatStore.getState().addMessage(chatId, msg)
+  }
+
+
+    if (voiceWaveform && msg.id != null) {
+      await apiClient.chats.updateWaveform(chatId, Number(msg.id), { waveformData: voiceWaveform })
+    }
+
+    addMessage(chatId, msg as ChatMessage)
+    if (mode === 'Thread' && parentId != null) {
+      setThreadRootId(parentId)
+    }
   }
 
   const handleReaction = async (messageId: number, emoji: string) => {
@@ -183,7 +192,7 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
         )}
 
         <MessageList
-          messages={messages}
+          messages={mainMessages}
           currentUserId={userId}
           canManage={canManage}
           pinnedIds={pinnedIds}
@@ -191,9 +200,10 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
           loadingMore={loadingMore}
           hasMore={hasMore}
           onLoadMore={() => void handleLoadMore()}
-          onReply={(m, flat) =>
+          onReply={(m, flat) => {
             setReplyTarget({ message: m, mode: flat ? 'Flat' : 'Thread' })
-          }
+            if (!flat) setThreadRootId(Number(m.id))
+          }}
           onQuote={setQuoteTarget}
           onOpenThread={(m) => setThreadRootId(Number(m.id))}
           onReaction={(id, emoji) => void handleReaction(id, emoji)}

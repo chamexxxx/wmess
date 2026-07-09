@@ -1,7 +1,8 @@
 import type { AttachmentResponse, MessageResponse, ReactionResponse } from '../../api/generated/data-contracts'
+import type { ChatMessage } from './types'
 
 /** MessagePack отдаёт PascalCase; REST/JSON — camelCase. Нормализуем для store. */
-export function normalizeMessageResponse(raw: Record<string, unknown>): MessageResponse {
+export function normalizeMessageResponse(raw: Record<string, unknown>): ChatMessage {
   const attachments = (raw.attachments ?? raw.Attachments ?? []) as Record<string, unknown>[]
   const reactions = (raw.reactions ?? raw.Reactions ?? []) as Record<string, unknown>[]
 
@@ -12,6 +13,7 @@ export function normalizeMessageResponse(raw: Record<string, unknown>): MessageR
     authorEmail: (raw.authorEmail ?? raw.AuthorEmail) as string | null | undefined,
     content: (raw.content ?? raw.Content) as string | null | undefined,
     parentMessageId: (raw.parentMessageId ?? raw.ParentMessageId) as MessageResponse['parentMessageId'],
+    replyMode: (raw.replyMode ?? raw.ReplyMode) as ChatMessage['replyMode'],
     createdAt: (raw.createdAt ?? raw.CreatedAt) as string,
     editedAt: (raw.editedAt ?? raw.EditedAt) as string | null | undefined,
     transcription: (raw.transcription ?? raw.Transcription) as string | null | undefined,

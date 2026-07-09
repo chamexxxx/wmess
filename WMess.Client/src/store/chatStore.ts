@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ChatResponse, MessageResponse } from '../api/generated/data-contracts'
 import type { ReplyMode } from '../features/chat/chatApi'
+import { isThreadMessage, threadRootId, type ChatMessage } from '../features/chat/types'
 
 export interface ReplyTarget {
   message: MessageResponse
@@ -12,6 +13,7 @@ interface ChatState {
   activeChatId: number | null
   canManage: boolean
   messagesByChat: Record<number, MessageResponse[]>
+  threadMessagesByRoot: Record<number, MessageResponse[]>
   pinnedMessageIds: Record<number, number[]>
   typingByChat: Record<number, string[]>
   replyTarget: ReplyTarget | null
@@ -20,8 +22,10 @@ interface ChatState {
   setChats: (chats: ChatResponse[]) => void
   setActiveChat: (chatId: number | null, canManage?: boolean) => void
   setMessages: (chatId: number, messages: MessageResponse[]) => void
+  setThreadMessages: (rootId: number, messages: MessageResponse[]) => void
   prependMessages: (chatId: number, messages: MessageResponse[]) => void
   addMessage: (chatId: number, message: MessageResponse) => void
+  addThreadMessage: (rootId: number, message: MessageResponse) => void
   updateMessage: (chatId: number, message: MessageResponse) => void
   removeMessage: (chatId: number, messageId: number) => void
   setPinnedIds: (chatId: number, ids: number[]) => void
@@ -56,6 +60,7 @@ export const useChatStore = create<ChatState>((set) => ({
   activeChatId: null,
   canManage: false,
   messagesByChat: {},
+  threadMessagesByRoot: {},
   pinnedMessageIds: {},
   typingByChat: {},
   replyTarget: null,
@@ -70,6 +75,9 @@ export const useChatStore = create<ChatState>((set) => ({
   setMessages: (chatId, messages) =>
     set((s) => ({ messagesByChat: { ...s.messagesByChat, [chatId]: messages } })),
 
+  setThreadMessages: (rootId, messages) =>
+    set((s) => ({ threadMessagesByRoot: { ...s.threadMessagesByRoot, [rootId]: messages } })),
+
   prependMessages: (chatId, messages) =>
     set((s) => ({
       messagesByChat: {
@@ -79,10 +87,31 @@ export const useChatStore = create<ChatState>((set) => ({
     })),
 
   addMessage: (chatId, message) =>
+    set((s) => {
+      const msg = message as ChatMessage
+      if (isThreadMessage(msg)) {
+        const rootId = threadRootId(msg)
+        if (rootId == null) return s
+        return {
+          threadMessagesByRoot: {
+            ...s.threadMessagesByRoot,
+            [rootId]: upsertMessage(s.threadMessagesByRoot[rootId] ?? [], message),
+          },
+        }
+      }
+      return {
+        messagesByChat: {
+          ...s.messagesByChat,
+          [chatId]: upsertMessage(s.messagesByChat[chatId] ?? [], message),
+        },
+      }
+    }),
+
+  addThreadMessage: (rootId, message) =>
     set((s) => ({
-      messagesByChat: {
-        ...s.messagesByChat,
-        [chatId]: upsertMessage(s.messagesByChat[chatId] ?? [], message),
+      threadMessagesByRoot: {
+        ...s.threadMessagesByRoot,
+        [rootId]: upsertMessage(s.threadMessagesByRoot[rootId] ?? [], message),
       },
     })),
 

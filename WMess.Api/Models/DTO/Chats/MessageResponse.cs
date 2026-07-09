@@ -1,5 +1,7 @@
 namespace WMess.Api.Models.DTO.Chats;
 
+using WMess.Api.Enums;
+
 public class MessageResponse
 {
     public int Id { get; set; }
@@ -8,6 +10,7 @@ public class MessageResponse
     public string? AuthorEmail { get; set; }
     public string? Content { get; set; }
     public int? ParentMessageId { get; set; }
+    public ReplyMode? ReplyMode { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? EditedAt { get; set; }
     public string? Transcription { get; set; }

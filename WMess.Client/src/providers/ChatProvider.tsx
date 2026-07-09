@@ -25,55 +25,22 @@ export function ChatProvider({ chatId, children }: ChatProviderProps) {
   const [isConnected, setIsConnected] = useState(false)
   const connRef = useRef<ChatSignalRConnection | null>(null)
 
-  const addMessage = useChatStore((s) => s.addMessage)
-  const updateMessage = useChatStore((s) => s.updateMessage)
-  const removeMessage = useChatStore((s) => s.removeMessage)
-  const applyReaction = useChatStore((s) => s.applyReaction)
-  const addPinned = useChatStore((s) => s.addPinned)
-  const removePinned = useChatStore((s) => s.removePinned)
-  const setTyping = useChatStore((s) => s.setTyping)
-
-  // Используем ref для функций, чтобы useEffect не перезапускался при их (маловероятном) изменении
-  const handlersRef = useRef({
-    addMessage,
-    updateMessage,
-    removeMessage,
-    applyReaction,
-    addPinned,
-    removePinned,
-    setTyping,
-  })
-
-  useEffect(() => {
-    handlersRef.current = {
-      addMessage,
-      updateMessage,
-      removeMessage,
-      applyReaction,
-      addPinned,
-      removePinned,
-      setTyping,
-    }
-  }, [addMessage, updateMessage, removeMessage, applyReaction, addPinned, removePinned, setTyping])
-
   useEffect(() => {
     const conn = new ChatSignalRConnection({
       onMessage: (msg) => {
-        const cId = msg.chatId != null ? Number(msg.chatId) : chatId
-        handlersRef.current.addMessage(cId, msg)
+        if (msg.chatId != null) useChatStore.getState().addMessage(Number(msg.chatId), msg)
       },
       onMessageUpdated: (msg) => {
-        const cId = msg.chatId != null ? Number(msg.chatId) : chatId
-        handlersRef.current.updateMessage(cId, msg)
+        if (msg.chatId != null) useChatStore.getState().updateMessage(Number(msg.chatId), msg)
       },
-      onMessageDeleted: (cId, messageId) => handlersRef.current.removeMessage(cId, messageId),
+      onMessageDeleted: (cId, messageId) => useChatStore.getState().removeMessage(cId, messageId),
       onReaction: (cId, messageId, userId, emoji, added) =>
-        handlersRef.current.applyReaction(cId, messageId, userId, emoji, added),
-      onPinned: (cId, messageId) => handlersRef.current.addPinned(cId, messageId),
-      onUnpinned: (cId, messageId) => handlersRef.current.removePinned(cId, messageId),
+        useChatStore.getState().applyReaction(cId, messageId, userId, emoji, added),
+      onPinned: (cId, messageId) => useChatStore.getState().addPinned(cId, messageId),
+      onUnpinned: (cId, messageId) => useChatStore.getState().removePinned(cId, messageId),
       onTyping: (cId, userId) => {
-        handlersRef.current.setTyping(cId, userId, true)
-        setTimeout(() => handlersRef.current.setTyping(cId, userId, false), 3000)
+        useChatStore.getState().setTyping(cId, userId, true)
+        setTimeout(() => useChatStore.getState().setTyping(cId, userId, false), 3000)
       },
       onStatus: setIsConnected,
     })
@@ -83,7 +50,8 @@ export function ChatProvider({ chatId, children }: ChatProviderProps) {
       conn.disconnect()
       connRef.current = null
     }
-  }, [chatId]) // Теперь только chatId в зависимостях
+  }, [chatId])
+
 
   const sendTyping = useCallback(() => {
     void connRef.current?.sendTyping()

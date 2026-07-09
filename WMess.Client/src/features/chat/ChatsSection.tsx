@@ -18,7 +18,6 @@ export function ChatsSection({ projectId, teamId }: Props) {
 
   const chats = useChatStore((s) => s.chats)
   const setChats = useChatStore((s) => s.setChats)
-  const setActiveChat = useChatStore((s) => s.setActiveChat)
 
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -40,13 +39,13 @@ export function ChatsSection({ projectId, teamId }: Props) {
 
   useEffect(() => {
     if (chatId == null) {
-      setActiveChat(null)
+      useChatStore.getState().setActiveChat(null)
       return
     }
     void apiClient.chats.getChat(chatId).then((res) => {
-      setActiveChat(chatId, res.data?.canManage ?? false)
+      useChatStore.getState().setActiveChat(chatId, res.data?.canManage ?? false)
     })
-  }, [chatId, setActiveChat])
+  }, [chatId])
 
   const handleCreate = async (name: string) => {
     setBusy(true)
