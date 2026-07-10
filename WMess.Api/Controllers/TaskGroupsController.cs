@@ -16,11 +16,16 @@ public class TaskGroupsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
+    private readonly ITasksChangeNotifier _tasksNotifier;
 
-    public TaskGroupsController(ApplicationDbContext context, IAuthorizationService authorizationService)
+    public TaskGroupsController(
+        ApplicationDbContext context,
+        IAuthorizationService authorizationService,
+        ITasksChangeNotifier tasksNotifier)
     {
         _context = context;
         _authorizationService = authorizationService;
+        _tasksNotifier = tasksNotifier;
     }
 
     [HttpGet]
@@ -66,6 +71,7 @@ public class TaskGroupsController : ControllerBase
 
         _context.TaskGroups.Add(group);
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
 
         return CreatedAtAction(nameof(GetGroups), new { teamId }, new TaskGroupResponse
         {
@@ -87,6 +93,7 @@ public class TaskGroupsController : ControllerBase
         group.Name = request.Name;
         group.Color = request.Color;
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 
@@ -113,6 +120,7 @@ public class TaskGroupsController : ControllerBase
 
         _context.TaskGroups.Remove(group);
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 
@@ -133,6 +141,7 @@ public class TaskGroupsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 

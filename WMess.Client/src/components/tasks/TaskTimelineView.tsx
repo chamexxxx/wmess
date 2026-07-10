@@ -462,7 +462,7 @@ export function TaskTimelineView({
           {segments.map((seg, segIdx) => (
             <div
               key={`preview-${task.id}-${segIdx}`}
-              className="absolute h-8 pointer-events-none z-10"
+              className="absolute h-8 pointer-events-none z-[2]"
               style={{ left: seg.left, width: seg.width, top, opacity, backgroundColor: color }}
             />
           ))}
@@ -478,7 +478,7 @@ export function TaskTimelineView({
             data-task-bar={task.id}
             role="button"
             tabIndex={0}
-            className={`absolute h-8 cursor-grab active:cursor-grabbing touch-none select-none shadow-sm z-10 transition-[filter] ${
+            className={`absolute h-8 cursor-grab active:cursor-grabbing touch-none select-none shadow-sm z-[1] transition-[filter] ${
               isHovered ? 'brightness-110' : ''
             }`}
             style={{ left: seg.left, width: seg.width, top, opacity, backgroundColor: color }}
@@ -665,7 +665,7 @@ export function TaskTimelineView({
                           style={{ height: ROW_HEIGHT }}
                         >
                           <div
-                            className="shrink-0 sticky left-0 z-10 flex items-center px-2 text-[11px] font-semibold text-muted bg-panel border-r border-line truncate"
+                            className="shrink-0 sticky left-0 z-20 flex items-center px-2 text-[11px] font-semibold text-muted bg-panel border-r border-line truncate"
                             style={{ width: LANE_LABEL_WIDTH }}
                             title={lane.label}
                           >

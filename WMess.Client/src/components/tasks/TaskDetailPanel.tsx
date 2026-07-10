@@ -25,21 +25,15 @@ import { TaskPriorityIcon } from './TaskPriorityIcon'
 
 
 interface TaskDetailPanelProps {
-
   taskId: string
-
+  initialTask?: TaskItem | null
   columns: TaskBoardColumn[]
-
   groups: TaskGroup[]
-
   members: TeamMemberResponse[]
-
+  refreshSignal?: number
   onClose: () => void
-
   onUpdated: (task: TaskItem) => void
-
   onDeleted: (taskId: string) => void
-
 }
 
 
@@ -68,11 +62,15 @@ export function TaskDetailPanel({
 
   taskId,
 
+  initialTask,
+
   columns,
 
   groups,
 
   members,
+
+  refreshSignal = 0,
 
   onClose,
 
@@ -117,10 +115,66 @@ export function TaskDetailPanel({
   const menuRef = useRef<HTMLDivElement>(null)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const skipSave = useRef(true)
-
   const loadSeq = useRef(0)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const isEditingRef = useRef(false)
+  const dirtyRef = useRef(false)
+  const pendingRemoteRef = useRef(false)
+  const lastRefreshSignal = useRef(refreshSignal)
+
+  const applyTaskData = (
+    t: TaskItem,
+    commentsData: { id: string; content: string; userEmail: string; createdAt: string }[],
+  ) => {
+    setTask(t)
+    setTitle(t.title)
+    setDescription(t.description ?? '')
+    setPriority(t.priority)
+    setColumnId(t.columnId)
+    setGroupId(t.groupId)
+    setEstimatedHours(t.estimatedHours)
+    setAssigned(t.assignedUserIds)
+    setComments(commentsData)
+    dirtyRef.current = false
+    skipSave.current = true
+  }
+
+  const syncRemote = async () => {
+    try {
+      const [taskRes, commentsRes] = await Promise.all([
+        tasksApi.get(taskId),
+        tasksApi.getComments(taskId),
+      ])
+      setComments(commentsRes.data)
+      if (!isEditingRef.current && !dirtyRef.current && !saveTimer.current) {
+        const t = taskRes.data
+        setTask(t)
+        setTitle(t.title)
+        setDescription(t.description ?? '')
+        setPriority(t.priority)
+        setColumnId(t.columnId)
+        setGroupId(t.groupId)
+        setEstimatedHours(t.estimatedHours)
+        setAssigned(t.assignedUserIds)
+        skipSave.current = true
+      }
+    } catch {
+      // Тихий refetch — ошибку не показываем, пользователь не прерывает редактирование.
+    }
+  }
+
+  const applyInitialTask = (t: TaskItem) => {
+    setTask(t)
+    setTitle(t.title)
+    setDescription(t.description ?? '')
+    setPriority(t.priority)
+    setColumnId(t.columnId)
+    setGroupId(t.groupId)
+    setEstimatedHours(t.estimatedHours)
+    setAssigned(t.assignedUserIds)
+    skipSave.current = true
+  }
 
 
 
@@ -184,13 +238,33 @@ export function TaskDetailPanel({
 
     skipSave.current = true
 
+    dirtyRef.current = false
+
+    pendingRemoteRef.current = false
+
+    isEditingRef.current = false
+
+    lastRefreshSignal.current = refreshSignal
+
     if (saveTimer.current) clearTimeout(saveTimer.current)
 
 
 
-    void (async () => {
+    if (initialTask) {
+
+      applyInitialTask(initialTask)
+
+      setLoading(false)
+
+    } else {
 
       setLoading(true)
+
+    }
+
+
+
+    void (async () => {
 
       try {
 
@@ -204,27 +278,7 @@ export function TaskDetailPanel({
 
         if (seq !== loadSeq.current) return
 
-        const t = taskRes.data
-
-        setTask(t)
-
-        setTitle(t.title)
-
-        setDescription(t.description ?? '')
-
-        setPriority(t.priority)
-
-        setColumnId(t.columnId)
-
-        setGroupId(t.groupId)
-
-        setEstimatedHours(t.estimatedHours)
-
-        setAssigned(t.assignedUserIds)
-
-        setComments(commentsRes.data)
-
-        skipSave.current = true
+        applyTaskData(taskRes.data, commentsRes.data)
 
       } finally {
 
@@ -234,7 +288,35 @@ export function TaskDetailPanel({
 
     })()
 
+
+
+    return () => {
+
+      loadSeq.current++
+
+    }
+
   }, [taskId])
+
+
+
+  useEffect(() => {
+
+    if (refreshSignal === lastRefreshSignal.current) return
+
+    lastRefreshSignal.current = refreshSignal
+
+    if (isEditingRef.current || dirtyRef.current || saveTimer.current) {
+
+      pendingRemoteRef.current = true
+
+      return
+
+    }
+
+    void syncRemote()
+
+  }, [refreshSignal, taskId])
 
 
 
@@ -253,6 +335,8 @@ export function TaskDetailPanel({
     const savingId = taskId
 
     saveTimer.current = setTimeout(() => {
+
+      saveTimer.current = null
 
       void (async () => {
 
@@ -278,7 +362,10 @@ export function TaskDetailPanel({
 
           })
 
-          if (savingId === taskId) onUpdated(res.data)
+          if (savingId === taskId) {
+            onUpdated(res.data)
+            dirtyRef.current = false
+          }
 
         } finally {
 
@@ -312,6 +399,8 @@ export function TaskDetailPanel({
 
   function addAssignee(userId: string) {
 
+    dirtyRef.current = true
+
     if (!assigned.includes(userId)) setAssigned((prev) => [...prev, userId])
 
     setAssigneeOpen(false)
@@ -321,6 +410,8 @@ export function TaskDetailPanel({
 
 
   function removeAssignee(userId: string) {
+
+    dirtyRef.current = true
 
     setAssigned((prev) => prev.filter((id) => id !== userId))
 
@@ -372,9 +463,33 @@ export function TaskDetailPanel({
 
       <div
 
+        ref={panelRef}
+
         className="fixed inset-y-0 right-0 w-[560px] max-w-full bg-white border-l border-line shadow-2xl z-50 flex flex-col font-ui"
 
         onMouseDown={(e) => e.stopPropagation()}
+
+        onFocusCapture={() => {
+
+          isEditingRef.current = true
+
+        }}
+
+        onBlurCapture={(e) => {
+
+          if (panelRef.current?.contains(e.relatedTarget as Node)) return
+
+          isEditingRef.current = false
+
+          if (pendingRemoteRef.current) {
+
+            pendingRemoteRef.current = false
+
+            void syncRemote()
+
+          }
+
+        }}
 
       >
 
@@ -390,7 +505,13 @@ export function TaskDetailPanel({
 
             value={title}
 
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+
+              dirtyRef.current = true
+
+              setTitle(e.target.value)
+
+            }}
 
             className="flex-1 min-w-0 text-lg font-bold border-0 bg-transparent px-0 py-0 focus:outline-none focus:ring-0 text-ink placeholder:text-faint"
 
@@ -484,7 +605,13 @@ export function TaskDetailPanel({
 
               value={description}
 
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+
+                dirtyRef.current = true
+
+                setDescription(e.target.value)
+
+              }}
 
               rows={5}
 
@@ -508,7 +635,13 @@ export function TaskDetailPanel({
 
                 value={columnId}
 
-                onChange={(e) => setColumnId(e.target.value)}
+                onChange={(e) => {
+
+                  dirtyRef.current = true
+
+                  setColumnId(e.target.value)
+
+                }}
 
                 className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
 
@@ -536,7 +669,13 @@ export function TaskDetailPanel({
 
                 value={groupId}
 
-                onChange={(e) => setGroupId(e.target.value)}
+                onChange={(e) => {
+
+                  dirtyRef.current = true
+
+                  setGroupId(e.target.value)
+
+                }}
 
                 className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
 
@@ -570,7 +709,13 @@ export function TaskDetailPanel({
 
                 value={priority}
 
-                onChange={(e) => setPriority(Number(e.target.value) as TaskItem['priority'])}
+                onChange={(e) => {
+
+                  dirtyRef.current = true
+
+                  setPriority(Number(e.target.value) as TaskItem['priority'])
+
+                }}
 
                 className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
 
@@ -610,7 +755,13 @@ export function TaskDetailPanel({
 
                 value={estimatedHours}
 
-                onChange={(e) => setEstimatedHours(Number(e.target.value))}
+                onChange={(e) => {
+
+                  dirtyRef.current = true
+
+                  setEstimatedHours(Number(e.target.value))
+
+                }}
 
                 className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
 

@@ -17,15 +17,18 @@ public class TeamScheduleController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
     private readonly IScheduleService _scheduleService;
+    private readonly ITasksChangeNotifier _tasksNotifier;
 
     public TeamScheduleController(
         ApplicationDbContext context,
         IAuthorizationService authorizationService,
-        IScheduleService scheduleService)
+        IScheduleService scheduleService,
+        ITasksChangeNotifier tasksNotifier)
     {
         _context = context;
         _authorizationService = authorizationService;
         _scheduleService = scheduleService;
+        _tasksNotifier = tasksNotifier;
     }
 
     [HttpGet("schedule-settings")]
@@ -67,6 +70,7 @@ public class TeamScheduleController : ControllerBase
         settings.WorkStartHour = Math.Clamp(request.WorkStartHour, 0, 23);
         settings.TimeZone = request.TimeZone;
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 
@@ -99,6 +103,7 @@ public class TeamScheduleController : ControllerBase
 
         _context.TeamHolidays.Add(holiday);
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
 
         return CreatedAtAction(nameof(GetHolidays), new { teamId }, new TeamHolidayResponse
         {
@@ -118,6 +123,7 @@ public class TeamScheduleController : ControllerBase
 
         _context.TeamHolidays.Remove(holiday);
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 
@@ -132,6 +138,7 @@ public class TeamScheduleController : ControllerBase
             request.AnchorLocalDate,
             request.ProjectId,
             request.GroupId);
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return Ok(new { updated });
     }
 

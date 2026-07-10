@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '../../api'
+import { useTasksLive } from '../../providers/useTasksLive'
 import {
   PRIORITY_LABELS,
   tasksApi,
@@ -29,6 +30,7 @@ interface TasksSectionProps {
 }
 
 export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSectionProps) {
+  const liveSignal = useTasksLive(teamId)
   const [view, setView] = useState<ViewMode>(() => (localStorage.getItem('wmess-tasks-view') as ViewMode) || 'kanban')
   const [scope, setScope] = useState<ScopeMode>('project')
   const [tasks, setTasks] = useState<TaskItem[]>([])
@@ -99,6 +101,11 @@ export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSect
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (liveSignal === 0) return
+    void load({ silent: true })
+  }, [liveSignal, load])
 
   useEffect(() => {
     localStorage.setItem('wmess-tasks-view', view)
@@ -249,9 +256,11 @@ export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSect
         <TaskDetailPanel
           key={selectedId}
           taskId={selectedId}
+          initialTask={tasks.find((t) => t.id === selectedId) ?? null}
           columns={columns}
           groups={groups}
           members={members}
+          refreshSignal={liveSignal}
           onClose={() => setSelectedId(null)}
           onUpdated={mergeTask}
           onDeleted={removeTask}

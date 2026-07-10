@@ -101,6 +101,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 // Register Library Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° СЌР»РµРјРµРЅС‚ Р±РёР±Р»РёРѕС‚РµРєРё)
 builder.Services.AddScoped<ILibraryAccessService, LibraryAccessService>();
 builder.Services.AddScoped<IScheduleService, ScheduleService>();
+builder.Services.AddScoped<ITasksChangeNotifier, TasksChangeNotifier>();
 
 // Register Chat Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° С‡Р°С‚)
 builder.Services.AddScoped<IChatAccessService, ChatAccessService>();
@@ -188,4 +189,5 @@ app.MapHub<WMess.Api.Hubs.BoardHub>("/hubs/board");
 app.MapHub<WMess.Api.Hubs.TableHub>("/hubs/table");
 app.MapHub<WMess.Api.Hubs.LibraryHub>("/hubs/library");
 app.MapHub<WMess.Api.Hubs.ChatHub>("/hubs/chat");
+app.MapHub<WMess.Api.Hubs.TasksHub>("/hubs/tasks");
 app.Run();

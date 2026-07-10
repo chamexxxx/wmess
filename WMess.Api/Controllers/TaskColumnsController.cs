@@ -16,11 +16,16 @@ public class TaskColumnsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
+    private readonly ITasksChangeNotifier _tasksNotifier;
 
-    public TaskColumnsController(ApplicationDbContext context, IAuthorizationService authorizationService)
+    public TaskColumnsController(
+        ApplicationDbContext context,
+        IAuthorizationService authorizationService,
+        ITasksChangeNotifier tasksNotifier)
     {
         _context = context;
         _authorizationService = authorizationService;
+        _tasksNotifier = tasksNotifier;
     }
 
     [HttpGet]
@@ -69,6 +74,7 @@ public class TaskColumnsController : ControllerBase
 
         _context.TaskBoardColumns.Add(column);
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
 
         return CreatedAtAction(nameof(GetColumns), new { teamId }, new TaskBoardColumnResponse
         {
@@ -92,6 +98,7 @@ public class TaskColumnsController : ControllerBase
         column.Color = request.Color;
         column.IsDoneColumn = request.IsDoneColumn;
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 
@@ -112,6 +119,7 @@ public class TaskColumnsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 
@@ -143,6 +151,7 @@ public class TaskColumnsController : ControllerBase
 
         _context.TaskBoardColumns.Remove(column);
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId);
         return NoContent();
     }
 

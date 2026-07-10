@@ -20,15 +20,18 @@ public class TasksController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ITasksChangeNotifier _tasksNotifier;
 
     public TasksController(
         ApplicationDbContext context,
         IAuthorizationService authorizationService,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        ITasksChangeNotifier tasksNotifier)
     {
         _context = context;
         _authorizationService = authorizationService;
         _userManager = userManager;
+        _tasksNotifier = tasksNotifier;
     }
 
     private string GetCurrentUserId() =>
@@ -156,6 +159,7 @@ public class TasksController : ControllerBase
 
         _context.Tasks.Add(task);
         await _context.SaveChangesAsync();
+        await _tasksNotifier.NotifyChangedAsync(teamId.Value);
 
         task = await LoadTaskAsync(task.Id);
         return CreatedAtAction(nameof(GetTask), new { id = task!.Id }, MapToResponse(task));
@@ -196,6 +200,8 @@ public class TasksController : ControllerBase
             .Select(uid => new TaskAssignment { TaskId = id, UserId = uid }).ToList();
 
         await _context.SaveChangesAsync();
+        if (task.TeamId.HasValue)
+            await _tasksNotifier.NotifyChangedAsync(task.TeamId.Value);
         return NoContent();
     }
 
@@ -246,6 +252,8 @@ public class TasksController : ControllerBase
 
         task.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+        if (task.TeamId.HasValue)
+            await _tasksNotifier.NotifyChangedAsync(task.TeamId.Value);
 
         task = await LoadTaskAsync(id);
         return Ok(MapToResponse(task!));
@@ -260,6 +268,8 @@ public class TasksController : ControllerBase
 
         _context.Tasks.Remove(task);
         await _context.SaveChangesAsync();
+        if (task.TeamId.HasValue)
+            await _tasksNotifier.NotifyChangedAsync(task.TeamId.Value);
         return NoContent();
     }
 
@@ -305,6 +315,8 @@ public class TasksController : ControllerBase
 
         _context.TaskComments.Add(comment);
         await _context.SaveChangesAsync();
+        if (task.TeamId.HasValue)
+            await _tasksNotifier.NotifyChangedAsync(task.TeamId.Value);
 
         var user = await _userManager.FindByIdAsync(comment.UserId);
         return CreatedAtAction(nameof(GetComments), new { id }, new TaskCommentResponse
@@ -320,12 +332,17 @@ public class TasksController : ControllerBase
     [HttpDelete("{id:guid}/comments/{commentId:guid}")]
     public async Task<IActionResult> DeleteComment(Guid id, Guid commentId)
     {
-        var comment = await _context.TaskComments.FirstOrDefaultAsync(c => c.Id == commentId && c.TaskId == id);
+        var comment = await _context.TaskComments
+            .Include(c => c.Task)
+            .FirstOrDefaultAsync(c => c.Id == commentId && c.TaskId == id);
         if (comment == null) return NotFound();
         if (comment.UserId != GetCurrentUserId()) return Forbid();
 
+        var teamId = comment.Task?.TeamId;
         _context.TaskComments.Remove(comment);
         await _context.SaveChangesAsync();
+        if (teamId.HasValue)
+            await _tasksNotifier.NotifyChangedAsync(teamId.Value);
         return NoContent();
     }
 
