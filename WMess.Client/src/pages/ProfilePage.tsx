@@ -8,7 +8,7 @@ import { Avatar } from '../components/Avatar'
 import { AvatarCropper } from '../components/AvatarCropper'
 import { ConfirmDialog } from '../components/WorkspaceModals'
 import { authField } from '../components/AuthLayout'
-import { ArrowLeftIcon, CameraIcon } from '../workspace/icons'
+import { CameraIcon } from '../workspace/icons'
 import { toast } from '../store/toastStore'
 
 const card = 'bg-white border border-line rounded-2xl shadow-[0_10px_30px_rgba(43,42,38,.05)]'
@@ -137,17 +137,8 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="wm-scroll fixed inset-0 overflow-auto bg-app text-ink font-ui text-sm antialiased">
-      <div className="max-w-[940px] mx-auto px-6 py-10 flex flex-col gap-6">
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-[13px] text-muted hover:text-ink cursor-pointer font-medium w-fit -mb-1"
-        >
-          <ArrowLeftIcon size={16} />
-          Назад
-        </button>
-
+    <div className="wm-scroll flex-1 min-w-0 overflow-auto bg-app text-ink font-ui text-sm antialiased">
+      <div className="max-w-[940px] px-6 py-10 flex flex-col gap-6">
         <h1 className="text-[24px] font-extrabold tracking-[-.5px]">Профиль</h1>
 
         <div className="flex flex-col md:flex-row gap-6 items-start">

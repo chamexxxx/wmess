@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMatch, useNavigate, useParams } from 'react-router'
 import { apiClient } from '../api'
-import { useAuth } from '../context/AuthContext'
 import type { ProjectResponse, TeamResponse, TeamDetailResponse } from '../api/generated/data-contracts'
-import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { LibrarySection } from '../components/LibrarySection'
 import { ProjectSettings } from '../components/ProjectSettings'
 import { TeamSettings } from '../components/TeamSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
+import { useWorkspace } from '../components/workspaceContext'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
 
@@ -16,8 +15,9 @@ type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectRespons
 type Confirm = { kind: 'team'; team: TeamResponse } | { kind: 'project'; project: ProjectResponse }
 
 export function HomePage() {
-  const { user, setUser } = useAuth()
   const navigate = useNavigate()
+  // Команды/проекты и общие действия берём из каркаса рабочего пространства.
+  const { teams, setTeams, projects, setProjects, openCreateTeam, setError } = useWorkspace()
 
   // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
   // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/library/:itemId
@@ -29,35 +29,12 @@ export function HomePage() {
   // Страница настроек команды: /teams/:teamId/settings (отдельно от настроек проекта).
   const isTeamSettings = useMatch('/teams/:teamId/settings') != null
 
-  const [teams, setTeams] = useState<TeamResponse[]>([])
-  const [projects, setProjects] = useState<ProjectResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [createTeamOpen, setCreateTeamOpen] = useState(false)
   const [projectModal, setProjectModal] = useState<ProjectModal | null>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
   const [busy, setBusy] = useState(false)
   // Детали выбранной команды (включая права). Грузятся только на странице команды.
   const [teamDetail, setTeamDetail] = useState<TeamDetailResponse | null>(null)
   const [teamDetailRefresh, setTeamDetailRefresh] = useState(0)
-
-  useEffect(() => {
-    Promise.all([apiClient.teams.teamsList(), apiClient.projects.projectsList()])
-      .then(([teamRes, projectRes]) => {
-        setTeams(teamRes.data ?? [])
-        setProjects(projectRes.data ?? [])
-      })
-      .catch(() => setError('Не удалось загрузить данные'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  // Auto-dismiss the error toast.
-  useEffect(() => {
-    if (!error) return
-    const t = setTimeout(() => setError(null), 4000)
-    return () => clearTimeout(t)
-  }, [error])
 
   // Детали команды (с правами текущего пользователя) — только когда выбрана команда.
   // teamDetail не сбрасываем синхронно: ниже права берутся только при совпадении id.
@@ -94,7 +71,6 @@ export function HomePage() {
   // Keep the URL pointing at something real: land on the first team, default to
   // the first section, and bounce off ids/sections that don't exist.
   useEffect(() => {
-    if (loading) return
     if (selectedTeamId != null && !teams.some((t) => Number(t.id) === selectedTeamId)) {
       navigate('/', { replace: true })
     } else if (selectedTeamId == null && teams.length > 0) {
@@ -106,33 +82,9 @@ export function HomePage() {
         replace: true,
       })
     }
-  }, [loading, selectedTeamId, selectedProjectId, selectedProject, section, isSettings, teams, navigate])
-
-  const handleLogout = async () => {
-    try {
-      await apiClient.logout()
-    } catch {
-      // logout failed, clear local state anyway
-    }
-    setUser(null)
-    navigate('/login')
-  }
+  }, [selectedTeamId, selectedProjectId, selectedProject, section, isSettings, teams, navigate])
 
   // ---- teams ----
-  const createTeam = async (name: string) => {
-    setBusy(true)
-    try {
-      const res = await apiClient.teams.teamsCreate({ name })
-      setTeams((prev) => [...prev, res.data])
-      setCreateTeamOpen(false)
-      navigate(`/teams/${Number(res.data.id)}`)
-    } catch {
-      setError('Не удалось создать команду')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const updateTeam = async (id: number, name: string) => {
     setBusy(true)
     try {
@@ -212,32 +164,8 @@ export function HomePage() {
 
   const title = selectedTeam ? 'Проекты' : 'Добро пожаловать'
 
-  // Пока идёт начальная загрузка (команды/проекты) — не показываем каркас с пустыми
-  // сайдбарами, а держим полноэкранный лоадер, чтобы не мелькал пустой layout.
-  if (loading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-app">
-        <div
-          className="h-7 w-7 rounded-full border-2 border-line border-t-accent animate-spin"
-          role="status"
-          aria-label="Загрузка"
-        />
-      </div>
-    )
-  }
-
   return (
-    <div className="wm-scroll fixed inset-0 flex bg-app text-ink font-ui text-sm text-left antialiased">
-      <TeamRail
-        teams={teams}
-        selectedTeamId={selectedTeamId}
-        onSelect={(id) => navigate(`/teams/${id}`)}
-        onCreate={() => setCreateTeamOpen(true)}
-        user={user}
-        onOpenProfile={() => navigate('/profile')}
-        onLogout={handleLogout}
-      />
-
+    <>
       <ProjectSidebar
         team={selectedTeam}
         projects={teamProjects}
@@ -312,12 +240,10 @@ export function HomePage() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {loading ? (
-            <EmptyState text="Загрузка…" />
-          ) : teams.length === 0 ? (
+          {teams.length === 0 ? (
             <EmptyState
               text="У вас пока нет команд. Создайте первую, чтобы начать работу."
-              action={{ label: 'Создать команду', onClick: () => setCreateTeamOpen(true) }}
+              action={{ label: 'Создать команду', onClick: openCreateTeam }}
             />
           ) : !selectedTeam ? null : isTeamSettings ? (
             <TeamSettings
@@ -352,17 +278,6 @@ export function HomePage() {
       </div>
 
       {/* MODALS */}
-      {createTeamOpen && (
-        <FormModal
-          title="Новая команда"
-          label="Название команды"
-          submitLabel="Создать"
-          busy={busy}
-          onSubmit={createTeam}
-          onClose={() => setCreateTeamOpen(false)}
-        />
-      )}
-
       {projectModal &&
         (projectModal.mode === 'create' ? (
           <FormModal
@@ -410,16 +325,7 @@ export function HomePage() {
             onClose={() => setConfirm(null)}
           />
         ))}
-
-      {error && (
-        <div
-          onClick={() => setError(null)}
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[#2a1215] text-[#ff9d8a] border border-[#5c2b2e] rounded-[10px] px-4 py-2.5 text-[13px] cursor-pointer z-[200] shadow-[0_10px_30px_rgba(0,0,0,.2)]"
-        >
-          {error}
-        </div>
-      )}
-    </div>
+    </>
   )
 }
 
