@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MessageResponse } from '../../api/generated/data-contracts'
 import type { ReplyTarget } from '../../store/chatStore'
 import { AttachmentUpload } from './AttachmentUpload'
@@ -6,26 +6,68 @@ import { VoiceRecorder } from './VoiceRecorder'
 
 interface Props {
   replyTarget: ReplyTarget | null
-  quoteTarget: MessageResponse | null
   editTarget?: MessageResponse | null
   onSend: (text: string, files: File[], voiceWaveform?: string) => Promise<void>
   onSaveEdit?: (text: string) => Promise<void>
   onTyping: () => void
   onClearReply: () => void
-  onClearQuote: () => void
   onClearEdit?: () => void
   disabled?: boolean
 }
 
+function FilePreview({ files, onRemove }: { files: File[]; onRemove: (index: number) => void }) {
+  const [urls, setUrls] = useState<string[]>([])
+
+  useEffect(() => {
+    const next = files.map((f) => URL.createObjectURL(f))
+    setUrls(next)
+    return () => next.forEach((u) => URL.revokeObjectURL(u))
+  }, [files])
+
+  if (!files.length) return null
+
+  return (
+    <div className="flex flex-wrap gap-2 mb-2">
+      {files.map((file, i) => {
+        const isImage = file.type.startsWith('image/')
+        const isVideo = file.type.startsWith('video/')
+        return (
+          <div
+            key={`${file.name}-${file.size}-${i}`}
+            className="relative group rounded-lg border border-line bg-tile overflow-hidden w-20 h-20 shrink-0"
+          >
+            {isImage && urls[i] ? (
+              <img src={urls[i]} alt={file.name} className="w-full h-full object-cover" />
+            ) : isVideo && urls[i] ? (
+              <video src={urls[i]} className="w-full h-full object-cover" muted />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-1 text-center">
+                <span className="text-lg">📎</span>
+                <span className="text-[9px] text-muted truncate w-full px-0.5">{file.name}</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-ink/70 text-white text-xs leading-none cursor-pointer opacity-0 group-hover:opacity-100"
+              title="Убрать"
+            >
+              ×
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function MessageInput({
   replyTarget,
-  quoteTarget,
   editTarget = null,
   onSend,
   onSaveEdit,
   onTyping,
   onClearReply,
-  onClearQuote,
   onClearEdit,
   disabled,
 }: Props) {
@@ -33,6 +75,7 @@ export function MessageInput({
   const [files, setFiles] = useState<File[]>([])
   const [voiceWaveform, setVoiceWaveform] = useState<string | undefined>()
   const [sending, setSending] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const isEditing = editTarget != null
   const editingVoice = isEditing && (editTarget.attachments ?? []).some((a) => a.contentType?.startsWith('audio/'))
@@ -42,10 +85,16 @@ export function MessageInput({
       setText(editTarget.content ?? '')
       setFiles([])
       setVoiceWaveform(undefined)
+      textareaRef.current?.focus()
     }
   }, [editTarget])
 
+  const restoreFocus = () => {
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
   const handleSubmit = async () => {
+    if (sending) return
     const trimmed = text.trim()
     if (isEditing) {
       if (!onSaveEdit) return
@@ -57,6 +106,7 @@ export function MessageInput({
         onClearEdit?.()
       } finally {
         setSending(false)
+        restoreFocus()
       }
       return
     }
@@ -69,15 +119,11 @@ export function MessageInput({
       setFiles([])
       setVoiceWaveform(undefined)
       onClearReply()
-      onClearQuote()
     } finally {
       setSending(false)
+      restoreFocus()
     }
   }
-
-  const preview = !isEditing && quoteTarget
-    ? `> ${quoteTarget.authorEmail}: ${quoteTarget.content?.slice(0, 120) ?? ''}\n\n`
-    : ''
 
   return (
     <div className="border-t border-line p-3 bg-panel shrink-0">
@@ -102,21 +148,11 @@ export function MessageInput({
           </button>
         </div>
       )}
-      {!isEditing && quoteTarget && (
-        <div className="flex items-center justify-between mb-2 px-3 py-2 bg-accent-soft/50 rounded-lg text-xs border-l-2 border-accent">
-          <span className="text-muted truncate">Цитата: {quoteTarget.content?.slice(0, 60)}</span>
-          <button type="button" onClick={onClearQuote} className="text-faint hover:text-ink cursor-pointer ml-2">
-            ✕
-          </button>
-        </div>
-      )}
-      {!isEditing && files.length > 0 && (
-        <div className="text-xs text-muted mb-2">
-          Файлов: {files.length}
-          <button type="button" onClick={() => setFiles([])} className="ml-2 text-accent cursor-pointer">
-            очистить
-          </button>
-        </div>
+      {!isEditing && (
+        <FilePreview
+          files={files}
+          onRemove={(index) => setFiles((prev) => prev.filter((_, i) => i !== index))}
+        />
       )}
       <div className="flex items-end gap-2">
         {!isEditing && (
@@ -130,9 +166,9 @@ export function MessageInput({
                   try {
                     await onSend('', [file], wf)
                     onClearReply()
-                    onClearQuote()
                   } finally {
                     setSending(false)
+                    restoreFocus()
                   }
                 })()
               }}
@@ -140,10 +176,10 @@ export function MessageInput({
           </>
         )}
         <textarea
-          value={preview + text}
+          ref={textareaRef}
+          value={text}
           onChange={(e) => {
-            const v = e.target.value
-            setText(!isEditing && quoteTarget ? v.slice(preview.length) : v)
+            setText(e.target.value)
             if (!isEditing) onTyping()
           }}
           onKeyDown={(e) => {
@@ -165,7 +201,7 @@ export function MessageInput({
               : 'Написать сообщение…'
           }
           rows={2}
-          disabled={disabled || sending}
+          disabled={disabled}
           className="flex-1 resize-none rounded-lg border border-line px-3 py-2 text-sm bg-app text-ink focus:outline-none focus:border-accent"
         />
         <button

@@ -28,14 +28,24 @@ export function MessageAttachments({ attachments }: Props) {
         const url = attachmentUrl(id)
         if (isImage(a.contentType)) {
           return (
-            <a key={id} href={url} target="_blank" rel="noreferrer" className="block max-w-sm">
-              <img src={url} alt={a.fileName} className="rounded-lg max-h-64 object-cover" />
+            <a key={id} href={url} target="_blank" rel="noreferrer" className="block max-w-full sm:max-w-sm mt-1">
+              <img
+                src={url}
+                alt={a.fileName}
+                className="rounded-lg max-h-64 max-w-full object-contain bg-tile"
+                loading="lazy"
+              />
             </a>
           )
         }
         if (isVideo(a.contentType)) {
           return (
-            <video key={id} src={url} controls className="rounded-lg max-w-md max-h-64" />
+            <video
+              key={id}
+              src={url}
+              controls
+              className="rounded-lg max-w-full sm:max-w-md max-h-64 mt-1"
+            />
           )
         }
         if (isAudio(a.contentType)) {

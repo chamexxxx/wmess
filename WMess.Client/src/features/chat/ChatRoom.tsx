@@ -47,25 +47,36 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
   const pinnedIds = useChatStore((s) => s.pinnedMessageIds[chatId] ?? EMPTY_ARRAY)
   const typingUsers = useChatStore((s) => s.typingByChat[chatId] ?? EMPTY_ARRAY)
   const replyTarget = useChatStore((s) => s.replyTarget)
-  const quoteTarget = useChatStore((s) => s.quoteTarget)
   const threadRootId = useChatStore((s) => s.threadRootId)
   const threadReplyCounts = useChatStore((s) => s.threadReplyCounts)
 
   const setReplyTarget = useChatStore((s) => s.setReplyTarget)
-  const setQuoteTarget = useChatStore((s) => s.setQuoteTarget)
   const setThreadRootId = useChatStore((s) => s.setThreadRootId)
   const setThreadReplyCount = useChatStore((s) => s.setThreadReplyCount)
   const prependMessages = useChatStore((s) => s.prependMessages)
   const addMessage = useChatStore((s) => s.addMessage)
+  const addPinned = useChatStore((s) => s.addPinned)
+  const removePinned = useChatStore((s) => s.removePinned)
 
   const fetchedThreadCounts = useRef(new Set<number>())
-
 
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [pinnedMessages, setPinnedMessages] = useState<MessageResponse[]>([])
   const [startingCall, setStartingCall] = useState(false)
   const [editTarget, setEditTarget] = useState<MessageResponse | null>(null)
+
+  const findMessage = useCallback(
+    (messageId: number): MessageResponse | undefined => {
+      return (
+        mainMessages.find((m) => Number(m.id) === messageId) ??
+        Object.values(threadMessagesByRoot)
+          .flat()
+          .find((m) => Number(m.id) === messageId)
+      )
+    },
+    [mainMessages, threadMessagesByRoot],
+  )
 
   const loadMessages = useCallback(async () => {
     const res = await apiClient.chats.getMessages(chatId, { limit: 50 })
@@ -74,16 +85,19 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
     setHasMore(data.length >= 50)
   }, [chatId])
 
+  const reloadPins = useCallback(async () => {
+    const res = await apiClient.chats.getPinnedMessages(chatId)
+    const pins = res.data ?? []
+    const ids = pins.map((p) => Number(p.messageId))
+    useChatStore.getState().setPinnedIds(chatId, ids)
+    setPinnedMessages(pins.map((p) => p.message).filter(Boolean) as MessageResponse[])
+  }, [chatId])
+
   useEffect(() => {
     void loadMessages()
     void apiClient.chats.markChatRead(chatId)
-    void apiClient.chats.getPinnedMessages(chatId).then((res) => {
-      const pins = res.data ?? []
-      const ids = pins.map((p) => Number(p.messageId))
-      useChatStore.getState().setPinnedIds(chatId, ids)
-      setPinnedMessages(pins.map((p) => p.message).filter(Boolean) as MessageResponse[])
-    })
-  }, [chatId, loadMessages])
+    void reloadPins()
+  }, [chatId, loadMessages, reloadPins])
 
   useEffect(() => {
     fetchedThreadCounts.current.clear()
@@ -99,6 +113,20 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
       })
     }
   }, [mainMessages, chatId, setThreadReplyCount])
+
+  // Синхронизация панели пинов при событиях SignalR (только ids в store)
+  useEffect(() => {
+    setPinnedMessages((prev) => {
+      const next = pinnedIds
+        .map((id) => prev.find((m) => Number(m.id) === id) ?? findMessage(id))
+        .filter(Boolean) as MessageResponse[]
+      if (next.length === pinnedIds.length) return next
+      if (next.length < pinnedIds.length) {
+        void reloadPins()
+      }
+      return next
+    })
+  }, [pinnedIds, findMessage, reloadPins])
 
   const messageById = useMemo(() => {
     const map = new Map<number, MessageResponse>()
@@ -123,20 +151,21 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
   const handleSend = async (text: string, files: File[], voiceWaveform?: string) => {
     const parentId = replyTarget ? Number(replyTarget.message.id) : null
     const mode = replyTarget?.mode ?? null
-    const content = quoteTarget
-      ? `> ${quoteTarget.authorEmail}: ${quoteTarget.content?.slice(0, 200) ?? ''}\n\n${text}`
-      : text
 
     let msg: MessageResponse
     if (files.length > 0) {
-      msg = await sendMessageWithFiles(chatId, {
-        content: content || null,
-        parentMessageId: parentId,
-        replyMode: mode,
-      }, files)
+      msg = await sendMessageWithFiles(
+        chatId,
+        {
+          content: text || null,
+          parentMessageId: parentId,
+          replyMode: mode,
+        },
+        files,
+      )
     } else {
       msg = await sendTextMessage(chatId, {
-        content,
+        content: text,
         parentMessageId: parentId,
         replyMode: mode,
       })
@@ -156,16 +185,26 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
 
   const handlePin = async (messageId: number) => {
     await apiClient.chats.pinMessage(chatId, messageId)
+    addPinned(chatId, messageId)
+    const msg = findMessage(messageId)
+    if (msg) {
+      setPinnedMessages((prev) =>
+        prev.some((m) => Number(m.id) === messageId) ? prev : [...prev, msg],
+      )
+    } else {
+      void reloadPins()
+    }
   }
 
   const handleUnpin = async (messageId: number) => {
     await apiClient.chats.unpinMessage(chatId, messageId)
+    removePinned(chatId, messageId)
+    setPinnedMessages((prev) => prev.filter((m) => Number(m.id) !== messageId))
   }
 
   const handleEdit = (message: MessageResponse) => {
     setEditTarget(message)
     setReplyTarget(null)
-    setQuoteTarget(null)
   }
 
   const handleSaveEdit = async (text: string) => {
@@ -179,18 +218,18 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
     setEditTarget(null)
   }
 
-  const handleStartCall = async (video: boolean) => {
+  const handleStartCall = async () => {
     setStartingCall(true)
     try {
-      await apiClient.chats.startCall(chatId, { callType: video ? 'video' : 'audio' })
+      await apiClient.chats.startCall(chatId, { callType: 'video' })
     } finally {
       setStartingCall(false)
     }
   }
 
   return (
-    <div className="h-full flex min-h-0">
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="h-full flex min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <div className="h-12 border-b border-line flex items-center gap-3 px-4 shrink-0">
           <button
             type="button"
@@ -200,22 +239,14 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
             ←
           </button>
           <span className="font-semibold truncate">{chatName ?? `Чат #${chatId}`}</span>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto">
             <button
               type="button"
               disabled={startingCall}
-              onClick={() => void handleStartCall(false)}
-              className="text-xs px-2 py-1 rounded-md bg-tile text-muted hover:bg-hovered cursor-pointer disabled:opacity-50"
+              onClick={() => void handleStartCall()}
+              className="text-xs px-3 py-1.5 rounded-md bg-tile text-muted hover:bg-hovered cursor-pointer disabled:opacity-50"
             >
-              📞
-            </button>
-            <button
-              type="button"
-              disabled={startingCall}
-              onClick={() => void handleStartCall(true)}
-              className="text-xs px-2 py-1 rounded-md bg-tile text-muted hover:bg-hovered cursor-pointer disabled:opacity-50"
-            >
-              📹
+              Начать звонок
             </button>
           </div>
         </div>
@@ -240,7 +271,6 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
           hasMore={hasMore}
           onLoadMore={() => void handleLoadMore()}
           onReply={(m) => setReplyTarget({ message: m, mode: 'Flat' })}
-          onQuote={setQuoteTarget}
           onOpenThread={(m) => setThreadRootId(Number(m.id))}
           onReaction={(id, emoji) => void handleReaction(id, emoji)}
           onPin={(id) => void handlePin(id)}
@@ -250,13 +280,11 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
 
         <MessageInput
           replyTarget={replyTarget}
-          quoteTarget={quoteTarget}
           editTarget={editTarget}
           onSend={handleSend}
           onSaveEdit={handleSaveEdit}
           onTyping={sendTyping}
           onClearReply={() => setReplyTarget(null)}
-          onClearQuote={() => setQuoteTarget(null)}
           onClearEdit={() => setEditTarget(null)}
         />
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiClient } from '../../api'
 import type { MessageResponse } from '../../api/generated/data-contracts'
 import { useChatStore, EMPTY_ARRAY, type ReplyTarget } from '../../store/chatStore'
@@ -41,19 +41,13 @@ export function ThreadPanel({
   const updateMessage = useChatStore((s) => s.updateMessage)
 
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null)
-  const [quoteTarget, setQuoteTarget] = useState<MessageResponse | null>(null)
   const [editTarget, setEditTarget] = useState<MessageResponse | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     apiClient.chats
       .getMessages(chatId, { parentMessageId: rootId, limit: 100 })
       .then((res) => useChatStore.getState().setThreadMessages(rootId, res.data ?? EMPTY_ARRAY))
   }, [chatId, rootId])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
 
   const messageById = useMemo(() => {
     const map = new Map<number, MessageResponse>()
@@ -65,7 +59,6 @@ export function ThreadPanel({
   const startEdit = (message: MessageResponse) => {
     setEditTarget(message)
     setReplyTarget(null)
-    setQuoteTarget(null)
   }
 
   const handleSaveEdit = async (text: string) => {
@@ -83,20 +76,17 @@ export function ThreadPanel({
     const isNestedReply = replyTarget != null && Number(replyTarget.message.id) !== rootId
     const parentId = isNestedReply ? Number(replyTarget!.message.id) : rootId
     const mode = isNestedReply ? ('Flat' as const) : ('Thread' as const)
-    const content = quoteTarget
-      ? `> ${quoteTarget.authorEmail}: ${quoteTarget.content?.slice(0, 200) ?? ''}\n\n${text}`
-      : text
 
     let msg: MessageResponse
     if (files.length > 0) {
       msg = await sendMessageWithFiles(
         chatId,
-        { content: content || null, parentMessageId: parentId, replyMode: mode },
+        { content: text || null, parentMessageId: parentId, replyMode: mode },
         files,
       )
     } else {
       msg = await sendTextMessage(chatId, {
-        content,
+        content: text,
         parentMessageId: parentId,
         replyMode: mode,
       })
@@ -115,7 +105,10 @@ export function ThreadPanel({
   }
 
   return (
-    <div style={{ width }} className="relative shrink-0 flex flex-col bg-panel min-h-0 border-l border-line">
+    <div
+      style={{ width }}
+      className="relative shrink-0 flex flex-col bg-panel min-h-0 min-w-0 border-l border-line overflow-hidden"
+    >
       <div
         onMouseDown={onResizeStart}
         title="Потяните, чтобы изменить ширину"
@@ -123,77 +116,74 @@ export function ThreadPanel({
       />
 
       <div className="h-12 border-b border-line flex items-center justify-between px-3 shrink-0">
-        <span className="font-semibold text-sm">Тред · {messages.length}</span>
-        <button type="button" onClick={onClose} className="text-muted hover:text-ink cursor-pointer">
+        <span className="font-semibold text-sm truncate">Тред · {messages.length}</span>
+        <button type="button" onClick={onClose} className="text-muted hover:text-ink cursor-pointer shrink-0">
           ✕
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 min-h-0">
-        {rootMessage && (
-          <div className="border-b border-line pb-2 mb-2">
-            <MessageItem
-              message={rootMessage}
-              currentUserId={currentUserId}
-              canManage={canManage}
-              isPinned={pinnedIds.includes(rootId)}
-              inThread
-              threadRootId={rootId}
-              onReply={() => setReplyTarget({ message: rootMessage, mode: 'Thread' })}
-              onQuote={() => setQuoteTarget(rootMessage)}
-              onOpenThread={() => {}}
-              onReaction={(emoji) => onReaction(rootId, emoji)}
-              onPin={() => onPin(rootId)}
-              onUnpin={() => onUnpin(rootId)}
-              onEdit={() => startEdit(rootMessage)}
-              onScrollTo={scrollTo}
-            />
-          </div>
-        )}
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden flex flex-col-reverse px-2">
+        <div className="flex flex-col justify-end min-h-full min-w-0">
+          {rootMessage && (
+            <div className="border-b border-line pb-2 mb-2 min-w-0">
+              <MessageItem
+                message={rootMessage}
+                currentUserId={currentUserId}
+                canManage={canManage}
+                isPinned={pinnedIds.includes(rootId)}
+                inThread
+                threadRootId={rootId}
+                onReply={() => setReplyTarget({ message: rootMessage, mode: 'Thread' })}
+                onOpenThread={() => {}}
+                onReaction={(emoji) => onReaction(rootId, emoji)}
+                onPin={() => onPin(rootId)}
+                onUnpin={() => onUnpin(rootId)}
+                onEdit={() => startEdit(rootMessage)}
+                onScrollTo={scrollTo}
+              />
+            </div>
+          )}
 
-        {messages.length === 0 ? (
-          <div className="p-4 text-sm text-muted">Нет ответов в треде</div>
-        ) : (
-          messages.map((m) => {
-            const msgId = Number(m.id)
-            const parentId = m.parentMessageId != null ? Number(m.parentMessageId) : null
-            const parent =
-              parentId != null && parentId !== rootId ? messageById.get(parentId) ?? null : null
-            return (
-              <div key={m.id} id={`thread-msg-${m.id}`}>
-                <MessageItem
-                  message={m}
-                  parent={parent}
-                  currentUserId={currentUserId}
-                  canManage={canManage}
-                  isPinned={pinnedIds.includes(msgId)}
-                  inThread
-                  threadRootId={rootId}
-                  onReply={() => setReplyTarget({ message: m, mode: 'Flat' })}
-                  onQuote={() => setQuoteTarget(m)}
-                  onOpenThread={() => {}}
-                  onReaction={(emoji) => onReaction(msgId, emoji)}
-                  onPin={() => onPin(msgId)}
-                  onUnpin={() => onUnpin(msgId)}
-                  onEdit={() => startEdit(m)}
-                  onScrollTo={scrollTo}
-                />
-              </div>
-            )
-          })
-        )}
-        <div ref={bottomRef} />
+          {messages.length === 0 ? (
+            <div className="p-4 text-sm text-muted">Нет ответов в треде</div>
+          ) : (
+            messages.map((m) => {
+              const msgId = Number(m.id)
+              const parentId = m.parentMessageId != null ? Number(m.parentMessageId) : null
+              const parent =
+                parentId != null && parentId !== rootId ? messageById.get(parentId) ?? null : null
+              return (
+                <div key={m.id} id={`thread-msg-${m.id}`} className="min-w-0">
+                  <MessageItem
+                    message={m}
+                    parent={parent}
+                    currentUserId={currentUserId}
+                    canManage={canManage}
+                    isPinned={pinnedIds.includes(msgId)}
+                    inThread
+                    threadRootId={rootId}
+                    onReply={() => setReplyTarget({ message: m, mode: 'Flat' })}
+                    onOpenThread={() => {}}
+                    onReaction={(emoji) => onReaction(msgId, emoji)}
+                    onPin={() => onPin(msgId)}
+                    onUnpin={() => onUnpin(msgId)}
+                    onEdit={() => startEdit(m)}
+                    onScrollTo={scrollTo}
+                  />
+                </div>
+              )
+            })
+          )}
+        </div>
       </div>
 
       <MessageInput
         replyTarget={replyTarget}
-        quoteTarget={quoteTarget}
         editTarget={editTarget}
         onSend={handleSend}
         onSaveEdit={handleSaveEdit}
         onTyping={onTyping}
         onClearReply={() => setReplyTarget(null)}
-        onClearQuote={() => setQuoteTarget(null)}
         onClearEdit={() => setEditTarget(null)}
       />
     </div>

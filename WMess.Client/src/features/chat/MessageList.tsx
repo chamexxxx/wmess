@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { type ReactNode } from 'react'
 import type { MessageResponse } from '../../api/generated/data-contracts'
 import { MessageItem } from './MessageItem'
 
@@ -13,7 +13,6 @@ interface Props {
   hasMore: boolean
   onLoadMore: () => void
   onReply: (message: MessageResponse) => void
-  onQuote: (message: MessageResponse) => void
   onOpenThread: (message: MessageResponse) => void
   onReaction: (messageId: number, emoji: string) => void
   onPin: (messageId: number) => void
@@ -32,29 +31,21 @@ export function MessageList({
   hasMore,
   onLoadMore,
   onReply,
-  onQuote,
   onOpenThread,
   onReaction,
   onPin,
   onUnpin,
   onEdit,
 }: Props) {
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const topRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
-
   const scrollTo = (id: number) => {
     document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   const renderMessages = () => {
-    const elements: JSX.Element[] = []
+    const elements: ReactNode[] = []
     let lastDateStr = ''
 
-    messages.forEach((m, idx) => {
+    for (const m of messages) {
       const date = new Date(m.createdAt ?? '')
       const dateStr = date.toLocaleDateString('ru-RU', {
         day: 'numeric',
@@ -89,7 +80,6 @@ export function MessageList({
           isPinned={pinnedIds.includes(msgId)}
           threadReplyCount={threadReplyCounts[msgId] ?? 0}
           onReply={() => onReply(m)}
-          onQuote={() => onQuote(m)}
           onOpenThread={() => onOpenThread(m)}
           onReaction={(emoji) => onReaction(msgId, emoji)}
           onPin={() => onPin(msgId)}
@@ -98,27 +88,29 @@ export function MessageList({
           onScrollTo={scrollTo}
         />,
       )
-    })
+    }
 
     return elements
   }
 
+  // flex-col-reverse: при открытии сразу видны последние сообщения, без JS-скролла
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3">
-      {hasMore && (
-        <div ref={topRef} className="text-center py-2">
-          <button
-            type="button"
-            disabled={loadingMore}
-            onClick={onLoadMore}
-            className="text-xs text-accent hover:underline cursor-pointer disabled:opacity-50"
-          >
-            {loadingMore ? 'Загрузка…' : 'Загрузить ранние сообщения'}
-          </button>
-        </div>
-      )}
-      {renderMessages()}
-      <div ref={bottomRef} />
+    <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col-reverse px-4 py-3">
+      <div className="flex flex-col justify-end min-h-full">
+        {hasMore && (
+          <div className="text-center py-2">
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={onLoadMore}
+              className="text-xs text-accent hover:underline cursor-pointer disabled:opacity-50"
+            >
+              {loadingMore ? 'Загрузка…' : 'Загрузить ранние сообщения'}
+            </button>
+          </div>
+        )}
+        {renderMessages()}
+      </div>
     </div>
   )
 }

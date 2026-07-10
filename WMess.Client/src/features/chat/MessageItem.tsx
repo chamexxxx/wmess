@@ -38,7 +38,6 @@ interface Props {
   threadRootId?: number
   threadReplyCount?: number
   onReply: () => void
-  onQuote: () => void
   onOpenThread: () => void
   onReaction: (emoji: string) => void
   onPin: () => void
@@ -52,12 +51,11 @@ export function MessageItem({
   message,
   parent,
   currentUserId,
-  canManage,
+  canManage: _canManage,
   inThread = false,
   threadRootId,
   threadReplyCount = 0,
   onReply,
-  onQuote,
   onOpenThread,
   onReaction,
   onPin,
@@ -90,15 +88,15 @@ export function MessageItem({
         onOpenThread()
       }}
     >
-      <div className="flex gap-3">
+      <div className="flex gap-3 min-w-0">
         <UserAvatar name={message.authorEmail} userId={message.authorId} size={36} />
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-baseline gap-2">
-            <span className="font-semibold text-sm text-ink">{message.authorEmail ?? 'Пользователь'}</span>
-            <span className="text-[11px] text-faint">{formatTime(message.createdAt)}</span>
-            {message.editedAt && <span className="text-[10px] text-faint">(ред.)</span>}
-            {isPinned && <span className="text-[10px] text-accent">📌</span>}
+            <span className="font-semibold text-sm text-ink truncate">{message.authorEmail ?? 'Пользователь'}</span>
+            <span className="text-[11px] text-faint shrink-0">{formatTime(message.createdAt)}</span>
+            {message.editedAt && <span className="text-[10px] text-faint shrink-0">(ред.)</span>}
+            {isPinned && <span className="text-[10px] text-accent shrink-0">📌</span>}
           </div>
 
           {showParentReply && (
@@ -141,29 +139,24 @@ export function MessageItem({
           <ReactionBar message={message} currentUserId={currentUserId} onToggle={onReaction} />
 
           <div
-            className="flex gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px]"
+            className="flex flex-wrap gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px]"
             data-no-thread
           >
             <button type="button" onClick={onReply} className="text-muted hover:text-accent cursor-pointer">
               Ответить
-            </button>
-            <button type="button" onClick={onQuote} className="text-muted hover:text-accent cursor-pointer">
-              Цитировать
             </button>
             {isOwn && (message.content || isVoiceMessage) && (
               <button type="button" onClick={onEdit} className="text-muted hover:text-accent cursor-pointer">
                 {isVoiceMessage && !message.content ? 'Подпись' : 'Изменить'}
               </button>
             )}
-            {canManage && (
-              <button
-                type="button"
-                onClick={isPinned ? onUnpin : onPin}
-                className="text-muted hover:text-accent cursor-pointer"
-              >
-                {isPinned ? 'Открепить' : 'Закрепить'}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={isPinned ? onUnpin : onPin}
+              className="text-muted hover:text-accent cursor-pointer"
+            >
+              {isPinned ? 'Открепить' : 'Закрепить'}
+            </button>
           </div>
         </div>
       </div>

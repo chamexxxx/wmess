@@ -15,7 +15,11 @@ public class AntiforgeryHeaderMiddleware
     {
         var path = context.Request.Path;
 
-        if (path.StartsWithSegments("/api") && !context.Request.Headers.ContainsKey(HeaderName))
+        // GET не требует CSRF: <img>/<video> и скачивания не могут передать X-CSRF.
+        var isGet = HttpMethods.IsGet(context.Request.Method);
+        if (path.StartsWithSegments("/api")
+            && !isGet
+            && !context.Request.Headers.ContainsKey(HeaderName))
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             return;
