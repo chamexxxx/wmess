@@ -21,7 +21,7 @@ builder.Services.AddOpenApi(options =>
     {
         document.Info.Title = "WMess API";
         document.Info.Version = "v1";
-        document.Info.Description = "API для системы управления сообщениями WMess";
+        document.Info.Description = "API РґР»СЏ СЃРёСЃС‚РµРјС‹ СѓРїСЂР°РІР»РµРЅРёСЏ СЃРѕРѕР±С‰РµРЅРёСЏРјРё WMess";
         return Task.CompletedTask;
     });
 });
@@ -38,7 +38,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength = 6;
 
-    // Логин (UserName) уникален и ограничен латиницей, цифрами, дефисом и подчёркиванием.
+    // Р›РѕРіРёРЅ (UserName) СѓРЅРёРєР°Р»РµРЅ Рё РѕРіСЂР°РЅРёС‡РµРЅ Р»Р°С‚РёРЅРёС†РµР№, С†РёС„СЂР°РјРё, РґРµС„РёСЃРѕРј Рё РїРѕРґС‡С‘СЂРєРёРІР°РЅРёРµРј.
     options.User.RequireUniqueEmail = true;
     options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
 })
@@ -67,8 +67,8 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey!))
     };
 
-    // SignalR передаёт токен через query string (?access_token=...) для WebSocket/SSE,
-    // где браузер не может выставить заголовок Authorization. Прокидываем его на /hubs.
+    // SignalR РїРµСЂРµРґР°С‘С‚ С‚РѕРєРµРЅ С‡РµСЂРµР· query string (?access_token=...) РґР»СЏ WebSocket/SSE,
+    // РіРґРµ Р±СЂР°СѓР·РµСЂ РЅРµ РјРѕР¶РµС‚ РІС‹СЃС‚Р°РІРёС‚СЊ Р·Р°РіРѕР»РѕРІРѕРє Authorization. РџСЂРѕРєРёРґС‹РІР°РµРј РµРіРѕ РЅР° /hubs.
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
@@ -98,9 +98,17 @@ builder.Services.AddAuthorization(options =>
 // Register Token Service
 builder.Services.AddScoped<ITokenService, TokenService>();
 
-// Register Library Access Service (единый источник вычисления прав на элемент библиотеки)
+// Register Library Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° СЌР»РµРјРµРЅС‚ Р±РёР±Р»РёРѕС‚РµРєРё)
 builder.Services.AddScoped<ILibraryAccessService, LibraryAccessService>();
 
+// Register Chat Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° С‡Р°С‚)
+builder.Services.AddScoped<IChatAccessService, ChatAccessService>();
+
+// Register Transcription Service (Р·Р°РіР»СѓС€РєР° РїРѕРґ Р±СѓРґСѓС‰РёР№ Whisper)
+builder.Services.AddScoped<ITranscriptionService, StubTranscriptionService>();
+
+// Register Task Resolver (Р·Р°РіР»СѓС€РєР° РїРѕРґ #{РЅРѕРјРµСЂ} Р·Р°РґР°С‡)
+builder.Services.AddScoped<ITaskResolver, StubTaskResolver>();
 // Register Authorization Handlers
 builder.Services.AddScoped<IAuthorizationHandler, TeamMemberHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, TeamManageHandler>();
@@ -109,21 +117,21 @@ builder.Services.AddScoped<IAuthorizationHandler, TeamChangeRoleHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ProjectAccessHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ProjectManageHandler>();
 
-// Register SignalR (MessagePack — для эффективной передачи бинарных Yjs-апдейтов)
+// Register SignalR (MessagePack вЂ” РґР»СЏ СЌС„С„РµРєС‚РёРІРЅРѕР№ РїРµСЂРµРґР°С‡Рё Р±РёРЅР°СЂРЅС‹С… Yjs-Р°РїРґРµР№С‚РѕРІ)
 builder.Services.AddSignalR(options =>
 {
-    // По умолчанию вызовы одного клиента обрабатываются строго последовательно (лимит = 1).
-    // SaveLibraryItemState пишет снапшот в БД (медленно) и при этом лимите блокирует поток
-    // инкрементальных SendUpdate/SendAwareness — у других участников правки появляются
-    // рывками/с задержкой. Разрешаем несколько параллельных вызовов, чтобы запись снапшота
-    // не вставала «в голову очереди». Каждый вызов хаба получает свой DI-scope (и свой
-    // DbContext), поэтому параллелизм безопасен.
+    // РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РІС‹Р·РѕРІС‹ РѕРґРЅРѕРіРѕ РєР»РёРµРЅС‚Р° РѕР±СЂР°Р±Р°С‚С‹РІР°СЋС‚СЃСЏ СЃС‚СЂРѕРіРѕ РїРѕСЃР»РµРґРѕРІР°С‚РµР»СЊРЅРѕ (Р»РёРјРёС‚ = 1).
+    // SaveLibraryItemState РїРёС€РµС‚ СЃРЅР°РїС€РѕС‚ РІ Р‘Р” (РјРµРґР»РµРЅРЅРѕ) Рё РїСЂРё СЌС‚РѕРј Р»РёРјРёС‚Рµ Р±Р»РѕРєРёСЂСѓРµС‚ РїРѕС‚РѕРє
+    // РёРЅРєСЂРµРјРµРЅС‚Р°Р»СЊРЅС‹С… SendUpdate/SendAwareness вЂ” Сѓ РґСЂСѓРіРёС… СѓС‡Р°СЃС‚РЅРёРєРѕРІ РїСЂР°РІРєРё РїРѕСЏРІР»СЏСЋС‚СЃСЏ
+    // СЂС‹РІРєР°РјРё/СЃ Р·Р°РґРµСЂР¶РєРѕР№. Р Р°Р·СЂРµС€Р°РµРј РЅРµСЃРєРѕР»СЊРєРѕ РїР°СЂР°Р»Р»РµР»СЊРЅС‹С… РІС‹Р·РѕРІРѕРІ, С‡С‚РѕР±С‹ Р·Р°РїРёСЃСЊ СЃРЅР°РїС€РѕС‚Р°
+    // РЅРµ РІСЃС‚Р°РІР°Р»Р° В«РІ РіРѕР»РѕРІСѓ РѕС‡РµСЂРµРґРёВ». РљР°Р¶РґС‹Р№ РІС‹Р·РѕРІ С…Р°Р±Р° РїРѕР»СѓС‡Р°РµС‚ СЃРІРѕР№ DI-scope (Рё СЃРІРѕР№
+    // DbContext), РїРѕСЌС‚РѕРјСѓ РїР°СЂР°Р»Р»РµР»РёР·Рј Р±РµР·РѕРїР°СЃРµРЅ.
     options.MaximumParallelInvocationsPerClient = 8;
 
-    // Дефолтный лимит входящего сообщения — 32 КБ. SaveLibraryItemState шлёт полный Yjs-снапшот
-    // состояния (encodeStateAsUpdate), который на доске с несколькими фигурами легко превышает
-    // 32 КБ; сервер тогда закрывает соединение с ошибкой, а на реконнекте Yjs ре-синкает всё
-    // разом — отсюда обрывы в консоли и «пачки» правок у других участников. Поднимаем лимит.
+    // Р”РµС„РѕР»С‚РЅС‹Р№ Р»РёРјРёС‚ РІС…РѕРґСЏС‰РµРіРѕ СЃРѕРѕР±С‰РµРЅРёСЏ вЂ” 32 РљР‘. SaveLibraryItemState С€Р»С‘С‚ РїРѕР»РЅС‹Р№ Yjs-СЃРЅР°РїС€РѕС‚
+    // СЃРѕСЃС‚РѕСЏРЅРёСЏ (encodeStateAsUpdate), РєРѕС‚РѕСЂС‹Р№ РЅР° РґРѕСЃРєРµ СЃ РЅРµСЃРєРѕР»СЊРєРёРјРё С„РёРіСѓСЂР°РјРё Р»РµРіРєРѕ РїСЂРµРІС‹С€Р°РµС‚
+    // 32 РљР‘; СЃРµСЂРІРµСЂ С‚РѕРіРґР° Р·Р°РєСЂС‹РІР°РµС‚ СЃРѕРµРґРёРЅРµРЅРёРµ СЃ РѕС€РёР±РєРѕР№, Р° РЅР° СЂРµРєРѕРЅРЅРµРєС‚Рµ Yjs СЂРµ-СЃРёРЅРєР°РµС‚ РІСЃС‘
+    // СЂР°Р·РѕРј вЂ” РѕС‚СЃСЋРґР° РѕР±СЂС‹РІС‹ РІ РєРѕРЅСЃРѕР»Рё Рё В«РїР°С‡РєРёВ» РїСЂР°РІРѕРє Сѓ РґСЂСѓРіРёС… СѓС‡Р°СЃС‚РЅРёРєРѕРІ. РџРѕРґРЅРёРјР°РµРј Р»РёРјРёС‚.
     options.MaximumReceiveMessageSize = 20 * 1024 * 1024;
 }).AddMessagePackProtocol();
 
@@ -131,6 +139,16 @@ builder.Services.AddSignalR(options =>
 builder.Services.AddControllers(options =>
 {
     options.Conventions.Add(new RouteTokenTransformerConvention(new LowercaseRouteTransformer()));
+})
+.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
+
+// ReadFromJsonAsync РІ РєРѕРЅС‚СЂРѕР»Р»РµСЂР°С… РёСЃРїРѕР»СЊР·СѓРµС‚ HttpJsonOptions, Р° РЅРµ Mvc JsonOptions
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 var app = builder.Build();
 // Configure the HTTP request pipeline.
@@ -155,4 +173,5 @@ app.MapHub<WMess.Api.Hubs.DocumentHub>("/hubs/document");
 app.MapHub<WMess.Api.Hubs.BoardHub>("/hubs/board");
 app.MapHub<WMess.Api.Hubs.TableHub>("/hubs/table");
 app.MapHub<WMess.Api.Hubs.LibraryHub>("/hubs/library");
+app.MapHub<WMess.Api.Hubs.ChatHub>("/hubs/chat");
 app.Run();

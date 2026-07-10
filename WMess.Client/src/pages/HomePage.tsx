@@ -9,7 +9,9 @@ import { TeamSettings } from '../components/TeamSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
 import { useWorkspace } from '../components/workspaceContext'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
+import { ChatsSection } from '../features/chat/ChatsSection'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
+
 
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
 type Confirm = { kind: 'team'; team: TeamResponse } | { kind: 'project'; project: ProjectResponse }
@@ -21,11 +23,12 @@ export function HomePage() {
 
   // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
   // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/library/:itemId
-  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, itemId: itemIdParam } = useParams()
+  // Открытый чат — /teams/:teamId/projects/:projectId/chats/:chatId
+  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, itemId: itemIdParam, chatId: chatIdParam } = useParams()
   const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
-  // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Библиотека».
-  const sectionKey = itemIdParam != null ? 'library' : sectionParam
+  // На маршруте документа/чата сегмент :section отсутствует — выводим нужный раздел.
+  const sectionKey = itemIdParam != null ? 'library' : chatIdParam != null ? 'chats' : sectionParam
   // Страница настроек команды: /teams/:teamId/settings (отдельно от настроек проекта).
   const isTeamSettings = useMatch('/teams/:teamId/settings') != null
 
@@ -271,6 +274,8 @@ export function HomePage() {
             />
           ) : section?.id === 'library' ? (
             <LibrarySection projectId={selectedProjectId!} />
+          ) : section?.id === 'chats' ? (
+            <ChatsSection projectId={selectedProjectId!} teamId={selectedTeamId!} />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}

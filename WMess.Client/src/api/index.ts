@@ -2,6 +2,7 @@ import axios, { isAxiosError } from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { Bff } from './generated/Bff'
 import { Library } from './generated/Library'
+import { Chats } from './generated/Chats'
 import { Projects } from './generated/Projects'
 import { Teams } from './generated/Teams'
 import { User } from './generated/User'
@@ -80,6 +81,7 @@ class WMessApiClient extends Bff {
   public projects: Projects
   public user: User
   public library: Library
+  public chats: Chats
 
   constructor(config: ApiConfig) {
     super(config)
@@ -88,12 +90,14 @@ class WMessApiClient extends Bff {
     this.projects = new Projects(config)
     this.user = new User(config)
     this.library = new Library(config)
+    this.chats = new Chats(config)
 
     attachAuthInterceptor(this.instance)
     attachAuthInterceptor(this.teams.instance)
     attachAuthInterceptor(this.projects.instance)
     attachAuthInterceptor(this.user.instance)
     attachAuthInterceptor(this.library.instance)
+    attachAuthInterceptor(this.chats.instance)
   }
 
   // Загрузка файлов с компьютера (multipart). Не входит в сгенерированный клиент,

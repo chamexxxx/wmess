@@ -24,6 +24,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<LinkContent> LinkContents { get; set; }
     public DbSet<LibraryFolder> LibraryFolders { get; set; }
 
+    public DbSet<Chat> Chats { get; set; }
+    public DbSet<Message> Messages { get; set; }
+    public DbSet<Attachment> Attachments { get; set; }
+    public DbSet<Reaction> Reactions { get; set; }
+    public DbSet<PinnedMessage> PinnedMessages { get; set; }
+    public DbSet<ChatMember> ChatMembers { get; set; }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -120,5 +127,120 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .WithOne(i => i.LinkContent)
             .HasForeignKey<LinkContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ===== Чаты =====
+
+        // Chat -> Team (опционально, каскадное удаление команды удаляет чат)
+        builder.Entity<Chat>()
+            .HasOne(c => c.Team)
+            .WithMany()
+            .HasForeignKey(c => c.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Chat -> Project (опционально)
+        builder.Entity<Chat>()
+            .HasOne(c => c.Project)
+            .WithMany()
+            .HasForeignKey(c => c.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Message -> Chat
+        builder.Entity<Message>()
+            .HasOne(m => m.Chat)
+            .WithMany(c => c.Messages)
+            .HasForeignKey(m => m.ChatId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Message -> Author (IdentityUser)
+        builder.Entity<Message>()
+            .HasOne(m => m.Author)
+            .WithMany()
+            .HasForeignKey(m => m.AuthorId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Message -> ParentMessage (самоссылающаяся связь, ответы/треды)
+        builder.Entity<Message>()
+            .HasOne(m => m.ParentMessage)
+            .WithMany()
+            .HasForeignKey(m => m.ParentMessageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Индексы ленты: Message(ChatId, CreatedAt) и Message(ParentMessageId)
+        builder.Entity<Message>()
+            .HasIndex(m => new { m.ChatId, m.CreatedAt });
+
+        builder.Entity<Message>()
+            .HasIndex(m => m.ParentMessageId);
+
+        // Attachment -> Message
+        builder.Entity<Attachment>()
+            .HasOne(a => a.Message)
+            .WithMany(m => m.Attachments)
+            .HasForeignKey(a => a.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Reaction -> Message
+        builder.Entity<Reaction>()
+            .HasOne(r => r.Message)
+            .WithMany(m => m.Reactions)
+            .HasForeignKey(r => r.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Reaction -> User
+        builder.Entity<Reaction>()
+            .HasOne(r => r.User)
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Уникальность реакции: (MessageId, UserId, Emoji)
+        builder.Entity<Reaction>()
+            .HasIndex(r => new { r.MessageId, r.UserId, r.Emoji })
+            .IsUnique();
+
+        // PinnedMessage -> Chat
+        builder.Entity<PinnedMessage>()
+            .HasOne(p => p.Chat)
+            .WithMany(c => c.PinnedMessages)
+            .HasForeignKey(p => p.ChatId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // PinnedMessage -> Message
+        builder.Entity<PinnedMessage>()
+            .HasOne(p => p.Message)
+            .WithMany()
+            .HasForeignKey(p => p.MessageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // PinnedMessage -> PinnedByUser
+        builder.Entity<PinnedMessage>()
+            .HasOne(p => p.PinnedByUser)
+            .WithMany()
+            .HasForeignKey(p => p.PinnedBy)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Уникальность пина: (ChatId, MessageId)
+        builder.Entity<PinnedMessage>()
+            .HasIndex(p => new { p.ChatId, p.MessageId })
+            .IsUnique();
+
+        // ChatMember -> Chat
+        builder.Entity<ChatMember>()
+            .HasOne(cm => cm.Chat)
+            .WithMany(c => c.Members)
+            .HasForeignKey(cm => cm.ChatId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ChatMember -> User
+        builder.Entity<ChatMember>()
+            .HasOne(cm => cm.User)
+            .WithMany()
+            .HasForeignKey(cm => cm.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Один участник на чат
+        builder.Entity<ChatMember>()
+            .HasIndex(cm => new { cm.ChatId, cm.UserId })
+            .IsUnique();
     }
 }

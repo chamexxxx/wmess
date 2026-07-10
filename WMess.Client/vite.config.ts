@@ -6,22 +6,28 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    host: true,          // слушать на всех интерфейсах (0.0.0.0) — доступ с других устройств в сети
+    host: true, // 0.0.0.0 — доступ с устройств в локальной сети
     port: 5173,
     strictPort: true,
-    allowedHosts: true,  // принимать запросы по IP/hostname машины, а не только по localhost
+    allowedHosts: true,
     // Проксируем на BFF (WMess.Web), а НЕ напрямую на API: BFF держит сессию в куке и
     // подставляет Bearer. Прямой проксинг на :5241 сломал бы авторизацию (API — только JWT).
+    // target остаётся localhost: BFF на этой же машине; браузер ходит только на Vite.
     proxy: {
       '/api': {
-        target: 'http://localhost:5100',
+        target: 'http://127.0.0.1:5100',
         changeOrigin: true,
       },
       '/hubs': {
-        target: 'http://localhost:5100',
+        target: 'http://127.0.0.1:5100',
         changeOrigin: true,
         ws: true,
       },
     },
+  },
+  preview: {
+    host: true,
+    port: 5173,
+    strictPort: true,
   },
 })

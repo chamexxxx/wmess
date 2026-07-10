@@ -236,6 +236,42 @@ namespace WMess.Api.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.Attachment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("MessageId")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StoredName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.ToTable("Attachments");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.BoardContent", b =>
                 {
                     b.Property<int>("LibraryItemId")
@@ -247,6 +283,73 @@ namespace WMess.Api.Migrations
                     b.HasKey("LibraryItemId");
 
                     b.ToTable("BoardContents");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.Chat", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaxNestingLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TeamId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("Chats");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.ChatMember", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChatId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ChatId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ChatMembers");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.DocumentContent", b =>
@@ -381,6 +484,94 @@ namespace WMess.Api.Migrations
                     b.ToTable("LinkContents");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.Message", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AuthorId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CallRoomId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CallType")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("ChatId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ParentMessageId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ReplyMode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Transcription")
+                        .HasColumnType("text");
+
+                    b.Property<string>("WaveformData")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorId");
+
+                    b.HasIndex("ParentMessageId");
+
+                    b.HasIndex("ChatId", "CreatedAt");
+
+                    b.ToTable("Messages");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.PinnedMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChatId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MessageId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("PinnedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PinnedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.HasIndex("PinnedBy");
+
+                    b.HasIndex("ChatId", "MessageId")
+                        .IsUnique();
+
+                    b.ToTable("PinnedMessages");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.Project", b =>
                 {
                     b.Property<int>("Id")
@@ -405,6 +596,39 @@ namespace WMess.Api.Migrations
                     b.HasIndex("TeamId");
 
                     b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.Reaction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Emoji")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<int>("MessageId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("MessageId", "UserId", "Emoji")
+                        .IsUnique();
+
+                    b.ToTable("Reactions");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.RefreshToken", b =>
@@ -539,6 +763,17 @@ namespace WMess.Api.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.Attachment", b =>
+                {
+                    b.HasOne("WMess.Api.Models.Message", "Message")
+                        .WithMany("Attachments")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Message");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.BoardContent", b =>
                 {
                     b.HasOne("WMess.Api.Models.LibraryItem", "Item")
@@ -548,6 +783,42 @@ namespace WMess.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.Chat", b =>
+                {
+                    b.HasOne("WMess.Api.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("WMess.Api.Models.Team", "Team")
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Project");
+
+                    b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.ChatMember", b =>
+                {
+                    b.HasOne("WMess.Api.Models.Chat", "Chat")
+                        .WithMany("Members")
+                        .HasForeignKey("ChatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chat");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.DocumentContent", b =>
@@ -627,6 +898,59 @@ namespace WMess.Api.Migrations
                     b.Navigation("Item");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.Message", b =>
+                {
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "Author")
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.Chat", "Chat")
+                        .WithMany("Messages")
+                        .HasForeignKey("ChatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.Message", "ParentMessage")
+                        .WithMany()
+                        .HasForeignKey("ParentMessageId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Author");
+
+                    b.Navigation("Chat");
+
+                    b.Navigation("ParentMessage");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.PinnedMessage", b =>
+                {
+                    b.HasOne("WMess.Api.Models.Chat", "Chat")
+                        .WithMany("PinnedMessages")
+                        .HasForeignKey("ChatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.Message", "Message")
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "PinnedByUser")
+                        .WithMany()
+                        .HasForeignKey("PinnedBy")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chat");
+
+                    b.Navigation("Message");
+
+                    b.Navigation("PinnedByUser");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.Project", b =>
                 {
                     b.HasOne("WMess.Api.Models.Team", "Team")
@@ -636,6 +960,25 @@ namespace WMess.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Team");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.Reaction", b =>
+                {
+                    b.HasOne("WMess.Api.Models.Message", "Message")
+                        .WithMany("Reactions")
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Message");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.RefreshToken", b =>
@@ -679,6 +1022,15 @@ namespace WMess.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.Chat", b =>
+                {
+                    b.Navigation("Members");
+
+                    b.Navigation("Messages");
+
+                    b.Navigation("PinnedMessages");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.LibraryFolder", b =>
                 {
                     b.Navigation("Items");
@@ -697,6 +1049,13 @@ namespace WMess.Api.Migrations
                     b.Navigation("LinkContent");
 
                     b.Navigation("TableContent");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.Message", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Reactions");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.Team", b =>
