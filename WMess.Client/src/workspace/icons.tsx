@@ -81,6 +81,65 @@ export const DocsIcon = (p: IconProps) => (
   </Svg>
 )
 
+// Загруженный файл (любой тип) — скрепка-вложение. Path Lucide-скрепки занимает почти весь
+// viewBox, поэтому равномерно ужимаем его до 85% (штрих масштабируется вместе с геометрией —
+// без залипания петель), чтобы визуальный размер совпадал с другими иконками.
+export const FileIcon = (p: IconProps) => (
+  <Svg {...p} strokeWidth={p.strokeWidth ?? 1.8}>
+    <g transform="translate(12 12) scale(0.85) translate(-12 -12)">
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </g>
+  </Svg>
+)
+
+// Фильтр — воронка.
+export const FilterIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 5.5h16l-6.2 7.4V20l-3.6-1.8v-5.3z" />
+  </Svg>
+)
+
+// Сортировка — строки разной длины.
+export const SortIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M5 7h14M5 12h9M5 17h5" />
+  </Svg>
+)
+
+// Слои — режим «все папки одним списком».
+export const LayersIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3l8.5 4.5L12 12 3.5 7.5 12 3z" />
+    <path d="M3.5 12L12 16.5 20.5 12" />
+    <path d="M3.5 16.5L12 21l8.5-4.5" />
+  </Svg>
+)
+
+// Загруженный файл-изображение — рамка с «горой» и солнцем.
+export const ImageIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+    <circle cx="8.8" cy="9" r="1.5" />
+    <path d="M20.5 15.5l-4.7-4.7L6 20.5" />
+  </Svg>
+)
+
+// Ссылка на внешний ресурс (ярлык) — стрелка из рамки. Иконка типа элемента библиотеки «ссылка».
+export const ExternalLinkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 4h6v6" />
+    <path d="M10.5 13.5 20 4" />
+    <path d="M18 13.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 19V8a1.5 1.5 0 0 1 1.5-1.5H11" />
+  </Svg>
+)
+
+export const LibraryIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="5" y="3.5" width="14" height="17" rx="1.8" />
+    <path d="M8.5 3.5v17" />
+  </Svg>
+)
+
 export const TasksIcon = (p: IconProps) => (
   <Svg {...p}>
     <rect x="4" y="4" width="16" height="16" rx="3.5" />
@@ -88,12 +147,11 @@ export const TasksIcon = (p: IconProps) => (
   </Svg>
 )
 
+// Доска для совместного рисования: рамка холста с рукописной волной внутри.
 export const BoardsIcon = (p: IconProps) => (
   <Svg {...p}>
-    <rect x="4" y="4" width="7" height="7" rx="1.5" />
-    <rect x="13" y="4" width="7" height="7" rx="1.5" />
-    <rect x="4" y="13" width="7" height="7" rx="1.5" />
-    <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <path d="M6.5 14c1.6-3 3.2-3 4.8 0s3.2 3 4.8 0" />
   </Svg>
 )
 
@@ -195,5 +253,12 @@ export const CopyIcon = (p: IconProps) => (
   <Svg {...p}>
     <rect x="9" y="9" width="13" height="13" rx="2" />
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </Svg>
+)
+
+export const CameraIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h1.8l1.2-2h7l1.2 2h1.8A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z" />
+    <circle cx="12" cy="13" r="3.2" />
   </Svg>
 )

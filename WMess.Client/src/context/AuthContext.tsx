@@ -1,9 +1,8 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
+import type { User } from './user'
 
-interface User {
-  email: string
-}
+export type { User } from './user'
 
 interface AuthContextValue {
   user: User | null

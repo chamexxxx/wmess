@@ -8,6 +8,7 @@ using Scalar.AspNetCore;
 using System.Text;
 using WMess.Api.Data;
 using WMess.Api.Infrastructure;
+using WMess.Api.Models;
 using WMess.Api.Services;
 using WMess.Api.Authorization;
 
@@ -29,13 +30,17 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Configure Identity
-builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength = 6;
+
+    // Логин (UserName) уникален и ограничен латиницей, цифрами, дефисом и подчёркиванием.
+    options.User.RequireUniqueEmail = true;
+    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
@@ -93,8 +98,8 @@ builder.Services.AddAuthorization(options =>
 // Register Token Service
 builder.Services.AddScoped<ITokenService, TokenService>();
 
-// Register Document Access Service (единый источник вычисления прав на документ)
-builder.Services.AddScoped<IDocumentAccessService, DocumentAccessService>();
+// Register Library Access Service (единый источник вычисления прав на элемент библиотеки)
+builder.Services.AddScoped<ILibraryAccessService, LibraryAccessService>();
 
 // Register Chat Access Service (единый источник вычисления прав на чат)
 builder.Services.AddScoped<IChatAccessService, ChatAccessService>();
@@ -113,7 +118,22 @@ builder.Services.AddScoped<IAuthorizationHandler, ProjectAccessHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ProjectManageHandler>();
 
 // Register SignalR (MessagePack — для эффективной передачи бинарных Yjs-апдейтов)
-builder.Services.AddSignalR().AddMessagePackProtocol();
+builder.Services.AddSignalR(options =>
+{
+    // По умолчанию вызовы одного клиента обрабатываются строго последовательно (лимит = 1).
+    // SaveLibraryItemState пишет снапшот в БД (медленно) и при этом лимите блокирует поток
+    // инкрементальных SendUpdate/SendAwareness — у других участников правки появляются
+    // рывками/с задержкой. Разрешаем несколько параллельных вызовов, чтобы запись снапшота
+    // не вставала «в голову очереди». Каждый вызов хаба получает свой DI-scope (и свой
+    // DbContext), поэтому параллелизм безопасен.
+    options.MaximumParallelInvocationsPerClient = 8;
+
+    // Дефолтный лимит входящего сообщения — 32 КБ. SaveLibraryItemState шлёт полный Yjs-снапшот
+    // состояния (encodeStateAsUpdate), который на доске с несколькими фигурами легко превышает
+    // 32 КБ; сервер тогда закрывает соединение с ошибкой, а на реконнекте Yjs ре-синкает всё
+    // разом — отсюда обрывы в консоли и «пачки» правок у других участников. Поднимаем лимит.
+    options.MaximumReceiveMessageSize = 20 * 1024 * 1024;
+}).AddMessagePackProtocol();
 
 // Register Controllers
 builder.Services.AddControllers(options =>
@@ -151,4 +171,7 @@ app.MapControllers();
 // Map SignalR Hubs
 app.MapHub<WMess.Api.Hubs.DocumentHub>("/hubs/document");
 app.MapHub<WMess.Api.Hubs.ChatHub>("/hubs/chat");
+app.MapHub<WMess.Api.Hubs.BoardHub>("/hubs/board");
+app.MapHub<WMess.Api.Hubs.TableHub>("/hubs/table");
+app.MapHub<WMess.Api.Hubs.LibraryHub>("/hubs/library");
 app.Run();

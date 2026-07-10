@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { apiClient } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { toUser } from '../context/user'
 import { AuthLayout, authError, authField, authLink, authPrimaryBtn } from '../components/AuthLayout'
 
 export function LoginPage() {
   const { setUser } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const [emailOrLogin, setEmailOrLogin] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
@@ -16,11 +17,11 @@ export function LoginPage() {
     setError('')
 
     try {
-      const res = await apiClient.login({ email, password })
-      setUser({ email: res.data.email! })
+      const res = await apiClient.login({ emailOrLogin, password })
+      setUser(toUser(res.data))
       navigate('/')
     } catch {
-      setError('Неверный email или пароль')
+      setError('Неверный email/логин или пароль')
     }
   }
 
@@ -39,11 +40,11 @@ export function LoginPage() {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input
-          type="email"
-          placeholder="Email"
+          type="text"
+          placeholder="Email или логин"
           className={authField}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={emailOrLogin}
+          onChange={(e) => setEmailOrLogin(e.target.value)}
           required
         />
         <input

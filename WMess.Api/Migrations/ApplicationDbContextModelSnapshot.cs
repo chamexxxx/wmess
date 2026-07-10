@@ -73,70 +73,6 @@ namespace WMess.Api.Migrations
                     b.ToTable("AspNetRoleClaims", (string)null);
                 });
 
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUser", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<int>("AccessFailedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ConcurrencyStamp")
-                        .IsConcurrencyToken()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("NormalizedEmail")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("NormalizedUserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<string>("PasswordHash")
-                        .HasColumnType("text");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("SecurityStamp")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UserName")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("EmailIndex");
-
-                    b.HasIndex("NormalizedUserName")
-                        .IsUnique()
-                        .HasDatabaseName("UserNameIndex");
-
-                    b.ToTable("AspNetUsers", (string)null);
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
                     b.Property<int>("Id")
@@ -322,49 +258,142 @@ namespace WMess.Api.Migrations
                 });
 
             modelBuilder.Entity("WMess.Api.Models.Document", b =>
+            modelBuilder.Entity("WMess.Api.Models.ApplicationUser", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
+                    b.Property<string>("Id")
                         .HasColumnType("text");
 
-                    b.Property<int?>("FolderId")
+                    b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("integer");
+                    b.Property<string>("AvatarContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
+                    b.Property<byte[]>("AvatarData")
+                        .HasColumnType("bytea");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("LockoutEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("NormalizedUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("PasswordHash")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("PhoneNumberConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("SecurityStamp")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("EmailIndex");
+
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasDatabaseName("UserNameIndex");
+
+                    b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.BoardContent", b =>
+                {
+                    b.Property<int>("LibraryItemId")
+                        .HasColumnType("integer");
 
                     b.Property<byte[]>("YjsState")
                         .HasColumnType("bytea");
 
-                    b.HasKey("Id");
+                    b.HasKey("LibraryItemId");
 
-                    b.HasIndex("CreatedBy");
-
-                    b.HasIndex("FolderId");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("Documents");
+                    b.ToTable("BoardContents");
                 });
 
-            modelBuilder.Entity("WMess.Api.Models.DocumentFolder", b =>
+            modelBuilder.Entity("WMess.Api.Models.DocumentContent", b =>
+                {
+                    b.Property<int>("LibraryItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("YjsState")
+                        .HasColumnType("bytea");
+
+                    b.HasKey("LibraryItemId");
+
+                    b.ToTable("DocumentContents");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.FileContent", b =>
+                {
+                    b.Property<int>("LibraryItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("LibraryItemId");
+
+                    b.ToTable("FileContents");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.LibraryFolder", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -395,10 +424,10 @@ namespace WMess.Api.Migrations
 
                     b.HasIndex("ProjectId");
 
-                    b.ToTable("DocumentFolders");
+                    b.ToTable("LibraryFolders");
                 });
 
-            modelBuilder.Entity("WMess.Api.Models.DocumentPermission", b =>
+            modelBuilder.Entity("WMess.Api.Models.LibraryItem", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -406,33 +435,54 @@ namespace WMess.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("CanEdit")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanManage")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("CanView")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("DocumentId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("GrantedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("UserId")
+                    b.Property<string>("CreatedBy")
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("FolderId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("CreatedBy");
 
-                    b.HasIndex("DocumentId", "UserId")
-                        .IsUnique();
+                    b.HasIndex("FolderId");
 
-                    b.ToTable("DocumentPermissions");
+                    b.HasIndex("ProjectId");
+
+                    b.ToTable("LibraryItems");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.LinkContent", b =>
+                {
+                    b.Property<int>("LibraryItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("LibraryItemId");
+
+                    b.ToTable("LinkContents");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.Message", b =>
@@ -611,6 +661,19 @@ namespace WMess.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.TableContent", b =>
+                {
+                    b.Property<int>("LibraryItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("YjsState")
+                        .HasColumnType("bytea");
+
+                    b.HasKey("LibraryItemId");
+
+                    b.ToTable("TableContents");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.Team", b =>
                 {
                     b.Property<int>("Id")
@@ -661,7 +724,7 @@ namespace WMess.Api.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                    b.HasOne("WMess.Api.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -670,7 +733,7 @@ namespace WMess.Api.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                    b.HasOne("WMess.Api.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -685,7 +748,7 @@ namespace WMess.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                    b.HasOne("WMess.Api.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -694,7 +757,7 @@ namespace WMess.Api.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", null)
+                    b.HasOne("WMess.Api.Models.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -749,15 +812,67 @@ namespace WMess.Api.Migrations
                 });
 
             modelBuilder.Entity("WMess.Api.Models.Document", b =>
+            modelBuilder.Entity("WMess.Api.Models.BoardContent", b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "Creator")
+                    b.HasOne("WMess.Api.Models.LibraryItem", "Item")
+                        .WithOne("BoardContent")
+                        .HasForeignKey("WMess.Api.Models.BoardContent", "LibraryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.DocumentContent", b =>
+                {
+                    b.HasOne("WMess.Api.Models.LibraryItem", "Item")
+                        .WithOne("DocumentContent")
+                        .HasForeignKey("WMess.Api.Models.DocumentContent", "LibraryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.FileContent", b =>
+                {
+                    b.HasOne("WMess.Api.Models.LibraryItem", "Item")
+                        .WithOne("FileContent")
+                        .HasForeignKey("WMess.Api.Models.FileContent", "LibraryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.LibraryFolder", b =>
+                {
+                    b.HasOne("WMess.Api.Models.LibraryFolder", "ParentFolder")
+                        .WithMany("SubFolders")
+                        .HasForeignKey("ParentFolderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("WMess.Api.Models.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ParentFolder");
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.LibraryItem", b =>
+                {
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "Creator")
                         .WithMany()
                         .HasForeignKey("CreatedBy")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("WMess.Api.Models.DocumentFolder", "Folder")
-                        .WithMany("Documents")
+                    b.HasOne("WMess.Api.Models.LibraryFolder", "Folder")
+                        .WithMany("Items")
                         .HasForeignKey("FolderId")
                         .OnDelete(DeleteBehavior.SetNull);
 
@@ -774,41 +889,15 @@ namespace WMess.Api.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("WMess.Api.Models.DocumentFolder", b =>
+            modelBuilder.Entity("WMess.Api.Models.LinkContent", b =>
                 {
-                    b.HasOne("WMess.Api.Models.DocumentFolder", "ParentFolder")
-                        .WithMany("SubFolders")
-                        .HasForeignKey("ParentFolderId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("WMess.Api.Models.Project", "Project")
-                        .WithMany()
-                        .HasForeignKey("ProjectId")
+                    b.HasOne("WMess.Api.Models.LibraryItem", "Item")
+                        .WithOne("LinkContent")
+                        .HasForeignKey("WMess.Api.Models.LinkContent", "LibraryItemId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ParentFolder");
-
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("WMess.Api.Models.DocumentPermission", b =>
-                {
-                    b.HasOne("WMess.Api.Models.Document", "Document")
-                        .WithMany("Permissions")
-                        .HasForeignKey("DocumentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Document");
-
-                    b.Navigation("User");
+                    b.Navigation("Item");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.Message", b =>
@@ -896,13 +985,24 @@ namespace WMess.Api.Migrations
 
             modelBuilder.Entity("WMess.Api.Models.RefreshToken", b =>
                 {
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.TableContent", b =>
+                {
+                    b.HasOne("WMess.Api.Models.LibraryItem", "Item")
+                        .WithOne("TableContent")
+                        .HasForeignKey("WMess.Api.Models.TableContent", "LibraryItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.TeamUser", b =>
@@ -913,7 +1013,7 @@ namespace WMess.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -934,15 +1034,24 @@ namespace WMess.Api.Migrations
                 });
 
             modelBuilder.Entity("WMess.Api.Models.Document", b =>
+            modelBuilder.Entity("WMess.Api.Models.LibraryFolder", b =>
                 {
-                    b.Navigation("Permissions");
-                });
-
-            modelBuilder.Entity("WMess.Api.Models.DocumentFolder", b =>
-                {
-                    b.Navigation("Documents");
+                    b.Navigation("Items");
 
                     b.Navigation("SubFolders");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.LibraryItem", b =>
+                {
+                    b.Navigation("BoardContent");
+
+                    b.Navigation("DocumentContent");
+
+                    b.Navigation("FileContent");
+
+                    b.Navigation("LinkContent");
+
+                    b.Navigation("TableContent");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.Message", b =>

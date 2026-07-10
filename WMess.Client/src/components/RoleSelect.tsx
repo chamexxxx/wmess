@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ROLE_LABELS } from '../workspace/roles'
-import { CheckIcon, ChevronDownIcon } from '../workspace/icons'
+import { ChevronDownIcon } from '../workspace/icons'
 
 const ROLE_VALUES = [0, 1, 2]
 
@@ -25,7 +25,8 @@ export function RoleSelect({ value, disabled, onChange }: RoleSelectProps) {
     if (!open) return
     const r = btnRef.current?.getBoundingClientRect()
     if (!r) return
-    const width = Math.max(r.width, 150)
+    // Ширина списка совпадает с шириной самой кнопки-поля.
+    const width = r.width
     // Выравниваем по правому краю кнопки и прижимаем к вьюпорту.
     const left = Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8))
     // Обычно раскрываем вниз, но если не помещается у нижнего края — вверх.
@@ -66,7 +67,7 @@ export function RoleSelect({ value, disabled, onChange }: RoleSelectProps) {
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="h-8 pl-2.5 pr-1.5 inline-flex items-center gap-1 rounded-[7px] border border-line bg-white text-sm text-ink-soft font-ui cursor-pointer hover:bg-hovered disabled:opacity-50 disabled:cursor-default focus:outline-none focus:border-accent"
+        className="h-8 pl-3 pr-2 min-w-[132px] inline-flex items-center justify-between gap-1 rounded-[7px] border border-line bg-white text-sm text-ink-soft font-ui cursor-pointer hover:bg-hovered disabled:opacity-50 disabled:cursor-default focus:outline-none focus:border-accent"
       >
         <span>{ROLE_LABELS[value]}</span>
         <ChevronDownIcon
@@ -89,11 +90,10 @@ export function RoleSelect({ value, disabled, onChange }: RoleSelectProps) {
                 setOpen(false)
                 if (r !== value) onChange(r)
               }}
-              className={`w-full flex items-center gap-2 px-3 py-[7px] text-[13px] text-left cursor-pointer hover:bg-hovered ${
+              className={`w-full flex items-center px-3 py-[7px] text-[13px] text-left cursor-pointer hover:bg-hovered ${
                 r === value ? 'text-accent-deep font-semibold' : 'text-ink-soft'
               }`}
             >
-              <CheckIcon size={15} className={r === value ? 'text-accent' : 'opacity-0'} />
               {ROLE_LABELS[r]}
             </button>
           ))}

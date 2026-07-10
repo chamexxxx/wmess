@@ -1,0 +1,954 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { apiClient } from '../api'
+import { FormModal, LinkFormModal, ConfirmDialog } from './WorkspaceModals'
+import { ContextMenu } from './ContextMenu'
+import type { ContextMenuItem } from './ContextMenu'
+import { BoardsIcon, DocsIcon, ExternalLinkIcon, FileIcon, FilterIcon, FolderIcon, HomeIcon, ImageIcon, LayersIcon, PencilIcon, SearchIcon, SortIcon, TablesIcon, TrashIcon } from '../workspace/icons'
+import { ImagePreview, isImageFile } from './ImagePreview'
+import type { PreviewImage } from './ImagePreview'
+import { toast } from '../store/toastStore'
+import { describeError } from '../api/errorMessage'
+
+interface FolderItem {
+  id: number
+  name: string
+  updatedAt?: string
+}
+
+interface DocItem {
+  id: number
+  title: string
+  type?: string
+  updatedAt?: string
+  // Адрес внешнего ресурса — только для элементов типа 'link'.
+  url?: string | null
+  // Заполняется только в плоском режиме (getProjectItems) — для фильтрации по поддереву папок.
+  folderId?: number | null
+}
+
+type RenameTarget = { kind: 'folder'; id: number; name: string } | { kind: 'doc'; id: number; name: string }
+type DeleteTarget = RenameTarget
+
+interface LibraryExplorerProps {
+  projectId: number
+  folderId: number | null
+  onNavigateFolder: (id: number | null) => void
+  onOpenDocument: (id: number, title: string, type?: string) => void
+  // Realtime-сигнал: при изменении перезапрашиваем текущий вид (кто-то поменял библиотеку проекта).
+  refreshSignal?: number
+}
+
+// Подписи фильтра по типу (значение → текст на кнопке).
+const FILTER_LABELS: Record<string, string> = {
+  all: 'Все',
+  document: 'Документы',
+  board: 'Доски',
+  table: 'Таблицы',
+  file: 'Файлы',
+  link: 'Ссылки',
+}
+
+// Короткие подписи сортировки для кнопки.
+const SORT_LABELS: Record<string, string> = {
+  'name-asc': 'Имя ↑',
+  'name-desc': 'Имя ↓',
+  'date-desc': 'Дата ↓',
+  'date-asc': 'Дата ↑',
+}
+
+function formatDate(value?: string): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+export function LibraryExplorer({ projectId, folderId, onNavigateFolder, onOpenDocument, refreshSignal = 0 }: LibraryExplorerProps) {
+  const [folders, setFolders] = useState<FolderItem[]>([])
+  const [documents, setDocuments] = useState<DocItem[]>([])
+  const [path, setPath] = useState<{ id: number; name: string }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [query, setQuery] = useState('')
+  const [searchFolders, setSearchFolders] = useState<FolderItem[]>([])
+  const [searchDocs, setSearchDocs] = useState<DocItem[]>([])
+  const searching = query.trim().length > 0
+  const [searchLoading, setSearchLoading] = useState(false)
+
+  const [createKind, setCreateKind] = useState<'folder' | 'doc' | 'board' | 'table' | 'link' | null>(null)
+  // Папка, в которой создаётся документ (через контекстное меню папки); null — текущая папка.
+  const [createDocFolderId, setCreateDocFolderId] = useState<number | null>(null)
+  const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [dragItem, setDragItem] = useState<{ kind: 'folder' | 'doc'; id: number } | null>(null)
+  const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [preview, setPreview] = useState<{ images: PreviewImage[]; index: number } | null>(null)
+  // Фильтр по типу элемента: 'all' | 'document' | 'board' | 'table' | 'file'.
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  // Сортировка: 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc'.
+  const [sort, setSort] = useState<string>('name-asc')
+  // Плоский режим: элементы текущей папки и всех вложенных одним списком, без разбивки по папкам.
+  const [flat, setFlat] = useState(false)
+  const [allItems, setAllItems] = useState<DocItem[]>([])
+  const [allFolders, setAllFolders] = useState<{ id: number; parentFolderId: number | null }[]>([])
+
+  const loadContents = async () => {
+    // Намеренно НЕ ставим loading=true при переходах: иначе список на миг заменяется на
+    // «Загрузка…» и контейнер дёргается. Лоадер показываем только для самой первой загрузки
+    // (loading инициализирован в true); дальше новый список плавно подменяет старый на месте.
+    try {
+      const res = await apiClient.library.getFolderContents(projectId, {
+        folderId: folderId ?? undefined,
+      })
+      const data = res.data
+      setFolders((data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '', updatedAt: f.updatedAt })))
+      setDocuments(
+        (data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type, updatedAt: d.updatedAt, url: d.url })),
+      )
+      setPath((data?.path ?? []).map((p) => ({ id: Number(p.id), name: p.name ?? '' })))
+    } catch (error) {
+      console.error('Failed to load folder contents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Загрузка файлов: скрытый input, папку-назначение держим в ref (чтобы не зависеть
+  // от асинхронного setState между кликом пункта меню и выбором файлов в диалоге).
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadFolderRef = useRef<number | null>(null)
+
+  const startUpload = (targetFolderId: number | null) => {
+    uploadFolderRef.current = targetFolderId
+    fileInputRef.current?.click()
+  }
+
+  const onFilesPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = '' // сброс, чтобы повторный выбор тех же файлов снова сработал
+    if (files.length === 0) return
+    setBusy(true)
+    try {
+      await apiClient.uploadLibraryFiles(projectId, uploadFolderRef.current, files)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to upload files:', error)
+      toast.error(describeError(error, 'Не удалось загрузить файлы'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    loadContents()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, folderId, refreshSignal])
+
+  // Плоский режим: подгружаем все элементы и папки проекта, чтобы собрать поддерево текущей папки.
+  useEffect(() => {
+    if (!flat) return
+    let cancelled = false
+    Promise.all([
+      apiClient.library.getProjectItems(projectId),
+      apiClient.library.getProjectFolders(projectId),
+    ])
+      .then(([itemsRes, foldersRes]) => {
+        if (cancelled) return
+        setAllItems(
+          (itemsRes.data ?? []).map((d) => ({
+            id: Number(d.id),
+            title: d.title ?? 'Без названия',
+            type: d.type,
+            updatedAt: d.updatedAt,
+            url: d.url,
+            folderId: d.folderId == null ? null : Number(d.folderId),
+          })),
+        )
+        setAllFolders(
+          (foldersRes.data ?? []).map((f) => ({
+            id: Number(f.id),
+            parentFolderId: f.parentFolderId == null ? null : Number(f.parentFolderId),
+          })),
+        )
+      })
+      .catch((error) => console.error('Failed to load project tree:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [flat, projectId, refreshSignal])
+
+  // Элементы поддерева текущей папки (сама папка + все вложенные). В корне (folderId=null) — весь проект.
+  const flatItems = useMemo(() => {
+    if (!flat) return []
+    if (folderId == null) return allItems
+    const childrenOf = new Map<number, number[]>()
+    for (const f of allFolders) {
+      if (f.parentFolderId != null) {
+        const arr = childrenOf.get(f.parentFolderId) ?? []
+        arr.push(f.id)
+        childrenOf.set(f.parentFolderId, arr)
+      }
+    }
+    const subtree = new Set<number>()
+    const stack = [folderId]
+    while (stack.length) {
+      const id = stack.pop()!
+      if (subtree.has(id)) continue
+      subtree.add(id)
+      for (const child of childrenOf.get(id) ?? []) stack.push(child)
+    }
+    return allItems.filter((it) => it.folderId != null && subtree.has(it.folderId))
+  }, [flat, folderId, allItems, allFolders])
+
+  // Поиск по проекту с дебаунсом (серверный).
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) {
+      setSearchFolders([])
+      setSearchDocs([])
+      setSearchLoading(false)
+      return
+    }
+    setSearchLoading(true)
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiClient.library.searchLibrary(projectId, { query: q })
+        setSearchFolders((res.data?.folders ?? []).map((f) => ({ id: Number(f.id), name: f.name ?? '' })))
+        setSearchDocs((res.data?.items ?? []).map((d) => ({ id: Number(d.id), title: d.title ?? 'Без названия', type: d.type, url: d.url })))
+      } catch (error) {
+        console.error('Failed to search:', error)
+      } finally {
+        setSearchLoading(false)
+      }
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [query, projectId])
+
+  const createFolder = async (name: string) => {
+    setBusy(true)
+    try {
+      await apiClient.library.createFolder({ projectId, parentFolderId: folderId, name })
+      setCreateKind(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+      toast.error(describeError(error, 'Не удалось создать папку'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createDocument = async (title: string) => {
+    setBusy(true)
+    try {
+      const res = await apiClient.library.createDocument({ projectId, folderId: createDocFolderId, title })
+      setCreateKind(null)
+      setCreateDocFolderId(null)
+      if (res.data?.id != null) {
+        onOpenDocument(Number(res.data.id), res.data.title ?? title, 'document')
+      }
+    } catch (error) {
+      console.error('Failed to create document:', error)
+      toast.error(describeError(error, 'Не удалось создать документ'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createBoard = async (title: string) => {
+    setBusy(true)
+    try {
+      const res = await apiClient.library.createBoard({ projectId, folderId: createDocFolderId, title })
+      setCreateKind(null)
+      setCreateDocFolderId(null)
+      if (res.data?.id != null) {
+        onOpenDocument(Number(res.data.id), res.data.title ?? title, 'board')
+      }
+    } catch (error) {
+      console.error('Failed to create board:', error)
+      toast.error(describeError(error, 'Не удалось создать доску'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createTable = async (title: string) => {
+    setBusy(true)
+    try {
+      const res = await apiClient.library.createTable({ projectId, folderId: createDocFolderId, title })
+      setCreateKind(null)
+      setCreateDocFolderId(null)
+      if (res.data?.id != null) {
+        onOpenDocument(Number(res.data.id), res.data.title ?? title, 'table')
+      }
+    } catch (error) {
+      console.error('Failed to create table:', error)
+      toast.error(describeError(error, 'Не удалось создать таблицу'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const createLink = async (title: string, url: string) => {
+    setBusy(true)
+    try {
+      await apiClient.library.createLink({ projectId, folderId: createDocFolderId, title, url })
+      setCreateKind(null)
+      setCreateDocFolderId(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to create link:', error)
+      toast.error(describeError(error, 'Не удалось добавить ссылку'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rename = async (name: string) => {
+    if (!renameTarget) return
+    setBusy(true)
+    try {
+      if (renameTarget.kind === 'folder') {
+        await apiClient.library.updateFolder(renameTarget.id, { name })
+      } else {
+        await apiClient.library.updateItem(renameTarget.id, { title: name })
+      }
+      setRenameTarget(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to rename:', error)
+      toast.error(describeError(error, 'Не удалось переименовать'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setBusy(true)
+    try {
+      if (deleteTarget.kind === 'folder') {
+        await apiClient.library.deleteFolder(deleteTarget.id)
+      } else {
+        await apiClient.library.deleteItem(deleteTarget.id)
+      }
+      setDeleteTarget(null)
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to delete:', error)
+      toast.error(describeError(error, 'Не удалось удалить'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Перемещение перетаскиванием: в папку (target=id) или в предка через крошки (target=id|null).
+  const moveInto = async (target: number | null) => {
+    const item = dragItem
+    setDragItem(null)
+    setDropTarget(null)
+    if (!item) return
+    if (item.kind === 'folder' && item.id === target) return
+    try {
+      if (item.kind === 'folder') {
+        await apiClient.library.moveFolder(item.id, { parentFolderId: target })
+      } else {
+        await apiClient.library.moveItem(item.id, { folderId: target })
+      }
+      await loadContents()
+    } catch (error) {
+      console.error('Failed to move:', error)
+      toast.error(describeError(error, 'Не удалось переместить'))
+    }
+  }
+
+  const rowBase =
+    'flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-hovered'
+
+  // Контекстное меню (правая кнопка) — действия вместо иконок при наведении.
+  const openFolderMenu = (e: React.MouseEvent, f: FolderItem) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Создать документ',
+          icon: <DocsIcon size={15} className="text-doc" />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Создать доску',
+          icon: <BoardsIcon size={15} className="text-board" />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('board')
+          },
+        },
+        {
+          label: 'Создать таблицу',
+          icon: <TablesIcon size={15} className="text-table" />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('table')
+          },
+        },
+        {
+          label: 'Добавить ссылку',
+          icon: <ExternalLinkIcon size={15} className="text-link" />,
+          onClick: () => {
+            setCreateDocFolderId(f.id)
+            setCreateKind('link')
+          },
+        },
+        {
+          label: 'Загрузить файлы',
+          icon: <FileIcon size={15} className="text-ink" />,
+          onClick: () => startUpload(f.id),
+        },
+        {
+          label: 'Переименовать',
+          icon: <PencilIcon size={15} />,
+          onClick: () => setRenameTarget({ kind: 'folder', id: f.id, name: f.name }),
+        },
+        {
+          label: 'Удалить',
+          icon: <TrashIcon size={15} />,
+          danger: true,
+          onClick: () => setDeleteTarget({ kind: 'folder', id: f.id, name: f.name }),
+        },
+      ],
+    })
+  }
+
+  const openDocMenu = (e: React.MouseEvent, d: DocItem) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Переименовать',
+          icon: <PencilIcon size={15} />,
+          onClick: () => setRenameTarget({ kind: 'doc', id: d.id, name: d.title }),
+        },
+        {
+          label: 'Удалить',
+          icon: <TrashIcon size={15} />,
+          danger: true,
+          onClick: () => setDeleteTarget({ kind: 'doc', id: d.id, name: d.title }),
+        },
+      ],
+    })
+  }
+
+  // Меню для пустой области списка — создание в текущей папке (folderId).
+  const openEmptyMenu = (e: React.MouseEvent) => {
+    if (searching) return
+    e.preventDefault()
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        {
+          label: 'Создать папку',
+          icon: <FolderIcon size={15} className="text-folder" />,
+          onClick: () => setCreateKind('folder'),
+        },
+        {
+          label: 'Создать документ',
+          icon: <DocsIcon size={15} className="text-doc" />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('doc')
+          },
+        },
+        {
+          label: 'Создать доску',
+          icon: <BoardsIcon size={15} className="text-board" />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('board')
+          },
+        },
+        {
+          label: 'Создать таблицу',
+          icon: <TablesIcon size={15} className="text-table" />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('table')
+          },
+        },
+        {
+          label: 'Добавить ссылку',
+          icon: <ExternalLinkIcon size={15} className="text-link" />,
+          onClick: () => {
+            setCreateDocFolderId(folderId)
+            setCreateKind('link')
+          },
+        },
+        {
+          label: 'Загрузить файлы',
+          icon: <FileIcon size={15} className="text-ink" />,
+          onClick: () => startUpload(folderId),
+        },
+      ],
+    })
+  }
+
+  // Перетаскивание включаем только в обычном просмотре (withMeta), не в результатах поиска,
+  // где элементы лежат плоским списком из разных папок.
+  const folderRow = (f: FolderItem, withMeta: boolean) => {
+    const isDragOver = dropTarget === f.id
+    const isDragging = dragItem?.kind === 'folder' && dragItem.id === f.id
+    const canDrop = withMeta && !!dragItem && !(dragItem.kind === 'folder' && dragItem.id === f.id)
+    return (
+    <div
+      key={`f-${f.id}`}
+      className={`${rowBase} ${isDragOver ? 'bg-accent-soft ring-1 ring-inset ring-accent/40' : ''} ${isDragging ? 'opacity-50' : ''}`}
+      onClick={() => onNavigateFolder(f.id)}
+      onContextMenu={(e) => openFolderMenu(e, f)}
+      draggable={withMeta}
+      onDragStart={
+        withMeta
+          ? (e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              setDragItem({ kind: 'folder', id: f.id })
+            }
+          : undefined
+      }
+      onDragEnd={
+        withMeta
+          ? () => {
+              setDragItem(null)
+              setDropTarget(null)
+            }
+          : undefined
+      }
+      onDragOver={
+        withMeta
+          ? (e) => {
+              if (!dragItem) return
+              e.stopPropagation()
+              if (!canDrop) {
+                e.dataTransfer.dropEffect = 'none'
+                if (dropTarget === f.id) setDropTarget(null)
+                return
+              }
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              if (dropTarget !== f.id) setDropTarget(f.id)
+            }
+          : undefined
+      }
+      onDragLeave={
+        withMeta
+          ? () => {
+              if (dropTarget === f.id) setDropTarget(null)
+            }
+          : undefined
+      }
+      onDrop={
+        withMeta
+          ? (e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              if (canDrop) moveInto(f.id)
+            }
+          : undefined
+      }
+    >
+      <FolderIcon size={18} className="text-folder shrink-0" />
+      <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{f.name}</span>
+      {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(f.updatedAt)}</span>}
+    </div>
+    )
+  }
+
+  // Открытие элемента: изображение — галерея по текущему списку, прочий файл — скачать,
+  // остальные типы — редактор.
+  const openItem = (d: DocItem) => {
+    if (d.type === 'link') {
+      if (d.url) {
+        window.open(d.url, '_blank', 'noopener,noreferrer')
+      }
+      return
+    }
+    if (d.type !== 'file') {
+      onOpenDocument(d.id, d.title, d.type)
+      return
+    }
+    if (!isImageFile(d.title)) {
+      apiClient.downloadLibraryFile(d.id, d.title)
+      return
+    }
+    const source = searching ? searchDocs : flat ? flatItems : documents
+    const imgs = source
+      .filter((x) => x.type === 'file' && isImageFile(x.title))
+      .map((x) => ({ id: x.id, title: x.title }))
+    const idx = imgs.findIndex((x) => x.id === d.id)
+    setPreview({ images: imgs, index: idx < 0 ? 0 : idx })
+  }
+
+  const docRow = (d: DocItem, withMeta: boolean) => {
+    const isDragging = dragItem?.kind === 'doc' && dragItem.id === d.id
+    return (
+    <div
+      key={`d-${d.id}`}
+      className={`${rowBase} ${isDragging ? 'opacity-50' : ''}`}
+      onClick={() => openItem(d)}
+      onContextMenu={(e) => openDocMenu(e, d)}
+      draggable={withMeta}
+      onDragStart={
+        withMeta
+          ? (e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              setDragItem({ kind: 'doc', id: d.id })
+            }
+          : undefined
+      }
+      onDragEnd={
+        withMeta
+          ? () => {
+              setDragItem(null)
+              setDropTarget(null)
+            }
+          : undefined
+      }
+    >
+      {d.type === 'board' ? (
+        <BoardsIcon size={18} className="text-board shrink-0" />
+      ) : d.type === 'table' ? (
+        <TablesIcon size={18} className="text-table shrink-0" />
+      ) : d.type === 'link' ? (
+        <ExternalLinkIcon size={18} className="text-link shrink-0" />
+      ) : d.type === 'file' ? (
+        isImageFile(d.title) ? (
+          <ImageIcon size={18} className="text-image shrink-0" />
+        ) : (
+          <FileIcon size={18} className="text-ink shrink-0" />
+        )
+      ) : (
+        <DocsIcon size={18} className="text-doc shrink-0" />
+      )}
+      <span className="flex-1 min-w-0 text-[13.5px] text-ink truncate">{d.title}</span>
+      {withMeta && <span className="shrink-0 w-28 text-right text-[12px] text-faint">{formatDate(d.updatedAt)}</span>}
+    </div>
+    )
+  }
+
+  // Компараторы для сортировки (по имени/дате). Даты в ISO — сравниваем как строки.
+  const docCmp = (a: DocItem, b: DocItem) => {
+    if (sort === 'name-desc') return b.title.localeCompare(a.title, 'ru')
+    if (sort === 'date-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+    if (sort === 'date-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
+    return a.title.localeCompare(b.title, 'ru')
+  }
+  const folderCmp = (a: FolderItem, b: FolderItem) => {
+    if (sort === 'name-desc') return b.name.localeCompare(a.name, 'ru')
+    if (sort === 'date-desc') return (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+    if (sort === 'date-asc') return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')
+    return a.name.localeCompare(b.name, 'ru')
+  }
+
+  const matchesType = (d: DocItem) => typeFilter === 'all' || d.type === typeFilter
+
+  // Что показываем: поиск → результаты; плоский режим → все элементы проекта; иначе — текущая папка.
+  // Папки скрываем в поиске и в плоском режиме.
+  const listFolders = searching || flat ? [] : [...folders].sort(folderCmp)
+  const listDocs = (searching ? searchDocs : flat ? flatItems : documents)
+    .filter(matchesType)
+    .sort(docCmp)
+  const searchFoldersSorted = searching ? [...searchFolders].sort(folderCmp) : []
+
+  const isEmpty = !searching && !flat && folders.length === 0 && documents.length === 0
+  // Есть ли что показать в режиме поиска (учитывая «протухшие» результаты прошлого запроса).
+  const hasSearchContent = searchFoldersSorted.length > 0 || listDocs.length > 0
+
+  // Выпадашка фильтра — переиспользуем ContextMenu, открывая её под кнопкой.
+  const openFilterMenu = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setMenu({
+      x: rect.left,
+      y: rect.bottom + 4,
+      items: [
+        { label: 'Все', icon: <FilterIcon size={15} className="text-muted" />, onClick: () => setTypeFilter('all') },
+        { label: 'Документы', icon: <DocsIcon size={15} className="text-doc" />, onClick: () => setTypeFilter('document') },
+        { label: 'Доски', icon: <BoardsIcon size={15} className="text-board" />, onClick: () => setTypeFilter('board') },
+        { label: 'Таблицы', icon: <TablesIcon size={15} className="text-table" />, onClick: () => setTypeFilter('table') },
+        { label: 'Файлы', icon: <FileIcon size={15} className="text-ink" />, onClick: () => setTypeFilter('file') },
+        { label: 'Ссылки', icon: <ExternalLinkIcon size={15} className="text-link" />, onClick: () => setTypeFilter('link') },
+      ],
+    })
+  }
+
+  // Выпадашка сортировки.
+  const openSortMenu = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const item = (label: string, value: string) => ({
+      label,
+      icon: <SortIcon size={15} className="text-muted" />,
+      onClick: () => setSort(value),
+    })
+    setMenu({
+      x: rect.left,
+      y: rect.bottom + 4,
+      items: [
+        item('По названию (А–Я)', 'name-asc'),
+        item('По названию (Я–А)', 'name-desc'),
+        item('По дате (новые)', 'date-desc'),
+        item('По дате (старые)', 'date-asc'),
+      ],
+    })
+  }
+
+  // Крошки как зоны сброса: перенос в предка (c.id) или в корень (Home → null).
+  const breadcrumbDnd = (target: number | 'root') => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!dragItem) return
+      e.preventDefault()
+      e.stopPropagation()
+      e.dataTransfer.dropEffect = 'move'
+      if (dropTarget !== target) setDropTarget(target)
+    },
+    onDragLeave: () => {
+      if (dropTarget === target) setDropTarget(null)
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      moveInto(target === 'root' ? null : target)
+    },
+  })
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <input ref={fileInputRef} type="file" multiple hidden onChange={onFilesPicked} />
+      <div className="h-[52px] shrink-0 flex items-center gap-3 px-5">
+        <nav className="flex items-center gap-1.5 text-[14px] min-w-0">
+          <button
+            type="button"
+            className={`shrink-0 w-7 h-7 -ml-1 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+              dropTarget === 'root'
+                ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/40'
+                : 'text-muted hover:bg-hovered hover:text-accent'
+            }`}
+            title="Все файлы"
+            onClick={() => onNavigateFolder(null)}
+            {...(path.length === 0 ? {} : breadcrumbDnd('root'))}
+          >
+            <HomeIcon size={16} />
+          </button>
+          {path.map((c, i) => {
+            // Последний пункт — текущая папка: не ссылка, без подсветки и не цель для переноса.
+            const isCurrent = i === path.length - 1
+            return (
+              <span key={c.id} className="flex items-center gap-1.5 min-w-0">
+                <span className="text-faintest shrink-0">/</span>
+                {isCurrent ? (
+                  <span className="truncate px-1 -mx-1 text-ink font-medium">{c.name}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`transition-colors truncate cursor-pointer rounded px-1 -mx-1 ${
+                      dropTarget === c.id
+                        ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/40'
+                        : 'text-muted hover:text-accent'
+                    }`}
+                    onClick={() => onNavigateFolder(c.id)}
+                    {...breadcrumbDnd(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                )}
+              </span>
+            )
+          })}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openFilterMenu}
+            title="Фильтр по типу"
+            className={`h-8 px-2.5 rounded-[9px] border text-[13px] flex items-center gap-1.5 cursor-pointer transition-colors ${
+              typeFilter === 'all'
+                ? 'border-line bg-white text-muted hover:border-accent'
+                : 'border-accent/40 bg-accent-soft text-accent'
+            }`}
+          >
+            <FilterIcon size={15} />
+            {FILTER_LABELS[typeFilter]}
+          </button>
+          <button
+            type="button"
+            onClick={openSortMenu}
+            title="Сортировка"
+            className="h-8 px-2.5 rounded-[9px] border border-line bg-white text-[13px] text-muted flex items-center gap-1.5 cursor-pointer hover:border-accent transition-colors"
+          >
+            <SortIcon size={15} />
+            {SORT_LABELS[sort]}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFlat((v) => !v)}
+            title="Показать элементы этой папки и всех вложенных одним списком"
+            className={`h-8 w-8 rounded-[9px] border flex items-center justify-center cursor-pointer transition-colors ${
+              flat
+                ? 'border-accent/40 bg-accent-soft text-accent'
+                : 'border-line bg-white text-muted hover:border-accent'
+            }`}
+          >
+            <LayersIcon size={16} />
+          </button>
+          <div className="relative">
+            <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск по проекту"
+              className="h-8 w-52 pl-8 pr-2 text-[13px] bg-white border border-line rounded-[9px] text-ink placeholder:text-faint focus:outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto wm-scroll px-3 pt-4 pb-2" onContextMenu={openEmptyMenu}>
+        {loading ? (
+          <div className="px-3 py-4 text-[13px] text-faint">Загрузка…</div>
+        ) : searching ? (
+          hasSearchContent ? (
+            <>
+              {searchFoldersSorted.map((f) => folderRow(f, false))}
+              {listDocs.map((d) => docRow(d, false))}
+            </>
+          ) : searchLoading ? (
+            <div className="px-3 py-4 text-[13px] text-faint">Поиск…</div>
+          ) : (
+            <div className="px-3 py-4 text-[13px] text-faint">Ничего не найдено</div>
+          )
+        ) : flat ? (
+          listDocs.length === 0 ? (
+            <div className="px-3 py-4 text-[13px] text-faint">Нет элементов выбранного типа</div>
+          ) : (
+            <>{listDocs.map((d) => docRow(d, true))}</>
+          )
+        ) : isEmpty ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-8">
+            <div className="w-[48px] h-[48px] rounded-2xl bg-accent-soft text-accent flex items-center justify-center">
+              <FolderIcon size={22} strokeWidth={1.6} />
+            </div>
+            <div className="text-[13.5px] text-muted max-w-[320px] leading-[1.5]">
+              {path.length > 0 ? 'Папка пуста.' : 'Здесь пока ничего нет.'} Создайте элемент или папку.
+            </div>
+          </div>
+        ) : (
+          <>
+            {listFolders.map((f) => folderRow(f, true))}
+            {listDocs.map((d) => docRow(d, true))}
+          </>
+        )}
+      </div>
+
+      {createKind === 'folder' && (
+        <FormModal
+          title="Новая папка"
+          label="Название папки"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createFolder}
+          onClose={() => setCreateKind(null)}
+        />
+      )}
+      {createKind === 'doc' && (
+        <FormModal
+          title="Новый документ"
+          label="Название документа"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createDocument}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
+        />
+      )}
+      {createKind === 'board' && (
+        <FormModal
+          title="Новая доска"
+          label="Название доски"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createBoard}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
+        />
+      )}
+      {createKind === 'table' && (
+        <FormModal
+          title="Новая таблица"
+          label="Название таблицы"
+          submitLabel="Создать"
+          busy={busy}
+          onSubmit={createTable}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
+        />
+      )}
+      {createKind === 'link' && (
+        <LinkFormModal
+          title="Новая ссылка"
+          submitLabel="Добавить"
+          busy={busy}
+          onSubmit={createLink}
+          onClose={() => {
+            setCreateKind(null)
+            setCreateDocFolderId(null)
+          }}
+        />
+      )}
+      {renameTarget && (
+        <FormModal
+          title={renameTarget.kind === 'folder' ? 'Переименовать папку' : 'Переименовать элемент'}
+          label={renameTarget.kind === 'folder' ? 'Название папки' : 'Название'}
+          submitLabel="Сохранить"
+          busy={busy}
+          initialValue={renameTarget.name}
+          onSubmit={rename}
+          onClose={() => setRenameTarget(null)}
+        />
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title={deleteTarget.kind === 'folder' ? 'Удалить папку?' : 'Удалить элемент?'}
+          message={
+            deleteTarget.kind === 'folder' ? (
+              <>Папка «{deleteTarget.name}» будет удалена. Вложенные элементы останутся без папки.</>
+            ) : (
+              <>Элемент «{deleteTarget.name}» будет удалён без возможности восстановления.</>
+            )
+          }
+          confirmLabel="Удалить"
+          busy={busy}
+          onConfirm={confirmDelete}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
+      {preview && (
+        <ImagePreview images={preview.images} index={preview.index} onClose={() => setPreview(null)} />
+      )}
+    </div>
+  )
+}

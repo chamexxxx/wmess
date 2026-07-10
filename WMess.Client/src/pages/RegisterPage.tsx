@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isAxiosError } from 'axios'
 import { Link, useNavigate } from 'react-router'
 import { apiClient } from '../api'
 import { AuthLayout, authError, authField, authLink, authPrimaryBtn } from '../components/AuthLayout'
@@ -6,6 +7,8 @@ import { AuthLayout, authError, authField, authLink, authPrimaryBtn } from '../c
 export function RegisterPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
+  const [login, setLogin] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
@@ -14,10 +17,14 @@ export function RegisterPage() {
     setError('')
 
     try {
-      await apiClient.register({ email, password })
+      await apiClient.register({ email, login, displayName, password })
       navigate('/login')
-    } catch {
-      setError('Ошибка регистрации')
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 409) {
+        setError('Пользователь с таким email или логином уже существует')
+      } else {
+        setError('Ошибка регистрации. Проверьте правильность полей')
+      }
     }
   }
 
@@ -41,6 +48,30 @@ export function RegisterPage() {
           className={authField}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <div>
+          <input
+            type="text"
+            placeholder="Логин"
+            className={authField}
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
+            pattern="[a-zA-Z0-9_\-]{3,32}"
+            title="3–32 символа: латиница, цифры, «_» или «-»"
+            required
+          />
+          <p className="text-[11.5px] text-faint mt-[6px]">
+            3–32 символа: латиница, цифры, «_» или «-»
+          </p>
+        </div>
+        <input
+          type="text"
+          placeholder="Имя"
+          className={authField}
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          maxLength={100}
           required
         />
         <div>

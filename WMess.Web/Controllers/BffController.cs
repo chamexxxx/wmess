@@ -34,7 +34,14 @@ public class BffController : ControllerBase
 
         await _sessionManager.SignInAsync(HttpContext, auth);
 
-        return Ok(new UserResponse { Email = auth.Email });
+        return Ok(new UserResponse
+        {
+            Id = auth.UserId,
+            Email = auth.Email,
+            Login = auth.Login,
+            DisplayName = auth.DisplayName,
+            HasAvatar = auth.HasAvatar
+        });
     }
 
     [HttpPost("register")]
@@ -71,7 +78,13 @@ public class BffController : ControllerBase
             return Unauthorized();
         }
 
-        return Ok(new UserResponse { Email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty });
+        return Ok(new UserResponse
+        {
+            Id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
+            Email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty,
+            Login = User.FindFirstValue(SessionManager.LoginClaim) ?? string.Empty,
+            DisplayName = User.FindFirstValue(SessionManager.DisplayNameClaim) ?? string.Empty
+        });
     }
 
     [HttpPost("refresh")]

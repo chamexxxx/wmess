@@ -15,6 +15,9 @@ dist-ssr
 # Generated API code
 src/api/generated
 
+# Ассеты Excalidraw, копируются из node_modules скриптом (см. scripts/copy-excalidraw-assets.mjs)
+public/excalidraw-assets
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

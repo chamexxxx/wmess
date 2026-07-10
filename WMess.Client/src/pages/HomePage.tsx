@@ -1,26 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useMatch, useNavigate, useParams } from 'react-router'
 import { apiClient } from '../api'
-import { useAuth } from '../context/AuthContext'
 import type { ProjectResponse, TeamResponse, TeamDetailResponse } from '../api/generated/data-contracts'
-import { TeamRail } from '../components/TeamRail'
 import { ProjectSidebar } from '../components/ProjectSidebar'
-import { DocumentsSection } from '../components/DocumentsSection'
+import { LibrarySection } from '../components/LibrarySection'
 import { ProjectSettings } from '../components/ProjectSettings'
+import { TeamSettings } from '../components/TeamSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
-import { TeamMembersModal } from '../components/TeamMembersModal'
+import { useWorkspace } from '../components/workspaceContext'
 import { FolderIcon, PlusIcon, SettingsIcon } from '../workspace/icons'
 import { ChatsSection } from '../features/chat/ChatsSection'
 import { DEFAULT_SECTION, sectionById, type Section } from '../workspace/sections'
 
-type TeamModal = { mode: 'create' } | { mode: 'edit'; team: TeamResponse }
 type ProjectModal = { mode: 'create' } | { mode: 'edit'; project: ProjectResponse }
 type Confirm = { kind: 'team'; team: TeamResponse } | { kind: 'project'; project: ProjectResponse }
-type MembersModal = { teamId: number }
 
 export function HomePage() {
-  const { user, setUser } = useAuth()
   const navigate = useNavigate()
+  // Команды/проекты и общие действия берём из каркаса рабочего пространства.
+  const { teams, setTeams, projects, setProjects, openCreateTeam, setError } = useWorkspace()
 
   // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
   // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/docs/:docId
@@ -29,37 +27,21 @@ export function HomePage() {
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
   // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Документы».
   const sectionKey = docIdParam != null ? 'docs' : chatIdParam != null ? 'chats' : sectionParam
+  // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/library/:itemId
+  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, itemId: itemIdParam } = useParams()
+  const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
+  const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
+  // На маршруте документа сегмент :section отсутствует — это всё равно раздел «Библиотека».
+  const sectionKey = itemIdParam != null ? 'library' : sectionParam
+  // Страница настроек команды: /teams/:teamId/settings (отдельно от настроек проекта).
+  const isTeamSettings = useMatch('/teams/:teamId/settings') != null
 
-  const [teams, setTeams] = useState<TeamResponse[]>([])
-  const [projects, setProjects] = useState<ProjectResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [teamModal, setTeamModal] = useState<TeamModal | null>(null)
   const [projectModal, setProjectModal] = useState<ProjectModal | null>(null)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
-  const [membersModal, setMembersModal] = useState<MembersModal | null>(null)
   const [busy, setBusy] = useState(false)
   // Детали выбранной команды (включая права). Грузятся только на странице команды.
   const [teamDetail, setTeamDetail] = useState<TeamDetailResponse | null>(null)
   const [teamDetailRefresh, setTeamDetailRefresh] = useState(0)
-
-  useEffect(() => {
-    Promise.all([apiClient.teams.teamsList(), apiClient.projects.projectsList()])
-      .then(([teamRes, projectRes]) => {
-        setTeams(teamRes.data ?? [])
-        setProjects(projectRes.data ?? [])
-      })
-      .catch(() => setError('Не удалось загрузить данные'))
-      .finally(() => setLoading(false))
-  }, [])
-
-  // Auto-dismiss the error toast.
-  useEffect(() => {
-    if (!error) return
-    const t = setTimeout(() => setError(null), 4000)
-    return () => clearTimeout(t)
-  }, [error])
 
   // Детали команды (с правами текущего пользователя) — только когда выбрана команда.
   // teamDetail не сбрасываем синхронно: ниже права берутся только при совпадении id.
@@ -96,7 +78,6 @@ export function HomePage() {
   // Keep the URL pointing at something real: land on the first team, default to
   // the first section, and bounce off ids/sections that don't exist.
   useEffect(() => {
-    if (loading) return
     if (selectedTeamId != null && !teams.some((t) => Number(t.id) === selectedTeamId)) {
       navigate('/', { replace: true })
     } else if (selectedTeamId == null && teams.length > 0) {
@@ -108,39 +89,14 @@ export function HomePage() {
         replace: true,
       })
     }
-  }, [loading, selectedTeamId, selectedProjectId, selectedProject, section, isSettings, teams, navigate])
-
-  const handleLogout = async () => {
-    try {
-      await apiClient.logout()
-    } catch {
-      // logout failed, clear local state anyway
-    }
-    setUser(null)
-    navigate('/login')
-  }
+  }, [selectedTeamId, selectedProjectId, selectedProject, section, isSettings, teams, navigate])
 
   // ---- teams ----
-  const createTeam = async (name: string) => {
-    setBusy(true)
-    try {
-      const res = await apiClient.teams.teamsCreate({ name })
-      setTeams((prev) => [...prev, res.data])
-      setTeamModal(null)
-      navigate(`/teams/${Number(res.data.id)}`)
-    } catch {
-      setError('Не удалось создать команду')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const updateTeam = async (id: number, name: string) => {
     setBusy(true)
     try {
       await apiClient.teams.teamsUpdate(id, { name })
       setTeams((prev) => prev.map((t) => (Number(t.id) === id ? { ...t, name } : t)))
-      setTeamModal(null)
     } catch {
       setError('Не удалось сохранить команду')
     } finally {
@@ -216,21 +172,13 @@ export function HomePage() {
   const title = selectedTeam ? 'Проекты' : 'Добро пожаловать'
 
   return (
-    <div className="wm-scroll fixed inset-0 flex bg-app text-ink font-ui text-sm text-left antialiased">
-      <TeamRail
-        teams={teams}
-        selectedTeamId={selectedTeamId}
-        onSelect={(id) => navigate(`/teams/${id}`)}
-        onCreate={() => setTeamModal({ mode: 'create' })}
-        userEmail={user?.email}
-        onLogout={handleLogout}
-      />
-
+    <>
       <ProjectSidebar
         team={selectedTeam}
         projects={teamProjects}
         selectedProjectId={selectedProjectId}
         selectedSectionId={isSettings ? 'settings' : section?.id}
+        teamSettingsActive={isTeamSettings}
         onSelectProject={(id) =>
           navigate(`/teams/${selectedTeamId}/projects/${id}/${section?.id ?? DEFAULT_SECTION}`)
         }
@@ -240,11 +188,8 @@ export function HomePage() {
         onCreateProject={() => setProjectModal({ mode: 'create' })}
         onEditProject={(project) => setProjectModal({ mode: 'edit', project })}
         onDeleteProject={(project) => setConfirm({ kind: 'project', project })}
-        onEditTeam={() => selectedTeam && setTeamModal({ mode: 'edit', team: selectedTeam })}
-        onDeleteTeam={() => selectedTeam && setConfirm({ kind: 'team', team: selectedTeam })}
-        onManageMembers={() => selectedTeamId && setMembersModal({ teamId: selectedTeamId })}
+        onOpenTeamSettings={() => selectedTeamId && navigate(`/teams/${selectedTeamId}/settings`)}
         canManage={canManage}
-        canDelete={canDelete}
       />
 
       {/* MAIN */}
@@ -264,7 +209,7 @@ export function HomePage() {
                 </button>
                 <span className="text-faintest shrink-0">/</span>
                 <span className="text-muted truncate">
-                  {isSettings ? 'Настройки' : (section?.label ?? 'Проект')}
+                  {isSettings ? 'Настройки проекта' : (section?.label ?? 'Проект')}
                 </span>
               </nav>
               {canManage && (
@@ -284,20 +229,41 @@ export function HomePage() {
                 </button>
               )}
             </>
+          ) : isTeamSettings && selectedTeam ? (
+            <nav className="flex items-center gap-2 min-w-0 text-[14px]">
+              <button
+                type="button"
+                className="font-semibold text-ink truncate hover:text-accent transition-colors cursor-pointer"
+                onClick={() => navigate(`/teams/${selectedTeamId}`)}
+              >
+                {selectedTeam.name}
+              </button>
+              <span className="text-faintest shrink-0">/</span>
+              <span className="text-muted truncate">Настройки команды</span>
+            </nav>
           ) : (
             <div className="text-base font-bold truncate">{title}</div>
           )}
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {loading ? (
-            <EmptyState text="Загрузка…" />
-          ) : teams.length === 0 ? (
+          {teams.length === 0 ? (
             <EmptyState
               text="У вас пока нет команд. Создайте первую, чтобы начать работу."
-              action={{ label: 'Создать команду', onClick: () => setTeamModal({ mode: 'create' }) }}
+              action={{ label: 'Создать команду', onClick: openCreateTeam }}
             />
-          ) : !selectedTeam ? null : !selectedProject ? (
+          ) : !selectedTeam ? null : isTeamSettings ? (
+            <TeamSettings
+              team={selectedTeam}
+              permissions={perms}
+              busy={busy}
+              canManage={canManage}
+              canDelete={canDelete}
+              onRename={(name) => updateTeam(selectedTeamId!, name)}
+              onDelete={() => setConfirm({ kind: 'team', team: selectedTeam })}
+              onMembersChanged={() => setTeamDetailRefresh((n) => n + 1)}
+            />
+          ) : !selectedProject ? (
             <EmptyState
               text="Выберите проект слева или создайте новый в этой команде."
               action={{ label: 'Новый проект', onClick: () => setProjectModal({ mode: 'create' }) }}
@@ -314,6 +280,8 @@ export function HomePage() {
             <DocumentsSection projectId={selectedProjectId!} />
           ) : section?.id === 'chats' ? (
             <ChatsSection projectId={selectedProjectId!} teamId={selectedTeamId!} />
+          ) : section?.id === 'library' ? (
+            <LibrarySection projectId={selectedProjectId!} />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}
@@ -321,40 +289,6 @@ export function HomePage() {
       </div>
 
       {/* MODALS */}
-      {membersModal && (
-        <TeamMembersModal
-          teamId={membersModal.teamId}
-          permissions={perms}
-          onClose={() => {
-            setMembersModal(null)
-            // Роли могли поменяться внутри модалки — перечитать свои права.
-            setTeamDetailRefresh((n) => n + 1)
-          }}
-        />
-      )}
-
-      {teamModal &&
-        (teamModal.mode === 'create' ? (
-          <FormModal
-            title="Новая команда"
-            label="Название команды"
-            submitLabel="Создать"
-            busy={busy}
-            onSubmit={createTeam}
-            onClose={() => setTeamModal(null)}
-          />
-        ) : (
-          <FormModal
-            title="Переименовать команду"
-            label="Название команды"
-            initialValue={teamModal.team.name}
-            submitLabel="Сохранить"
-            busy={busy}
-            onSubmit={(name) => updateTeam(Number(teamModal.team.id), name)}
-            onClose={() => setTeamModal(null)}
-          />
-        ))}
-
       {projectModal &&
         (projectModal.mode === 'create' ? (
           <FormModal
@@ -402,16 +336,7 @@ export function HomePage() {
             onClose={() => setConfirm(null)}
           />
         ))}
-
-      {error && (
-        <div
-          onClick={() => setError(null)}
-          className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[#2a1215] text-[#ff9d8a] border border-[#5c2b2e] rounded-[10px] px-4 py-2.5 text-[13px] cursor-pointer z-[200] shadow-[0_10px_30px_rgba(0,0,0,.2)]"
-        >
-          {error}
-        </div>
-      )}
-    </div>
+    </>
   )
 }
 

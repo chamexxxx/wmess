@@ -37,7 +37,7 @@ export class SignalRProvider {
   public readonly doc: Y.Doc
   public readonly awareness: Awareness
 
-  private readonly documentId: number
+  private readonly itemId: number
   private readonly connection: HubConnection
   private readonly listeners: Map<ProviderEvent, Set<(...args: unknown[]) => void>> = new Map()
 
@@ -47,8 +47,12 @@ export class SignalRProvider {
   private desired = false
   private op: Promise<void> = Promise.resolve()
 
-  constructor(documentId: number, doc: Y.Doc, serverUrl: string = '/hubs/document') {
-    this.documentId = documentId
+  constructor(
+    itemId: number,
+    doc: Y.Doc,
+    serverUrl: string = '/hubs/document',
+  ) {
+    this.itemId = itemId
     this.doc = doc
     this.awareness = new Awareness(doc)
 
@@ -103,11 +107,11 @@ export class SignalRProvider {
       this.emit('status', { status: 'connected' })
       // После реконнекта переподключаемся к группе и заново синхронизируемся.
       try {
-        await this.connection.invoke('JoinDocument', this.documentId)
+        await this.connection.invoke('JoinLibraryItem', this.itemId)
         await this.sendSyncStep1()
         this.broadcastLocalAwareness()
       } catch (error) {
-        console.error('Error re-joining document after reconnect:', error)
+        console.error('Error re-joining item after reconnect:', error)
       }
     })
     this.connection.onclose(() => this.emit('status', { status: 'disconnected' }))
@@ -115,7 +119,7 @@ export class SignalRProvider {
 
   private registerHubHandlers() {
     // Стартовый снапшот: база для холодного старта (когда мы зашли первыми).
-    this.connection.on('DocumentState', (state: Uint8Array) => {
+    this.connection.on('LibraryItemState', (state: Uint8Array) => {
       if (state && state.length > 0) {
         Y.applyUpdate(this.doc, state, this)
       }
@@ -126,20 +130,20 @@ export class SignalRProvider {
     })
 
     // Шаг 1 sync-протокола от другого участника: отвечаем недостающими апдейтами адресно.
-    this.connection.on('ReceiveSyncStep1', (_docId: number, stateVector: Uint8Array, fromConnectionId: string) => {
+    this.connection.on('ReceiveSyncStep1', (_itemId: number, stateVector: Uint8Array, fromConnectionId: string) => {
       const diff = Y.encodeStateAsUpdate(this.doc, stateVector)
-      this.invoke('SyncStep2', this.documentId, diff, fromConnectionId)
+      this.invoke('SyncStep2', this.itemId, diff, fromConnectionId)
     })
 
-    this.connection.on('ReceiveSyncStep2', (_docId: number, update: Uint8Array) => {
+    this.connection.on('ReceiveSyncStep2', (_itemId: number, update: Uint8Array) => {
       Y.applyUpdate(this.doc, update, this)
     })
 
-    this.connection.on('ReceiveUpdate', (_docId: number, update: Uint8Array) => {
+    this.connection.on('ReceiveUpdate', (_itemId: number, update: Uint8Array) => {
       Y.applyUpdate(this.doc, update, this)
     })
 
-    this.connection.on('ReceiveAwareness', (_docId: number, update: Uint8Array) => {
+    this.connection.on('ReceiveAwareness', (_itemId: number, update: Uint8Array) => {
       applyAwarenessUpdate(this.awareness, update, this)
     })
   }
@@ -148,7 +152,7 @@ export class SignalRProvider {
     // Локальные изменения документа → рассылаем остальным + дебаунс-сохранение снапшота.
     this.doc.on('update', (update: Uint8Array, origin: unknown) => {
       if (origin !== this) {
-        this.invoke('SendUpdate', this.documentId, update)
+        this.invoke('SendUpdate', this.itemId, update)
         this.scheduleSnapshotSave()
       }
     })
@@ -160,7 +164,7 @@ export class SignalRProvider {
         if (origin === this) return
         const changed = added.concat(updated, removed)
         const update = encodeAwarenessUpdate(this.awareness, changed)
-        this.invoke('SendAwareness', this.documentId, update)
+        this.invoke('SendAwareness', this.itemId, update)
       },
     )
   }
@@ -194,8 +198,8 @@ export class SignalRProvider {
         this.emit('status', { status: 'connected' })
         // На время активной сессии вешаем флаш снапшота на выгрузку страницы (закрытие вкладки / F5).
         window.addEventListener('pagehide', this.handlePageHide)
-        await this.connection.invoke('JoinDocument', this.documentId)
-        // Снапшот придёт событием DocumentState; затем тянем недостающее у активных участников.
+        await this.connection.invoke('JoinLibraryItem', this.itemId)
+        // Снапшот придёт событием LibraryItemState; затем тянем недостающее у активных участников.
         await this.sendSyncStep1()
         this.broadcastLocalAwareness()
       }
@@ -210,8 +214,8 @@ export class SignalRProvider {
         if (hadPendingSave) {
           try {
             await this.connection.invoke(
-              'SaveDocumentState',
-              this.documentId,
+              'SaveLibraryItemState',
+              this.itemId,
               Y.encodeStateAsUpdate(this.doc),
             )
           } catch (error) {
@@ -221,7 +225,7 @@ export class SignalRProvider {
         // Сообщаем остальным, что наш курсор/presence ушёл, пока соединение ещё живо.
         removeAwarenessStates(this.awareness, [this.doc.clientID], 'local')
         try {
-          await this.connection.invoke('LeaveDocument', this.documentId)
+          await this.connection.invoke('LeaveLibraryItem', this.itemId)
         } catch {
           // соединение могло уже закрыться — не критично
         }
@@ -237,14 +241,14 @@ export class SignalRProvider {
 
   private async sendSyncStep1(): Promise<void> {
     const stateVector = Y.encodeStateVector(this.doc)
-    await this.invoke('SyncStep1', this.documentId, stateVector)
+    await this.invoke('SyncStep1', this.itemId, stateVector)
   }
 
   private broadcastLocalAwareness(): void {
     const localState = this.awareness.getLocalState()
     if (localState) {
       const update = encodeAwarenessUpdate(this.awareness, [this.doc.clientID])
-      this.invoke('SendAwareness', this.documentId, update)
+      this.invoke('SendAwareness', this.itemId, update)
     }
   }
 
@@ -261,7 +265,7 @@ export class SignalRProvider {
   private readonly handlePageHide = (): void => {
     if (!this.hasPendingSave()) return
     this.clearSaveTimers()
-    void fetch(`/api/documents/${this.documentId}/state`, {
+    void fetch(`/api/library-items/${this.itemId}/state`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
@@ -302,6 +306,6 @@ export class SignalRProvider {
 
   private flushSnapshotSave(): void {
     this.clearSaveTimers()
-    this.invoke('SaveDocumentState', this.documentId, Y.encodeStateAsUpdate(this.doc))
+    this.invoke('SaveLibraryItemState', this.itemId, Y.encodeStateAsUpdate(this.doc))
   }
 }

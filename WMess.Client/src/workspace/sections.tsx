@@ -1,11 +1,8 @@
 import type { ComponentType } from 'react'
 import {
-  BoardsIcon,
   CalendarIcon,
   ChatIcon,
-  DocsIcon,
-  FolderIcon,
-  TablesIcon,
+  LibraryIcon,
   TasksIcon,
   type IconProps,
 } from './icons'
@@ -19,12 +16,9 @@ export interface Section {
 // The sections every project gets. `id` doubles as the URL segment.
 export const sections: Section[] = [
   { id: 'chats', label: 'Чаты', Icon: ChatIcon },
-  { id: 'docs', label: 'Документы', Icon: DocsIcon },
+  { id: 'library', label: 'Библиотека', Icon: LibraryIcon },
   { id: 'tasks', label: 'Задачи', Icon: TasksIcon },
-  { id: 'boards', label: 'Доски', Icon: BoardsIcon },
   { id: 'calendar', label: 'Календарь', Icon: CalendarIcon },
-  { id: 'tables', label: 'Таблицы', Icon: TablesIcon },
-  { id: 'files', label: 'Файлы', Icon: FolderIcon },
 ]
 
 export const DEFAULT_SECTION = sections[0].id
