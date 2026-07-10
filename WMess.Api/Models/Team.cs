@@ -17,4 +17,6 @@ public class Team
     // Навигационные свойства
     public ICollection<TeamUser> TeamUsers { get; set; } = new List<TeamUser>();
     public ICollection<Project> Projects { get; set; } = new List<Project>();
+    public ICollection<TaskBoardColumn> TaskBoardColumns { get; set; } = new List<TaskBoardColumn>();
+    public TeamScheduleSettings? ScheduleSettings { get; set; }
 }

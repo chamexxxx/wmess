@@ -21,7 +21,7 @@ public class BffController : ControllerBase
 
     [HttpPost("login")]
     [EndpointName("Login")]
-    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<BffUserResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -34,7 +34,7 @@ public class BffController : ControllerBase
 
         await _sessionManager.SignInAsync(HttpContext, auth);
 
-        return Ok(new UserResponse
+        return Ok(new BffUserResponse
         {
             Id = auth.UserId,
             Email = auth.Email,
@@ -69,7 +69,7 @@ public class BffController : ControllerBase
 
     [HttpGet("user")]
     [EndpointName("GetUser")]
-    [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<BffUserResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult GetUser()
     {
@@ -78,7 +78,7 @@ public class BffController : ControllerBase
             return Unauthorized();
         }
 
-        return Ok(new UserResponse
+        return Ok(new BffUserResponse
         {
             Id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
             Email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty,

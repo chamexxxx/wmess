@@ -100,6 +100,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 
 // Register Library Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° СЌР»РµРјРµРЅС‚ Р±РёР±Р»РёРѕС‚РµРєРё)
 builder.Services.AddScoped<ILibraryAccessService, LibraryAccessService>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
 
 // Register Chat Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° С‡Р°С‚)
 builder.Services.AddScoped<IChatAccessService, ChatAccessService>();

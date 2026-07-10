@@ -8,6 +8,7 @@ using WMess.Api.Data;
 using WMess.Api.Enums;
 using WMess.Api.Models;
 using WMess.Api.Models.DTO.Teams;
+using WMess.Api.Services;
 
 namespace WMess.Api.Controllers;
 
@@ -117,7 +118,10 @@ public class TeamsController : ControllerBase
             }
         };
 
+        TaskBoardSeed.AttachDefaults(team);
         _context.Teams.Add(team);
+        await _context.SaveChangesAsync();
+        TaskBoardSeed.SeedLabels(_context, team.Id);
         await _context.SaveChangesAsync();
 
         var response = new TeamResponse

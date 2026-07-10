@@ -4,6 +4,7 @@ import { apiClient } from '../api'
 import type { ProjectResponse, TeamResponse, TeamDetailResponse } from '../api/generated/data-contracts'
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { LibrarySection } from '../components/LibrarySection'
+import { TasksSection } from '../components/tasks/TasksSection'
 import { ProjectSettings } from '../components/ProjectSettings'
 import { TeamSettings } from '../components/TeamSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
@@ -21,14 +22,11 @@ export function HomePage() {
   // Команды/проекты и общие действия берём из каркаса рабочего пространства.
   const { teams, setTeams, projects, setProjects, openCreateTeam, setError } = useWorkspace()
 
-  // Selection lives in the URL: /teams/:teamId/projects/:projectId/:section
-  // Открытый документ — отдельный маршрут: /teams/:teamId/projects/:projectId/library/:itemId
-  // Открытый чат — /teams/:teamId/projects/:projectId/chats/:chatId
-  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, itemId: itemIdParam, chatId: chatIdParam } = useParams()
+  // Открытый документ — /library/:itemId; чат — /chats/:chatId; задача — /tasks/:taskId
+  const { teamId: teamIdParam, projectId: projectIdParam, section: sectionParam, itemId: itemIdParam, chatId: chatIdParam, taskId: taskIdParam } = useParams()
   const selectedTeamId = teamIdParam ? Number(teamIdParam) : null
   const selectedProjectId = projectIdParam ? Number(projectIdParam) : null
-  // На маршруте документа/чата сегмент :section отсутствует — выводим нужный раздел.
-  const sectionKey = itemIdParam != null ? 'library' : chatIdParam != null ? 'chats' : sectionParam
+  const sectionKey = itemIdParam != null ? 'library' : chatIdParam != null ? 'chats' : taskIdParam != null ? 'tasks' : sectionParam
   // Страница настроек команды: /teams/:teamId/settings (отдельно от настроек проекта).
   const isTeamSettings = useMatch('/teams/:teamId/settings') != null
 
@@ -276,6 +274,13 @@ export function HomePage() {
             <LibrarySection projectId={selectedProjectId!} />
           ) : section?.id === 'chats' ? (
             <ChatsSection projectId={selectedProjectId!} teamId={selectedTeamId!} />
+          ) : section?.id === 'tasks' ? (
+            <TasksSection
+              teamId={selectedTeamId!}
+              projectId={selectedProjectId!}
+              canManage={canManage}
+              taskId={taskIdParam}
+            />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}

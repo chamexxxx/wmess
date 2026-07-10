@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npm run generate-api && npm run copy-excalidraw-assets && vite",
     "build": "npm run generate-api && npm run copy-excalidraw-assets && tsc -b && vite build",
-    "build:docker": "npm run copy-excalidraw-assets && vite build",
+    "build:docker": "npm run generate-api && npm run copy-excalidraw-assets && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "generate-api": "node scripts/generate-api.mjs",

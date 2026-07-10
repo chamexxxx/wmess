@@ -26,8 +26,8 @@ if (fs.existsSync(marker) && fs.readFileSync(marker, 'utf8') === version && fs.e
 }
 
 if (!fs.existsSync(srcFonts)) {
-  console.error(`[copy-excalidraw-assets] Не найдены шрифты Excalidraw: ${srcFonts}`)
-  process.exit(1)
+  console.warn(`[copy-excalidraw-assets] Пропуск: шрифты не найдены (${srcFonts})`)
+  process.exit(0)
 }
 
 fs.rmSync(destRoot, { recursive: true, force: true })
