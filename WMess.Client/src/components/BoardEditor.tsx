@@ -169,12 +169,13 @@ export function BoardEditor() {
 
       doc.transact(() => {
         const yMap = yMapRef.current!
-        const currentElementIds = new Set<string>()
 
-        // Собираем ID элементов, которые были в Y.Map
-        yMap.forEach((_, id) => currentElementIds.add(id as string))
-
-        // Обновляем/добавляем элементы
+        // Обновляем/добавляем элементы. Excalidraw отдаёт в onChange элементы ВКЛЮЧАЯ удалённые
+        // (getElementsIncludingDeleted): у удалённого isDeleted=true и увеличенная version, поэтому
+        // удаление синхронизируется тем же путём по смене version, что и правки. Отдельного прохода
+        // «удалить отсутствующие в сцене» быть НЕ должно: при холодном старте сцена Excalidraw пуста,
+        // пока не пришёл и не применился снапшот, и такой проход трактовал бы пустую сцену как
+        // «пользователь всё удалил» — затирая только что загруженные в Y.Map элементы (потеря доски).
         for (const element of elements) {
           const existingRaw = yMap.get(element.id)
           const existing = existingRaw as unknown as ExcalidrawElement | undefined
@@ -188,13 +189,6 @@ export function BoardEditor() {
             // у других участников элемент застынет на первом снимке (точке старта).
             yMap.set(element.id, structuredClone(element) as unknown as Record<string, unknown>)
           }
-
-          currentElementIds.delete(element.id)
-        }
-
-        // Удаляем исчезнувшие элементы
-        for (const id of currentElementIds) {
-          yMap.delete(id)
         }
       }, EXCALIDRAW_ORIGIN)
     },
