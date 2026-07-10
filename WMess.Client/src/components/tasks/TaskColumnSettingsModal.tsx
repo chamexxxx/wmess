@@ -2,6 +2,64 @@ import { useState } from 'react'
 import { tasksApi, type TaskBoardColumn } from '../../api/tasksApi'
 import { ConfirmDialog, FormModal } from '../WorkspaceModals'
 
+function ColumnRenameModal({
+  initialName,
+  initialColor,
+  busy,
+  onClose,
+  onSubmit,
+}: {
+  initialName: string
+  initialColor: string
+  busy: boolean
+  onClose: () => void
+  onSubmit: (name: string, color: string) => void
+}) {
+  const [name, setName] = useState(initialName)
+  const [color, setColor] = useState(initialColor)
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-ink/30" onMouseDown={onClose}>
+      <div
+        className="w-[360px] bg-white rounded-2xl border border-line p-5 shadow-xl font-ui"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold text-ink">Изменить статус</h2>
+        <label className="block mt-4 text-[11px] font-bold text-faint uppercase">Название</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-[13px]"
+        />
+        <label className="block mt-3 text-[11px] font-bold text-faint uppercase">Цвет</label>
+        <input
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          className="mt-1 w-10 h-10 rounded-lg border border-line cursor-pointer"
+        />
+        <div className="mt-4 flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 h-9 rounded-lg border border-line text-[13px] font-semibold text-muted"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            disabled={busy || !name.trim()}
+            onClick={() => onSubmit(name.trim(), color)}
+            className="px-4 h-9 rounded-lg bg-accent text-white text-[13px] font-semibold disabled:opacity-50"
+          >
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface TaskColumnSettingsModalProps {
   teamId: number
   columns: TaskBoardColumn[]
@@ -38,8 +96,8 @@ export function TaskColumnSettingsModal({
     }
   }
 
-  async function rename(name: string) {
-    if (!renamingColumn || name === renamingColumn.name) {
+  async function rename(name: string, color: string) {
+    if (!renamingColumn || (name === renamingColumn.name && color === renamingColumn.color)) {
       setRenamingColumn(null)
       return
     }
@@ -47,13 +105,29 @@ export function TaskColumnSettingsModal({
     try {
       await tasksApi.updateColumn(teamId, renamingColumn.id, {
         name,
-        color: renamingColumn.color,
+        color,
         isDoneColumn: renamingColumn.isDoneColumn,
       })
       setItems((prev) =>
-        prev.map((c) => (c.id === renamingColumn.id ? { ...c, name } : c)),
+        prev.map((c) => (c.id === renamingColumn.id ? { ...c, name, color } : c)),
       )
       setRenamingColumn(null)
+      await onChanged()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function changeColor(col: TaskBoardColumn, color: string) {
+    if (color === col.color) return
+    setBusy(true)
+    try {
+      await tasksApi.updateColumn(teamId, col.id, {
+        name: col.name,
+        color,
+        isDoneColumn: col.isDoneColumn,
+      })
+      setItems((prev) => prev.map((c) => (c.id === col.id ? { ...c, color } : c)))
       await onChanged()
     } finally {
       setBusy(false)
@@ -90,8 +164,8 @@ export function TaskColumnSettingsModal({
           className="w-[400px] bg-white rounded-2xl border border-line p-5 shadow-xl font-ui"
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <h2 className="text-lg font-bold text-ink">Колонки Kanban</h2>
-          <p className="text-[13px] text-muted mt-1">Переименуйте, добавьте или удалите колонки.</p>
+          <h2 className="text-lg font-bold text-ink">Статусы задач</h2>
+          <p className="text-[13px] text-muted mt-1">Переименуйте, добавьте или удалите статусы.</p>
 
           <ul className="mt-4 space-y-2 max-h-64 overflow-y-auto">
             {[...items]
@@ -101,10 +175,21 @@ export function TaskColumnSettingsModal({
                   key={col.id}
                   className="flex items-center gap-2 p-2 rounded-lg border border-line"
                 >
-                  <span
-                    className="w-3 h-3 rounded-full shrink-0"
-                    style={{ backgroundColor: col.color }}
-                  />
+                  {canManage ? (
+                    <input
+                      type="color"
+                      value={col.color}
+                      disabled={busy}
+                      onChange={(e) => void changeColor(col, e.target.value)}
+                      className="w-7 h-7 rounded-full shrink-0 border border-line cursor-pointer p-0 overflow-hidden"
+                      title="Цвет статуса"
+                    />
+                  ) : (
+                    <span
+                      className="w-3 h-3 rounded-full shrink-0"
+                      style={{ backgroundColor: col.color }}
+                    />
+                  )}
                   <span className="flex-1 text-[13px] font-semibold truncate">{col.name}</span>
                   {col.isDoneColumn && (
                     <span className="text-[10px] text-faint uppercase">готово</span>
@@ -143,7 +228,7 @@ export function TaskColumnSettingsModal({
                 onClick={() => setAddingColumn(true)}
                 className="px-4 h-9 rounded-lg bg-accent text-white text-[13px] font-semibold"
               >
-                + Колонка
+                + Статус
               </button>
             )}
             <button
@@ -159,7 +244,7 @@ export function TaskColumnSettingsModal({
 
       {addingColumn && (
         <FormModal
-          title="Новая колонка"
+          title="Новый статус"
           label="Название"
           submitLabel="Создать"
           busy={busy}
@@ -169,20 +254,18 @@ export function TaskColumnSettingsModal({
       )}
 
       {renamingColumn && (
-        <FormModal
-          title="Переименовать колонку"
-          label="Название"
-          initialValue={renamingColumn.name}
-          submitLabel="Сохранить"
+        <ColumnRenameModal
+          initialName={renamingColumn.name}
+          initialColor={renamingColumn.color}
           busy={busy}
           onClose={() => setRenamingColumn(null)}
-          onSubmit={(name) => void rename(name)}
+          onSubmit={(name, color) => void rename(name, color)}
         />
       )}
 
       {deletingColumn && (
         <ConfirmDialog
-          title="Удалить колонку"
+          title="Удалить статус"
           message={
             <>
               Удалить «{deletingColumn.name}»? Задачи перенесутся в «

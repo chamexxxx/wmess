@@ -39,6 +39,9 @@ public class TaskItem
     public int? TeamId { get; set; }
     public Team? Team { get; set; }
 
+    public Guid GroupId { get; set; }
+    public TaskGroup Group { get; set; } = null!;
+
     public string CreatedById { get; set; } = string.Empty;
     public ApplicationUser? CreatedBy { get; set; }
 

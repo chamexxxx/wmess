@@ -22,6 +22,10 @@ export function RegisterPage() {
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409) {
         setError('Пользователь с таким email или логином уже существует')
+      } else if (isAxiosError(err) && err.response?.status === 400) {
+        const data = err.response.data as { errors?: string[]; message?: string } | undefined
+        const details = data?.errors?.join(' ') ?? data?.message
+        setError(details || 'Ошибка регистрации. Проверьте правильность полей')
       } else {
         setError('Ошибка регистрации. Проверьте правильность полей')
       }
@@ -84,7 +88,9 @@ export function RegisterPage() {
             minLength={6}
             required
           />
-          <p className="text-[11.5px] text-faint mt-[6px]">Минимум 6 символов</p>
+          <p className="text-[11.5px] text-faint mt-[6px]">
+            Минимум 6 символов, заглавная буква, цифра и спецсимвол (!@#$…)
+          </p>
         </div>
         {error && <div className={authError}>{error}</div>}
         <button type="submit" className={authPrimaryBtn}>

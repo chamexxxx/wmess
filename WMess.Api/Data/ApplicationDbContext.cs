@@ -24,6 +24,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<LinkContent> LinkContents { get; set; }
     public DbSet<LibraryFolder> LibraryFolders { get; set; }
     public DbSet<TaskItem> Tasks { get; set; }
+    public DbSet<TaskGroup> TaskGroups { get; set; }
     public DbSet<TaskBoardColumn> TaskBoardColumns { get; set; }
     public DbSet<TaskComment> TaskComments { get; set; }
     public DbSet<TaskLabelDefinition> TaskLabelDefinitions { get; set; }
@@ -247,6 +248,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(c => c.TeamId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Entity<TaskGroup>()
+            .HasOne(g => g.Team)
+            .WithMany(t => t.TaskGroups)
+            .HasForeignKey(g => g.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskItem>()
+            .HasOne(t => t.Group)
+            .WithMany(g => g.Tasks)
+            .HasForeignKey(t => t.GroupId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Entity<TaskItem>()
             .HasOne(t => t.Column)
             .WithMany(c => c.Tasks)
@@ -278,7 +291,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.Entity<TaskItem>()
-            .HasIndex(t => new { t.ColumnId, t.SortOrder });
+            .HasIndex(t => new { t.GroupId, t.ColumnId, t.SortOrder });
 
         builder.Entity<TaskAssignment>()
             .HasKey(ta => new { ta.TaskId, ta.UserId });

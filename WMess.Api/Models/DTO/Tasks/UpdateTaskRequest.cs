@@ -12,6 +12,7 @@ public class UpdateTaskRequest
     public string? Description { get; set; }
     public TaskPriority Priority { get; set; }
     public Guid ColumnId { get; set; }
+    public Guid GroupId { get; set; }
     public int SortOrder { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? DueDate { get; set; }

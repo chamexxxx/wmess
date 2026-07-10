@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '../../api'
-import { useAuth } from '../../context/AuthContext'
 import {
-  PRIORITY_COLORS,
   PRIORITY_LABELS,
   tasksApi,
   type TaskBoardColumn,
+  type TaskGroup,
   type TaskItem,
-  type TaskLabel,
   type TeamHoliday,
   type TeamScheduleSettings,
 } from '../../api/tasksApi'
@@ -16,9 +14,8 @@ import { TaskListView } from './TaskListView'
 import { TaskKanbanView } from './TaskKanbanView'
 import { TaskTimelineView } from './TaskTimelineView'
 import { TaskDetailPanel } from './TaskDetailPanel'
-import { TaskColumnSettingsModal } from './TaskColumnSettingsModal'
-import { TimelineSettingsModal } from './TimelineSettingsModal'
-import { FormModal } from '../WorkspaceModals'
+import { TasksSettingsModal } from './TasksSettingsModal'
+import { CreateTaskModal } from './CreateTaskModal'
 import { PlusIcon, SettingsIcon } from '../../workspace/icons'
 
 type ViewMode = 'list' | 'kanban' | 'timeline'
@@ -32,26 +29,27 @@ interface TasksSectionProps {
 }
 
 export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSectionProps) {
-  const { user } = useAuth()
   const [view, setView] = useState<ViewMode>(() => (localStorage.getItem('wmess-tasks-view') as ViewMode) || 'kanban')
   const [scope, setScope] = useState<ScopeMode>('project')
   const [tasks, setTasks] = useState<TaskItem[]>([])
   const [columns, setColumns] = useState<TaskBoardColumn[]>([])
-  const [labels, setLabels] = useState<TaskLabel[]>([])
+  const [groups, setGroups] = useState<TaskGroup[]>([])
   const [members, setMembers] = useState<TeamMemberResponse[]>([])
   const [schedule, setSchedule] = useState<TeamScheduleSettings | null>(null)
   const [holidays, setHolidays] = useState<TeamHoliday[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(taskId ?? null)
-  const [showColumns, setShowColumns] = useState(false)
-  const [showTimelineSettings, setShowTimelineSettings] = useState(false)
-  const [filterMine, setFilterMine] = useState(false)
-  const [busy, setBusy] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [filterAssignee, setFilterAssignee] = useState('')
+  const [filterPriority, setFilterPriority] = useState<string>('')
   const [showCreateTask, setShowCreateTask] = useState(false)
+  const [calendarFromToday, setCalendarFromToday] = useState(
+    () => localStorage.getItem(`wmess-calendar-from-today-${teamId}`) !== 'false',
+  )
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     setError(null)
     try {
       const taskParams =
@@ -59,10 +57,10 @@ export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSect
           ? { projectId }
           : { teamId, scope: 'all' as const }
 
-      const [tasksRes, colsRes, labelsRes, membersRes, schedRes, holRes] = await Promise.all([
+      const [tasksRes, colsRes, groupsRes, membersRes, schedRes, holRes] = await Promise.all([
         tasksApi.list(taskParams),
         tasksApi.getColumns(teamId),
-        tasksApi.getLabels(teamId),
+        tasksApi.getGroups(teamId),
         apiClient.teams.teamsMembersList(teamId),
         tasksApi.getScheduleSettings(teamId),
         tasksApi.getHolidays(teamId),
@@ -70,16 +68,33 @@ export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSect
 
       setTasks(tasksRes.data)
       setColumns(colsRes.data)
-      setLabels(labelsRes.data)
+      setGroups(groupsRes.data)
       setMembers(membersRes.data ?? [])
       setSchedule(schedRes.data)
       setHolidays(holRes.data)
     } catch {
       setError('Не удалось загрузить задачи')
     } finally {
-      setLoading(false)
+      if (!opts?.silent) setLoading(false)
     }
   }, [teamId, projectId, scope])
+
+  const reloadSilent = useCallback(() => load({ silent: true }), [load])
+
+  const mergeTask = useCallback((updated: TaskItem) => {
+    setTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === updated.id)
+      if (idx < 0) return prev
+      const next = [...prev]
+      next[idx] = updated
+      return next
+    })
+  }, [])
+
+  const removeTask = useCallback((id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+    setSelectedId((cur) => (cur === id ? null : cur))
+  }, [])
 
   useEffect(() => {
     void load()
@@ -93,42 +108,18 @@ export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSect
     if (taskId) setSelectedId(taskId)
   }, [taskId])
 
-  const selectedTask = tasks.find((t) => t.id === selectedId) ?? null
+  useEffect(() => {
+    setCalendarFromToday(localStorage.getItem(`wmess-calendar-from-today-${teamId}`) !== 'false')
+  }, [teamId])
 
-  const visibleTasks = filterMine && user?.email
-    ? tasks.filter((t) => t.assignees.some((a) => a.email === user.email))
-    : tasks
+  const matchesAssignee = (t: TaskItem, id: string) =>
+    !id || t.assignedUserIds.includes(id) || t.primaryAssigneeId === id
 
-  async function createTask(title: string) {
-    setBusy(true)
-    try {
-      const defaultCol = columns.find((c) => !c.isDoneColumn) ?? columns[0]
-      await tasksApi.create({
-        title,
-        projectId: scope === 'project' ? projectId : undefined,
-        teamId: scope === 'team' ? teamId : undefined,
-        columnId: defaultCol?.id,
-      })
-      setShowCreateTask(false)
-      await load()
-    } catch {
-      setError('Не удалось создать задачу')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function recalculate() {
-    setBusy(true)
-    try {
-      await tasksApi.recalculate(teamId, { projectId: scope === 'project' ? projectId : undefined })
-      await load()
-    } catch {
-      setError('Не удалось пересчитать расписание')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const visibleTasks = tasks.filter((t) => {
+    if (!matchesAssignee(t, filterAssignee)) return false
+    if (filterPriority !== '' && t.priority !== Number(filterPriority)) return false
+    return true
+  })
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -171,46 +162,52 @@ export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSect
 
         <button
           type="button"
-          disabled={busy}
+          disabled={false}
           onClick={() => setShowCreateTask(true)}
-          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent text-white text-[13px] font-semibold font-ui disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-accent text-white text-[13px] font-semibold font-ui"
         >
           <PlusIcon size={14} /> Задача
         </button>
 
-        {view === 'kanban' && (
-          <button
-            type="button"
-            onClick={() => setShowColumns(true)}
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-muted font-ui"
+        <button
+          type="button"
+          onClick={() => setShowSettings(true)}
+          className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-muted font-ui"
+        >
+          <SettingsIcon size={15} /> Настройки
+        </button>
+      </div>
+
+      <div className="shrink-0 flex flex-wrap items-center gap-3 px-4 py-2 border-b border-line bg-white">
+        <label className="flex items-center gap-2 text-[13px] text-muted font-ui">
+          <span className="text-faint text-[11px] uppercase font-bold">Исполнитель</span>
+          <select
+            value={filterAssignee}
+            onChange={(e) => setFilterAssignee(e.target.value)}
+            className="border border-line rounded-lg px-2 py-1 text-[13px] min-w-[140px]"
           >
-            <SettingsIcon size={15} /> Колонки
-          </button>
-        )}
-
-        {view === 'timeline' && (
-          <>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void recalculate()}
-              className="h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-muted font-ui disabled:opacity-60"
-            >
-              Пересчитать
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowTimelineSettings(true)}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-muted font-ui"
-            >
-              <SettingsIcon size={15} /> Календарь
-            </button>
-          </>
-        )}
-
-        <label className="ml-auto flex items-center gap-2 text-[13px] text-muted font-ui cursor-pointer">
-          <input type="checkbox" checked={filterMine} onChange={(e) => setFilterMine(e.target.checked)} />
-          Мои задачи
+            <option value="">Все</option>
+            {members.map((m) => (
+              <option key={m.userId} value={m.userId ?? ''}>
+                {m.email}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-[13px] text-muted font-ui">
+          <span className="text-faint text-[11px] uppercase font-bold">Приоритет</span>
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="border border-line rounded-lg px-2 py-1 text-[13px] min-w-[120px]"
+          >
+            <option value="">Все</option>
+            {PRIORITY_LABELS.map((l, i) => (
+              <option key={l} value={i}>
+                {l}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 
@@ -220,75 +217,75 @@ export function TasksSection({ teamId, projectId, canManage, taskId }: TasksSect
         ) : error ? (
           <div className="h-full flex items-center justify-center text-[#c44] text-sm">{error}</div>
         ) : view === 'list' ? (
-          <TaskListView
-            tasks={visibleTasks}
-            onSelect={setSelectedId}
-            onRefresh={load}
-          />
+          <TaskListView tasks={visibleTasks} groups={groups} onSelect={setSelectedId} />
         ) : view === 'kanban' ? (
           <TaskKanbanView
             tasks={visibleTasks}
             columns={columns}
+            groups={groups}
             onSelect={setSelectedId}
-            onRefresh={load}
+            onTaskUpdated={mergeTask}
           />
         ) : (
           <TaskTimelineView
-            tasks={visibleTasks}
+            tasks={tasks}
+            filterAssignee={filterAssignee}
+            filterPriority={filterPriority}
+            groups={groups}
             members={members}
             schedule={schedule}
             holidays={holidays}
+            teamId={teamId}
+            projectId={scope === 'project' ? projectId : undefined}
+            calendarFromToday={calendarFromToday}
             onSelect={setSelectedId}
-            onRefresh={load}
+            onTaskUpdated={mergeTask}
+            onRefresh={reloadSilent}
           />
         )}
       </div>
 
-      {selectedTask && (
+      {selectedId && (
         <TaskDetailPanel
-          task={selectedTask}
+          key={selectedId}
+          taskId={selectedId}
           columns={columns}
-          labels={labels}
+          groups={groups}
           members={members}
-          teamId={teamId}
           onClose={() => setSelectedId(null)}
-          onUpdated={load}
+          onUpdated={mergeTask}
+          onDeleted={removeTask}
         />
       )}
 
-      {showColumns && (
-        <TaskColumnSettingsModal
+      {showSettings && schedule && (
+        <TasksSettingsModal
           teamId={teamId}
           columns={columns}
-          canManage={canManage}
-          onClose={() => setShowColumns(false)}
-          onChanged={load}
-        />
-      )}
-
-      {showTimelineSettings && schedule && (
-        <TimelineSettingsModal
-          teamId={teamId}
-          settings={schedule}
+          groups={groups}
+          schedule={schedule}
           holidays={holidays}
           canManage={canManage}
-          onClose={() => setShowTimelineSettings(false)}
+          onClose={() => setShowSettings(false)}
           onChanged={load}
+          onCalendarFromTodayChanged={setCalendarFromToday}
         />
       )}
 
       {showCreateTask && (
-        <FormModal
-          title="Новая задача"
-          label="Название"
-          submitLabel="Создать"
-          busy={busy}
+        <CreateTaskModal
+          columns={columns}
+          groups={groups}
+          members={members}
+          scope={scope}
+          projectId={projectId}
+          teamId={teamId}
           onClose={() => setShowCreateTask(false)}
-          onSubmit={(title) => void createTask(title)}
+          onCreated={load}
         />
       )}
     </div>
   )
 }
 
-export { PRIORITY_LABELS, PRIORITY_COLORS }
+export { PRIORITY_LABELS }

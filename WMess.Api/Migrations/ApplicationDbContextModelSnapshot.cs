@@ -749,6 +749,35 @@ namespace WMess.Api.Migrations
                     b.ToTable("TaskComments");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.TaskGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TeamId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamId");
+
+                    b.ToTable("TaskGroups");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.TaskItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -773,6 +802,9 @@ namespace WMess.Api.Migrations
 
                     b.Property<decimal>("EstimatedHours")
                         .HasColumnType("numeric");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PrimaryAssigneeId")
                         .HasColumnType("text");
@@ -805,6 +837,8 @@ namespace WMess.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ColumnId");
+
                     b.HasIndex("CreatedById");
 
                     b.HasIndex("PrimaryAssigneeId");
@@ -813,7 +847,7 @@ namespace WMess.Api.Migrations
 
                     b.HasIndex("TeamId");
 
-                    b.HasIndex("ColumnId", "SortOrder");
+                    b.HasIndex("GroupId", "ColumnId", "SortOrder");
 
                     b.ToTable("Tasks");
                 });
@@ -911,6 +945,9 @@ namespace WMess.Api.Migrations
 
                     b.Property<decimal>("HoursPerDay")
                         .HasColumnType("numeric");
+
+                    b.Property<int>("WorkStartHour")
+                        .HasColumnType("integer");
 
                     b.Property<string>("TimeZone")
                         .IsRequired()
@@ -1283,6 +1320,17 @@ namespace WMess.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.TaskGroup", b =>
+                {
+                    b.HasOne("WMess.Api.Models.Team", "Team")
+                        .WithMany("TaskGroups")
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Team");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.TaskItem", b =>
                 {
                     b.HasOne("WMess.Api.Models.TaskBoardColumn", "Column")
@@ -1294,6 +1342,12 @@ namespace WMess.Api.Migrations
                     b.HasOne("WMess.Api.Models.ApplicationUser", "CreatedBy")
                         .WithMany()
                         .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.TaskGroup", "Group")
+                        .WithMany("Tasks")
+                        .HasForeignKey("GroupId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1315,6 +1369,8 @@ namespace WMess.Api.Migrations
                     b.Navigation("Column");
 
                     b.Navigation("CreatedBy");
+
+                    b.Navigation("Group");
 
                     b.Navigation("PrimaryAssignee");
 
@@ -1435,6 +1491,11 @@ namespace WMess.Api.Migrations
                     b.Navigation("Tasks");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.TaskGroup", b =>
+                {
+                    b.Navigation("Tasks");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.TaskItem", b =>
                 {
                     b.Navigation("Assignments");
@@ -1456,6 +1517,8 @@ namespace WMess.Api.Migrations
                     b.Navigation("ScheduleSettings");
 
                     b.Navigation("TaskBoardColumns");
+
+                    b.Navigation("TaskGroups");
 
                     b.Navigation("TeamUsers");
                 });

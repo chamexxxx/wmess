@@ -13,9 +13,10 @@ export interface TaskBoardColumn {
   isDoneColumn: boolean
 }
 
-export interface TaskLabel {
+export interface TaskGroup {
   id: string
   name: string
+  sortOrder: number
   color: string
 }
 
@@ -28,6 +29,9 @@ export interface TaskItem {
   columnName: string
   columnColor: string
   isDoneColumn: boolean
+  groupId: string
+  groupName: string
+  groupColor: string
   sortOrder: number
   startDate?: string | null
   dueDate?: string | null
@@ -35,18 +39,21 @@ export interface TaskItem {
   scheduleMode: ScheduleMode
   primaryAssigneeId?: string | null
   primaryAssigneeEmail?: string | null
+  createdById: string
+  createdByEmail: string
   createdAt: string
   updatedAt: string
   projectId?: number | null
   teamId?: number | null
   assignedUserIds: string[]
   assignees: { userId: string; email: string }[]
-  labels: TaskLabel[]
+  labels: { id: string; name: string; color: string }[]
 }
 
 export interface TeamScheduleSettings {
   workingDays: number
   hoursPerDay: number
+  workStartHour: number
   timeZone: string
 }
 
@@ -57,7 +64,7 @@ export interface TeamHoliday {
 }
 
 export const PRIORITY_LABELS = ['Низкий', 'Средний', 'Высокий', 'Критический'] as const
-export const PRIORITY_COLORS = ['#6B7280', '#3B82F6', '#F59E0B', '#EF4444'] as const
+export const PRIORITY_COLORS = ['#3B82F6', '#EAB308', '#F97316', '#EF4444'] as const
 
 export const tasksApi = {
   list(params: { projectId?: number; teamId?: number; scope?: string }) {
@@ -104,8 +111,24 @@ export const tasksApi = {
     return http.put(`/api/teams/${teamId}/task-columns/reorder`, { items })
   },
 
-  getLabels(teamId: number) {
-    return http.get<TaskLabel[]>(`/api/teams/${teamId}/task-labels`)
+  getGroups(teamId: number) {
+    return http.get<TaskGroup[]>(`/api/teams/${teamId}/task-groups`)
+  },
+
+  createGroup(teamId: number, body: { name: string; color: string }) {
+    return http.post<TaskGroup>(`/api/teams/${teamId}/task-groups`, body)
+  },
+
+  updateGroup(teamId: number, groupId: string, body: { name: string; color: string }) {
+    return http.put(`/api/teams/${teamId}/task-groups/${groupId}`, body)
+  },
+
+  deleteGroup(teamId: number, groupId: string, moveTo?: string) {
+    return http.delete(`/api/teams/${teamId}/task-groups/${groupId}`, { params: { moveTo } })
+  },
+
+  reorderGroups(teamId: number, items: { id: string; sortOrder: number }[]) {
+    return http.put(`/api/teams/${teamId}/task-groups/reorder`, { items })
   },
 
   getScheduleSettings(teamId: number) {
@@ -128,7 +151,7 @@ export const tasksApi = {
     return http.delete(`/api/teams/${teamId}/holidays/${holidayId}`)
   },
 
-  recalculate(teamId: number, body?: { anchorDate?: string; projectId?: number }) {
+  recalculate(teamId: number, body?: { anchorDate?: string; anchorLocalDate?: string; projectId?: number; groupId?: string }) {
     return http.post<{ updated: number }>(`/api/teams/${teamId}/schedule/recalculate`, body ?? {})
   },
 

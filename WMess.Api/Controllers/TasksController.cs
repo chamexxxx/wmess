@@ -41,8 +41,9 @@ public class TasksController : ControllerBase
     {
         var query = _context.Tasks
             .Include(t => t.Column)
+            .Include(t => t.Group)
+            .Include(t => t.CreatedBy)
             .Include(t => t.Assignments).ThenInclude(a => a.User)
-            .Include(t => t.LabelAssignments).ThenInclude(la => la.Label)
             .AsQueryable();
 
         if (projectId.HasValue)
@@ -59,6 +60,8 @@ public class TasksController : ControllerBase
             if (team == null) return NotFound();
             var auth = await _authorizationService.AuthorizeAsync(User, team, Policies.TeamMember);
             if (!auth.Succeeded) return Forbid();
+
+            await TaskBoardSeed.EnsureGroupsAsync(_context, teamId.Value);
 
             if (string.Equals(scope, "all", StringComparison.OrdinalIgnoreCase))
             {
@@ -86,7 +89,8 @@ public class TasksController : ControllerBase
         }
 
         var tasks = await query
-            .OrderBy(t => t.Column!.SortOrder)
+            .OrderBy(t => t.Group!.SortOrder)
+            .ThenBy(t => t.Column!.SortOrder)
             .ThenBy(t => t.SortOrder)
             .ToListAsync();
 
@@ -116,9 +120,13 @@ public class TasksController : ControllerBase
             return BadRequest(new { message = "One or more assignees are not team members" });
 
         var columnId = request.ColumnId ?? await TaskBoardSeed.GetDefaultColumnIdAsync(_context, teamId.Value);
+        var groupId = request.GroupId ?? await TaskBoardSeed.GetDefaultGroupIdAsync(_context, teamId.Value);
+
+        if (!await ValidateGroupAsync(teamId.Value, groupId))
+            return BadRequest(new { message = "Invalid group" });
 
         var maxSort = await _context.Tasks
-            .Where(t => t.ColumnId == columnId)
+            .Where(t => t.ColumnId == columnId && t.GroupId == groupId)
             .Select(t => (int?)t.SortOrder)
             .MaxAsync() ?? -1;
 
@@ -129,6 +137,7 @@ public class TasksController : ControllerBase
             Description = request.Description,
             Priority = request.Priority,
             ColumnId = columnId,
+            GroupId = groupId,
             SortOrder = maxSort + 1,
             StartDate = request.StartDate,
             DueDate = request.DueDate,
@@ -145,7 +154,6 @@ public class TasksController : ControllerBase
         foreach (var userId in request.AssignedUserIds.Distinct())
             task.Assignments.Add(new TaskAssignment { UserId = userId });
 
-        await ApplyLabelsAsync(task, teamId.Value, request.LabelIds);
         _context.Tasks.Add(task);
         await _context.SaveChangesAsync();
 
@@ -158,7 +166,6 @@ public class TasksController : ControllerBase
     {
         var task = await _context.Tasks
             .Include(t => t.Assignments)
-            .Include(t => t.LabelAssignments)
             .FirstOrDefaultAsync(t => t.Id == id);
 
         if (task == null) return NotFound();
@@ -168,10 +175,14 @@ public class TasksController : ControllerBase
         if (!await ValidateAssigneesAsync(task.TeamId.Value, request.AssignedUserIds))
             return BadRequest(new { message = "One or more assignees are not team members" });
 
+        if (!await ValidateGroupAsync(task.TeamId.Value, request.GroupId))
+            return BadRequest(new { message = "Invalid group" });
+
         task.Title = request.Title;
         task.Description = request.Description;
         task.Priority = request.Priority;
         task.ColumnId = request.ColumnId;
+        task.GroupId = request.GroupId;
         task.SortOrder = request.SortOrder;
         task.StartDate = request.StartDate;
         task.DueDate = request.DueDate;
@@ -184,8 +195,6 @@ public class TasksController : ControllerBase
         task.Assignments = request.AssignedUserIds.Distinct()
             .Select(uid => new TaskAssignment { TaskId = id, UserId = uid }).ToList();
 
-        _context.TaskLabelAssignments.RemoveRange(task.LabelAssignments);
-        await ApplyLabelsAsync(task, task.TeamId.Value, request.LabelIds);
         await _context.SaveChangesAsync();
         return NoContent();
     }
@@ -193,19 +202,47 @@ public class TasksController : ControllerBase
     [HttpPatch("{id:guid}")]
     public async Task<ActionResult<TaskResponse>> PatchTask(Guid id, PatchTaskRequest request)
     {
-        var task = await LoadTaskAsync(id);
+        var task = await _context.Tasks
+            .Include(t => t.Assignments)
+            .FirstOrDefaultAsync(t => t.Id == id);
+
         if (task == null) return NotFound();
         if (!await HasAccessAsync(task)) return Forbid();
 
         if (request.Title != null) task.Title = request.Title;
+        if (request.Description != null) task.Description = request.Description;
         if (request.ColumnId.HasValue) task.ColumnId = request.ColumnId.Value;
+        if (request.GroupId.HasValue)
+        {
+            if (task.TeamId == null || !await ValidateGroupAsync(task.TeamId.Value, request.GroupId.Value))
+                return BadRequest(new { message = "Invalid group" });
+            task.GroupId = request.GroupId.Value;
+        }
         if (request.SortOrder.HasValue) task.SortOrder = request.SortOrder.Value;
         if (request.Priority.HasValue) task.Priority = request.Priority.Value;
-        if (request.StartDate.HasValue) task.StartDate = request.StartDate;
-        if (request.DueDate.HasValue) task.DueDate = request.DueDate;
+        if (request.ClearSchedule)
+        {
+            task.StartDate = null;
+            task.DueDate = null;
+        }
+        else
+        {
+            if (request.StartDate.HasValue) task.StartDate = request.StartDate;
+            if (request.DueDate.HasValue) task.DueDate = request.DueDate;
+        }
         if (request.EstimatedHours.HasValue) task.EstimatedHours = request.EstimatedHours.Value;
         if (request.ScheduleMode.HasValue) task.ScheduleMode = request.ScheduleMode.Value;
         if (request.PrimaryAssigneeId != null) task.PrimaryAssigneeId = request.PrimaryAssigneeId;
+
+        if (request.AssignedUserIds != null)
+        {
+            if (task.TeamId == null || !await ValidateAssigneesAsync(task.TeamId.Value, request.AssignedUserIds))
+                return BadRequest(new { message = "One or more assignees are not team members" });
+
+            _context.TaskAssignments.RemoveRange(task.Assignments);
+            task.Assignments = request.AssignedUserIds.Distinct()
+                .Select(uid => new TaskAssignment { TaskId = id, UserId = uid }).ToList();
+        }
 
         task.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -295,9 +332,10 @@ public class TasksController : ControllerBase
     private async Task<TaskItem?> LoadTaskAsync(Guid id) =>
         await _context.Tasks
             .Include(t => t.Column)
+            .Include(t => t.Group)
+            .Include(t => t.CreatedBy)
             .Include(t => t.PrimaryAssignee)
             .Include(t => t.Assignments).ThenInclude(a => a.User)
-            .Include(t => t.LabelAssignments).ThenInclude(la => la.Label)
             .FirstOrDefaultAsync(t => t.Id == id);
 
     private async Task<int?> ResolveTeamIdAsync(int? projectId, int? teamId)
@@ -366,16 +404,8 @@ public class TasksController : ControllerBase
         return count == ids.Count;
     }
 
-    private async Task ApplyLabelsAsync(TaskItem task, int teamId, List<Guid> labelIds)
-    {
-        if (labelIds.Count == 0) return;
-        var valid = await _context.TaskLabelDefinitions
-            .Where(l => l.TeamId == teamId && labelIds.Contains(l.Id))
-            .Select(l => l.Id)
-            .ToListAsync();
-        foreach (var labelId in valid)
-            task.LabelAssignments.Add(new TaskLabelAssignment { LabelId = labelId });
-    }
+    private async Task<bool> ValidateGroupAsync(int teamId, Guid groupId) =>
+        await _context.TaskGroups.AnyAsync(g => g.Id == groupId && g.TeamId == teamId);
 
     private static TaskResponse MapToResponse(TaskItem t) => new()
     {
@@ -387,6 +417,9 @@ public class TasksController : ControllerBase
         ColumnName = t.Column?.Name ?? "",
         ColumnColor = t.Column?.Color ?? "#808080",
         IsDoneColumn = t.Column?.IsDoneColumn ?? false,
+        GroupId = t.GroupId,
+        GroupName = t.Group?.Name ?? "",
+        GroupColor = t.Group?.Color ?? "#6B7280",
         SortOrder = t.SortOrder,
         StartDate = t.StartDate,
         DueDate = t.DueDate,
@@ -399,17 +432,13 @@ public class TasksController : ControllerBase
         ProjectId = t.ProjectId,
         TeamId = t.TeamId,
         CreatedById = t.CreatedById,
+        CreatedByEmail = t.CreatedBy?.Email ?? "",
         AssignedUserIds = t.Assignments.Select(a => a.UserId).ToList(),
         Assignees = t.Assignments.Select(a => new TaskAssigneeResponse
         {
             UserId = a.UserId,
             Email = a.User?.Email ?? ""
         }).ToList(),
-        Labels = t.LabelAssignments.Select(la => new TaskLabelResponse
-        {
-            Id = la.Label!.Id,
-            Name = la.Label.Name,
-            Color = la.Label.Color
-        }).ToList()
+        Labels = []
     };
 }

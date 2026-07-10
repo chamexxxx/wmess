@@ -23,7 +23,11 @@ public class TaskResponse
     public DateTime UpdatedAt { get; set; }
     public int? ProjectId { get; set; }
     public int? TeamId { get; set; }
+    public Guid GroupId { get; set; }
+    public string GroupName { get; set; } = string.Empty;
+    public string GroupColor { get; set; } = "#6B7280";
     public string CreatedById { get; set; } = string.Empty;
+    public string CreatedByEmail { get; set; } = string.Empty;
     public List<string> AssignedUserIds { get; set; } = new();
     public List<TaskAssigneeResponse> Assignees { get; set; } = new();
     public List<TaskLabelResponse> Labels { get; set; } = new();

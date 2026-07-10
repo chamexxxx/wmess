@@ -1,280 +1,828 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
 import {
+
   PRIORITY_LABELS,
+
   tasksApi,
+
   type TaskBoardColumn,
+
+  type TaskGroup,
+
   type TaskItem,
-  type TaskLabel,
+
 } from '../../api/tasksApi'
+
 import type { TeamMemberResponse } from '../../api/generated/data-contracts'
-import { useAuth } from '../../context/AuthContext'
+
+import { ConfirmDialog } from '../WorkspaceModals'
+
+import { SettingsIcon } from '../../workspace/icons'
+
+import { TaskPriorityIcon } from './TaskPriorityIcon'
+
+
 
 interface TaskDetailPanelProps {
-  task: TaskItem
+
+  taskId: string
+
   columns: TaskBoardColumn[]
-  labels: TaskLabel[]
+
+  groups: TaskGroup[]
+
   members: TeamMemberResponse[]
-  teamId: number
+
   onClose: () => void
-  onUpdated: () => void
+
+  onUpdated: (task: TaskItem) => void
+
+  onDeleted: (taskId: string) => void
+
 }
+
+
+
+function formatDateTime(iso: string) {
+
+  return new Date(iso).toLocaleString('ru-RU', {
+
+    day: '2-digit',
+
+    month: '2-digit',
+
+    year: 'numeric',
+
+    hour: '2-digit',
+
+    minute: '2-digit',
+
+  })
+
+}
+
+
 
 export function TaskDetailPanel({
-  task,
+
+  taskId,
+
   columns,
-  labels,
+
+  groups,
+
   members,
+
   onClose,
+
   onUpdated,
+
+  onDeleted,
+
 }: TaskDetailPanelProps) {
-  const { user } = useAuth()
-  const [title, setTitle] = useState(task.title)
-  const [description, setDescription] = useState(task.description ?? '')
-  const [priority, setPriority] = useState(task.priority)
-  const [columnId, setColumnId] = useState(task.columnId)
-  const [estimatedHours, setEstimatedHours] = useState(task.estimatedHours)
-  const [scheduleMode, setScheduleMode] = useState(task.scheduleMode)
-  const [primaryAssigneeId, setPrimaryAssigneeId] = useState(task.primaryAssigneeId ?? '')
-  const [assigned, setAssigned] = useState<string[]>(task.assignedUserIds)
-  const [selectedLabels, setSelectedLabels] = useState<string[]>(task.labels.map((l) => l.id))
+
+  const [task, setTask] = useState<TaskItem | null>(null)
+
+  const [title, setTitle] = useState('')
+
+  const [description, setDescription] = useState('')
+
+  const [priority, setPriority] = useState<TaskItem['priority']>(1)
+
+  const [columnId, setColumnId] = useState('')
+
+  const [groupId, setGroupId] = useState('')
+
+  const [estimatedHours, setEstimatedHours] = useState(8)
+
+  const [assigned, setAssigned] = useState<string[]>([])
+
+  const [assigneeOpen, setAssigneeOpen] = useState(false)
+
   const [comments, setComments] = useState<{ id: string; content: string; userEmail: string; createdAt: string }[]>([])
+
   const [commentText, setCommentText] = useState('')
+
+  const [loading, setLoading] = useState(true)
+
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    tasksApi.getComments(task.id).then((r) => setComments(r.data)).catch(() => {})
-  }, [task.id])
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  async function save() {
-    setSaving(true)
-    try {
-      await tasksApi.update(task.id, {
-        title,
-        description,
-        priority,
-        columnId,
-        sortOrder: task.sortOrder,
-        estimatedHours,
-        scheduleMode,
-        primaryAssigneeId: primaryAssigneeId || null,
-        startDate: task.startDate,
-        dueDate: task.dueDate,
-        assignedUserIds: assigned,
-        labelIds: selectedLabels,
-      })
-      await onUpdated()
-    } finally {
-      setSaving(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const skipSave = useRef(true)
+
+  const loadSeq = useRef(0)
+
+
+
+  useEffect(() => {
+
+    return () => {
+
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+
     }
-  }
+
+  }, [])
+
+
+
+  useEffect(() => {
+
+    const onKey = (e: KeyboardEvent) => {
+
+      if (e.key === 'Escape') {
+
+        if (confirmDelete) return
+
+        if (menuOpen) setMenuOpen(false)
+
+        else onClose()
+
+      }
+
+    }
+
+    window.addEventListener('keydown', onKey)
+
+    return () => window.removeEventListener('keydown', onKey)
+
+  }, [onClose, confirmDelete, menuOpen])
+
+
+
+  useEffect(() => {
+
+    if (!menuOpen) return
+
+    const onDoc = (e: MouseEvent) => {
+
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+
+    }
+
+    document.addEventListener('mousedown', onDoc)
+
+    return () => document.removeEventListener('mousedown', onDoc)
+
+  }, [menuOpen])
+
+
+
+  useEffect(() => {
+
+    const seq = ++loadSeq.current
+
+    skipSave.current = true
+
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+
+
+
+    void (async () => {
+
+      setLoading(true)
+
+      try {
+
+        const [taskRes, commentsRes] = await Promise.all([
+
+          tasksApi.get(taskId),
+
+          tasksApi.getComments(taskId),
+
+        ])
+
+        if (seq !== loadSeq.current) return
+
+        const t = taskRes.data
+
+        setTask(t)
+
+        setTitle(t.title)
+
+        setDescription(t.description ?? '')
+
+        setPriority(t.priority)
+
+        setColumnId(t.columnId)
+
+        setGroupId(t.groupId)
+
+        setEstimatedHours(t.estimatedHours)
+
+        setAssigned(t.assignedUserIds)
+
+        setComments(commentsRes.data)
+
+        skipSave.current = true
+
+      } finally {
+
+        if (seq === loadSeq.current) setLoading(false)
+
+      }
+
+    })()
+
+  }, [taskId])
+
+
+
+  useEffect(() => {
+
+    if (loading || skipSave.current) {
+
+      skipSave.current = false
+
+      return
+
+    }
+
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+
+    const savingId = taskId
+
+    saveTimer.current = setTimeout(() => {
+
+      void (async () => {
+
+        setSaving(true)
+
+        try {
+
+          const res = await tasksApi.patch(savingId, {
+
+            title,
+
+            description,
+
+            priority,
+
+            columnId,
+
+            groupId,
+
+            estimatedHours,
+
+            assignedUserIds: assigned,
+
+          })
+
+          if (savingId === taskId) onUpdated(res.data)
+
+        } finally {
+
+          if (savingId === taskId) setSaving(false)
+
+        }
+
+      })()
+
+    }, 500)
+
+  }, [title, description, priority, columnId, groupId, estimatedHours, assigned, loading, taskId, onUpdated])
+
+
 
   async function addComment() {
+
     if (!commentText.trim()) return
-    await tasksApi.addComment(task.id, commentText.trim())
+
+    await tasksApi.addComment(taskId, commentText.trim())
+
     setCommentText('')
-    const r = await tasksApi.getComments(task.id)
+
+    const r = await tasksApi.getComments(taskId)
+
     setComments(r.data)
+
   }
 
-  function toggleAssignee(userId: string) {
-    setAssigned((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
-    )
+
+
+  function addAssignee(userId: string) {
+
+    if (!assigned.includes(userId)) setAssigned((prev) => [...prev, userId])
+
+    setAssigneeOpen(false)
+
   }
+
+
+
+  function removeAssignee(userId: string) {
+
+    setAssigned((prev) => prev.filter((id) => id !== userId))
+
+  }
+
+
+
+  async function deleteTask() {
+
+    setDeleting(true)
+
+    try {
+
+      await tasksApi.remove(taskId)
+
+      onDeleted(taskId)
+
+      onClose()
+
+    } finally {
+
+      setDeleting(false)
+
+      setConfirmDelete(false)
+
+    }
+
+  }
+
+
+
+  const availableMembers = members.filter((m) => m.userId && !assigned.includes(m.userId))
+
+
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[420px] max-w-full bg-white border-l border-line shadow-2xl z-50 flex flex-col font-ui">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-        <span className="font-bold text-ink">Задача</span>
-        <button type="button" onClick={onClose} className="text-muted hover:text-ink text-xl leading-none px-2">
-          ×
-        </button>
+
+    <>
+
+      <div
+
+        className="fixed inset-0 bg-ink/10 z-40"
+
+        onMouseDown={onClose}
+
+        aria-hidden
+
+      />
+
+      <div
+
+        className="fixed inset-y-0 right-0 w-[560px] max-w-full bg-white border-l border-line shadow-2xl z-50 flex flex-col font-ui"
+
+        onMouseDown={(e) => e.stopPropagation()}
+
+      >
+
+      <div className="shrink-0 flex items-center gap-2 px-5 py-3 border-b border-line">
+
+        {loading || !task ? (
+
+          <span className="flex-1 font-bold text-ink">Загрузка…</span>
+
+        ) : (
+
+          <input
+
+            value={title}
+
+            onChange={(e) => setTitle(e.target.value)}
+
+            className="flex-1 min-w-0 text-lg font-bold border-0 bg-transparent px-0 py-0 focus:outline-none focus:ring-0 text-ink placeholder:text-faint"
+
+            placeholder="Название задачи"
+
+          />
+
+        )}
+
+        <div className="flex items-center gap-2 shrink-0">
+
+          {saving && <span className="text-[11px] text-faint">Сохранение…</span>}
+
+          {!loading && task && (
+
+            <div className="relative" ref={menuRef}>
+
+              <button
+
+                type="button"
+
+                onClick={() => setMenuOpen((v) => !v)}
+
+                className="p-1.5 rounded-md text-muted hover:text-ink hover:bg-sidebar"
+
+                title="Настройки"
+
+              >
+
+                <SettingsIcon size={16} />
+
+              </button>
+
+              {menuOpen && (
+
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-line rounded-lg shadow-lg py-1 z-10">
+
+                  <button
+
+                    type="button"
+
+                    onClick={() => {
+
+                      setMenuOpen(false)
+
+                      setConfirmDelete(true)
+
+                    }}
+
+                    className="block w-full text-left px-3 py-2 text-[13px] text-[#c44] hover:bg-sidebar"
+
+                  >
+
+                    Удалить задачу
+
+                  </button>
+
+                </div>
+
+              )}
+
+            </div>
+
+          )}
+
+          <button type="button" onClick={onClose} className="text-muted hover:text-ink text-xl leading-none px-2">
+
+            ×
+
+          </button>
+
+        </div>
+
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full text-lg font-bold border border-line rounded-lg px-3 py-2"
+
+
+      {loading || !task ? (
+
+        <div className="flex-1 flex items-center justify-center text-muted text-sm">Загрузка…</div>
+
+      ) : (
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+          <div>
+
+            <label className="text-[11px] font-bold text-faint uppercase">Описание</label>
+
+            <textarea
+
+              value={description}
+
+              onChange={(e) => setDescription(e.target.value)}
+
+              rows={5}
+
+              className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-[13px] resize-y"
+
+              placeholder="Markdown поддерживается…"
+
+            />
+
+          </div>
+
+
+
+          <div className="grid grid-cols-2 gap-3">
+
+            <div>
+
+              <label className="text-[11px] font-bold text-faint uppercase">Статус</label>
+
+              <select
+
+                value={columnId}
+
+                onChange={(e) => setColumnId(e.target.value)}
+
+                className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
+
+              >
+
+                {columns.map((c) => (
+
+                  <option key={c.id} value={c.id}>
+
+                    {c.name}
+
+                  </option>
+
+                ))}
+
+              </select>
+
+            </div>
+
+            <div>
+
+              <label className="text-[11px] font-bold text-faint uppercase">Группа</label>
+
+              <select
+
+                value={groupId}
+
+                onChange={(e) => setGroupId(e.target.value)}
+
+                className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
+
+              >
+
+                {groups.map((g) => (
+
+                  <option key={g.id} value={g.id}>
+
+                    {g.name}
+
+                  </option>
+
+                ))}
+
+              </select>
+
+            </div>
+
+          </div>
+
+
+
+          <div className="grid grid-cols-2 gap-3">
+
+            <div>
+
+              <label className="text-[11px] font-bold text-faint uppercase">Приоритет</label>
+
+              <select
+
+                value={priority}
+
+                onChange={(e) => setPriority(Number(e.target.value) as TaskItem['priority'])}
+
+                className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
+
+              >
+
+                {PRIORITY_LABELS.map((l, i) => (
+
+                  <option key={l} value={i}>
+
+                    {l}
+
+                  </option>
+
+                ))}
+
+              </select>
+
+              <div className="mt-1">
+
+                <TaskPriorityIcon priority={priority} size={18} />
+
+              </div>
+
+            </div>
+
+            <div>
+
+              <label className="text-[11px] font-bold text-faint uppercase">Оценка, ч</label>
+
+              <input
+
+                type="number"
+
+                min={0.5}
+
+                step={0.5}
+
+                value={estimatedHours}
+
+                onChange={(e) => setEstimatedHours(Number(e.target.value))}
+
+                className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
+
+              />
+
+            </div>
+
+          </div>
+
+
+
+          <div>
+
+            <label className="text-[11px] font-bold text-faint uppercase">Автор</label>
+
+            <div className="mt-1 text-[13px] text-muted">{task.createdByEmail || '—'}</div>
+
+          </div>
+
+
+
+          <div>
+
+            <label className="text-[11px] font-bold text-faint uppercase">Исполнители</label>
+
+            <div className="mt-2 flex flex-wrap gap-2">
+
+              {assigned.map((id) => {
+
+                const m = members.find((x) => x.userId === id)
+
+                return (
+
+                  <span
+
+                    key={id}
+
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-accent-soft text-accent text-[12px] font-semibold"
+
+                  >
+
+                    {m?.email ?? id}
+
+                    <button
+
+                      type="button"
+
+                      onClick={() => removeAssignee(id)}
+
+                      className="text-accent/70 hover:text-accent leading-none"
+
+                    >
+
+                      ×
+
+                    </button>
+
+                  </span>
+
+                )
+
+              })}
+
+            </div>
+
+            <div className="relative mt-2">
+
+              <button
+
+                type="button"
+
+                onClick={() => setAssigneeOpen((v) => !v)}
+
+                className="w-full text-left border border-line rounded-lg px-2 py-1.5 text-[13px] text-muted hover:bg-sidebar"
+
+              >
+
+                + Добавить исполнителя
+
+              </button>
+
+              {assigneeOpen && availableMembers.length > 0 && (
+
+                <div className="absolute z-10 mt-1 w-full bg-white border border-line rounded-lg shadow-lg max-h-40 overflow-y-auto">
+
+                  {availableMembers.map((m) => (
+
+                    <button
+
+                      key={m.userId}
+
+                      type="button"
+
+                      onClick={() => addAssignee(m.userId!)}
+
+                      className="block w-full text-left px-3 py-2 text-[13px] hover:bg-sidebar"
+
+                    >
+
+                      {m.email}
+
+                    </button>
+
+                  ))}
+
+                </div>
+
+              )}
+
+            </div>
+
+          </div>
+
+
+
+          <div>
+
+            <label className="text-[11px] font-bold text-faint uppercase">Комментарии</label>
+
+            <textarea
+
+              value={commentText}
+
+              onChange={(e) => setCommentText(e.target.value)}
+
+              rows={3}
+
+              className="mt-2 w-full border border-line rounded-lg px-3 py-2 text-[13px] resize-y"
+
+              placeholder="Написать комментарий…"
+
+            />
+
+            <button
+
+              type="button"
+
+              disabled={!commentText.trim()}
+
+              onClick={() => void addComment()}
+
+              className="mt-2 px-4 h-8 rounded-lg bg-accent text-white text-[12px] font-semibold disabled:opacity-50"
+
+            >
+
+              Отправить
+
+            </button>
+
+            <div className="mt-4 space-y-3">
+
+              {comments.map((c) => (
+
+                <div key={c.id} className="text-[12px] bg-sidebar rounded-lg p-3">
+
+                  <div className="flex items-center justify-between gap-2 text-faint text-[10px]">
+
+                    <span>{c.userEmail}</span>
+
+                    <span>{formatDateTime(c.createdAt)}</span>
+
+                  </div>
+
+                  <div className="text-ink mt-1 whitespace-pre-wrap">{c.content}</div>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+      </div>
+
+
+
+      {confirmDelete && (
+
+        <ConfirmDialog
+
+          title="Удалить задачу"
+
+          message={
+
+            <>
+
+              Удалить «{title || task?.title || 'задачу'}»? Это действие нельзя отменить.
+
+            </>
+
+          }
+
+          confirmLabel="Удалить"
+
+          busy={deleting}
+
+          onClose={() => setConfirmDelete(false)}
+
+          onConfirm={() => void deleteTask()}
+
         />
 
-        <div>
-          <label className="text-[11px] font-bold text-faint uppercase">Описание</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={5}
-            className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-[13px] resize-y"
-            placeholder="Markdown поддерживается…"
-          />
-        </div>
+      )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[11px] font-bold text-faint uppercase">Колонка</label>
-            <select
-              value={columnId}
-              onChange={(e) => setColumnId(e.target.value)}
-              className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
-            >
-              {columns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-faint uppercase">Приоритет</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value) as TaskItem['priority'])}
-              className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
-            >
-              {PRIORITY_LABELS.map((l, i) => (
-                <option key={l} value={i}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+    </>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-[11px] font-bold text-faint uppercase">Оценка, ч</label>
-            <input
-              type="number"
-              min={0.5}
-              step={0.5}
-              value={estimatedHours}
-              onChange={(e) => setEstimatedHours(Number(e.target.value))}
-              className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-faint uppercase">Расписание</label>
-            <select
-              value={scheduleMode}
-              onChange={(e) => setScheduleMode(Number(e.target.value) as 0 | 1)}
-              className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
-            >
-              <option value={0}>Авто</option>
-              <option value={1}>Вручную</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-bold text-faint uppercase">Исполнители</label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {members.map((m) => {
-              const id = m.userId ?? ''
-              const on = assigned.includes(id)
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => toggleAssignee(id)}
-                  className={`px-2 py-1 rounded-lg text-[12px] border ${
-                    on ? 'bg-accent text-white border-accent' : 'border-line text-muted'
-                  }`}
-                >
-                  {m.email}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-bold text-faint uppercase">Основной на таймлайне</label>
-          <select
-            value={primaryAssigneeId}
-            onChange={(e) => setPrimaryAssigneeId(e.target.value)}
-            className="mt-1 w-full border border-line rounded-lg px-2 py-1.5 text-[13px]"
-          >
-            <option value="">—</option>
-            {assigned.map((id) => {
-              const m = members.find((x) => x.userId === id)
-              return (
-                <option key={id} value={id}>
-                  {m?.email ?? id}
-                </option>
-              )
-            })}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-bold text-faint uppercase">Метки</label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {labels.map((l) => {
-              const on = selectedLabels.includes(l.id)
-              return (
-                <button
-                  key={l.id}
-                  type="button"
-                  onClick={() =>
-                    setSelectedLabels((prev) =>
-                      on ? prev.filter((x) => x !== l.id) : [...prev, l.id],
-                    )
-                  }
-                  className="px-2 py-0.5 rounded text-[11px] font-semibold text-white"
-                  style={{
-                    backgroundColor: l.color,
-                    opacity: on ? 1 : 0.35,
-                  }}
-                >
-                  {l.name}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-bold text-faint uppercase">Комментарии</label>
-          <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
-            {comments.map((c) => (
-              <div key={c.id} className="text-[12px] bg-sidebar rounded-lg p-2">
-                <div className="text-faint text-[10px]">{c.userEmail}</div>
-                <div className="text-ink mt-0.5">{c.content}</div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <input
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              className="flex-1 border border-line rounded-lg px-2 py-1.5 text-[13px]"
-              placeholder="Комментарий…"
-              onKeyDown={(e) => e.key === 'Enter' && void addComment()}
-            />
-            <button
-              type="button"
-              onClick={() => void addComment()}
-              className="px-3 rounded-lg bg-accent text-white text-[12px] font-semibold"
-            >
-              →
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="shrink-0 p-4 border-t border-line flex gap-2">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void save()}
-          className="flex-1 h-10 rounded-lg bg-accent text-white font-semibold text-[13px] disabled:opacity-60"
-        >
-          {saving ? 'Сохранение…' : 'Сохранить'}
-        </button>
-        {user?.email && task.assignees.some((a) => a.email === user.email) && (
-          <span className="text-[11px] text-faint self-center">вы в задаче</span>
-        )}
-      </div>
-    </div>
   )
+
 }
+

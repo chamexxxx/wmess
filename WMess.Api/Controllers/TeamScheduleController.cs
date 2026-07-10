@@ -45,6 +45,7 @@ public class TeamScheduleController : ControllerBase
         {
             WorkingDays = settings.WorkingDays,
             HoursPerDay = settings.HoursPerDay,
+            WorkStartHour = settings.WorkStartHour,
             TimeZone = settings.TimeZone
         });
     }
@@ -63,6 +64,7 @@ public class TeamScheduleController : ControllerBase
 
         settings.WorkingDays = request.WorkingDays;
         settings.HoursPerDay = request.HoursPerDay;
+        settings.WorkStartHour = Math.Clamp(request.WorkStartHour, 0, 23);
         settings.TimeZone = request.TimeZone;
         await _context.SaveChangesAsync();
         return NoContent();
@@ -124,7 +126,12 @@ public class TeamScheduleController : ControllerBase
     {
         if (!await IsMemberAsync(teamId)) return Forbid();
 
-        var updated = await _scheduleService.RecalculateAsync(teamId, request.AnchorDate, request.ProjectId);
+        var updated = await _scheduleService.RecalculateAsync(
+            teamId,
+            request.AnchorDate,
+            request.AnchorLocalDate,
+            request.ProjectId,
+            request.GroupId);
         return Ok(new { updated });
     }
 
@@ -132,12 +139,6 @@ public class TeamScheduleController : ControllerBase
     public async Task<ActionResult<IEnumerable<TaskLabelDefinitionResponse>>> GetLabels(int teamId)
     {
         if (!await IsMemberAsync(teamId)) return Forbid();
-
-        if (!await _context.TaskLabelDefinitions.AnyAsync(l => l.TeamId == teamId))
-        {
-            TaskBoardSeed.SeedLabels(_context, teamId);
-            await _context.SaveChangesAsync();
-        }
 
         var labels = await _context.TaskLabelDefinitions
             .Where(l => l.TeamId == teamId)

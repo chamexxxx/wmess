@@ -21,7 +21,8 @@ export function TimelineSettingsModal({
   onChanged,
 }: TimelineSettingsModalProps) {
   const [workingDays, setWorkingDays] = useState(settings.workingDays)
-  const [hoursPerDay, setHoursPerDay] = useState(settings.hoursPerDay)
+  const [workStartHour, setWorkStartHour] = useState(settings.workStartHour ?? 9)
+  const [workEndHour, setWorkEndHour] = useState((settings.workStartHour ?? 9) + settings.hoursPerDay)
   const [holidayList, setHolidayList] = useState(holidays)
   const [newDate, setNewDate] = useState('')
   const [newName, setNewName] = useState('')
@@ -36,12 +37,23 @@ export function TimelineSettingsModal({
     return (workingDays & (1 << dow)) !== 0
   }
 
+  function hourToTime(h: number) {
+    return `${String(h).padStart(2, '0')}:00`
+  }
+
+  function timeToHour(value: string) {
+    const h = Number.parseInt(value.split(':')[0] ?? '9', 10)
+    return Number.isFinite(h) ? Math.min(23, Math.max(0, h)) : 9
+  }
+
   async function saveSettings() {
     setBusy(true)
     try {
+      const hours = Math.max(1, workEndHour - workStartHour)
       await tasksApi.updateScheduleSettings(teamId, {
         workingDays,
-        hoursPerDay,
+        hoursPerDay: hours,
+        workStartHour,
         timeZone: settings.timeZone,
       })
       await onChanged()
@@ -103,16 +115,38 @@ export function TimelineSettingsModal({
         </div>
 
         <div className="mt-4">
-          <label className="text-[11px] font-bold text-faint uppercase">Часов в рабочий день</label>
-          <input
-            type="number"
-            min={1}
-            max={24}
-            disabled={!canManage}
-            value={hoursPerDay}
-            onChange={(e) => setHoursPerDay(Number(e.target.value))}
-            className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-[13px]"
-          />
+          <div className="text-[11px] font-bold text-faint uppercase">Рабочее время</div>
+          <div className="mt-2 flex items-center gap-2">
+            <label className="flex-1 text-[12px] text-muted">
+              С
+              <input
+                type="time"
+                step={3600}
+                disabled={!canManage}
+                value={hourToTime(workStartHour)}
+                onChange={(e) => {
+                  const start = timeToHour(e.target.value)
+                  setWorkStartHour(start)
+                  if (workEndHour <= start) setWorkEndHour(Math.min(24, start + 1))
+                }}
+                className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-[13px]"
+              />
+            </label>
+            <label className="flex-1 text-[12px] text-muted">
+              До
+              <input
+                type="time"
+                step={3600}
+                disabled={!canManage}
+                value={hourToTime(workEndHour)}
+                onChange={(e) => {
+                  const end = timeToHour(e.target.value)
+                  setWorkEndHour(Math.max(end, workStartHour + 1))
+                }}
+                className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-[13px]"
+              />
+            </label>
+          </div>
         </div>
 
         {canManage && (

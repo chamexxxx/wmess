@@ -12,6 +12,9 @@ public class TeamScheduleSettings
 
     public decimal HoursPerDay { get; set; } = 8;
 
+    /// <summary>Local hour (0–23) when the work period starts each working day.</summary>
+    public int WorkStartHour { get; set; } = 9;
+
     [MaxLength(64)]
     public string TimeZone { get; set; } = "UTC";
 }

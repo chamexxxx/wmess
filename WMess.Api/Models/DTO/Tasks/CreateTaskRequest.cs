@@ -18,6 +18,7 @@ public class CreateTaskRequest
     public ScheduleMode ScheduleMode { get; set; } = ScheduleMode.Auto;
     public int? ProjectId { get; set; }
     public int? TeamId { get; set; }
+    public Guid? GroupId { get; set; }
     public string? PrimaryAssigneeId { get; set; }
     public List<string> AssignedUserIds { get; set; } = new();
     public List<Guid> LabelIds { get; set; } = new();

@@ -34,6 +34,27 @@ namespace WMess.Api.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TaskGroups",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TeamId = table.Column<int>(type: "integer", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: false),
+                    Color = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TaskGroups", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_TaskGroups_Teams_TeamId",
+                        column: x => x.TeamId,
+                        principalTable: "Teams",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "TaskLabelDefinitions",
                 columns: table => new
                 {
@@ -80,6 +101,7 @@ namespace WMess.Api.Migrations
                     TeamId = table.Column<int>(type: "integer", nullable: false),
                     WorkingDays = table.Column<int>(type: "integer", nullable: false),
                     HoursPerDay = table.Column<decimal>(type: "numeric", nullable: false),
+                    WorkStartHour = table.Column<int>(type: "integer", nullable: false, defaultValue: 9),
                     TimeZone = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false)
                 },
                 constraints: table =>
@@ -93,6 +115,18 @@ namespace WMess.Api.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.Sql("""
+                INSERT INTO "TaskGroups" ("Id", "TeamId", "Name", "SortOrder", "Color")
+                SELECT gen_random_uuid(), t."Id", v.name, v.sort_order, v.color
+                FROM "Teams" t
+                CROSS JOIN (VALUES
+                    ('Разработка', 0, '#3B82F6'),
+                    ('Арт', 1, '#8B5CF6'),
+                    ('Общее', 2, '#6B7280')
+                ) AS v(name, sort_order, color)
+                WHERE NOT EXISTS (SELECT 1 FROM "TaskGroups" g WHERE g."TeamId" = t."Id");
+                """);
+
             migrationBuilder.CreateTable(
                 name: "Tasks",
                 columns: table => new
@@ -102,6 +136,7 @@ namespace WMess.Api.Migrations
                     Description = table.Column<string>(type: "text", nullable: true),
                     Priority = table.Column<int>(type: "integer", nullable: false),
                     ColumnId = table.Column<Guid>(type: "uuid", nullable: false),
+                    GroupId = table.Column<Guid>(type: "uuid", nullable: false),
                     SortOrder = table.Column<int>(type: "integer", nullable: false),
                     StartDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     DueDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -139,6 +174,12 @@ namespace WMess.Api.Migrations
                         name: "FK_Tasks_TaskBoardColumns_ColumnId",
                         column: x => x.ColumnId,
                         principalTable: "TaskBoardColumns",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Tasks_TaskGroups_GroupId",
+                        column: x => x.GroupId,
+                        principalTable: "TaskGroups",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -245,6 +286,11 @@ namespace WMess.Api.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_TaskGroups_TeamId",
+                table: "TaskGroups",
+                column: "TeamId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TaskLabelAssignments_LabelId",
                 table: "TaskLabelAssignments",
                 column: "LabelId");
@@ -255,14 +301,19 @@ namespace WMess.Api.Migrations
                 column: "TeamId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Tasks_ColumnId_SortOrder",
+                name: "IX_Tasks_ColumnId",
                 table: "Tasks",
-                columns: new[] { "ColumnId", "SortOrder" });
+                column: "ColumnId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Tasks_CreatedById",
                 table: "Tasks",
                 column: "CreatedById");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Tasks_GroupId_ColumnId_SortOrder",
+                table: "Tasks",
+                columns: new[] { "GroupId", "ColumnId", "SortOrder" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Tasks_PrimaryAssigneeId",
@@ -309,6 +360,9 @@ namespace WMess.Api.Migrations
 
             migrationBuilder.DropTable(
                 name: "Tasks");
+
+            migrationBuilder.DropTable(
+                name: "TaskGroups");
 
             migrationBuilder.DropTable(
                 name: "TaskBoardColumns");

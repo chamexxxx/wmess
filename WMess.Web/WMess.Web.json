@@ -3076,6 +3076,281 @@
         ]
       }
     },
+    "/api/teams/{teamId}/task-groups": {
+      "get": {
+        "tags": [
+          "TaskGroups"
+        ],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskGroupResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskGroupResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskGroupResponse"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "TaskGroups"
+        ],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskGroupRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskGroupRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTaskGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskGroupResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskGroupResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskGroupResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
+    "/api/teams/{teamId}/task-groups/{groupId}": {
+      "put": {
+        "tags": [
+          "TaskGroups"
+        ],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskGroupRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskGroupRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "TaskGroups"
+        ],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "moveTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
+    "/api/teams/{teamId}/task-groups/reorder": {
+      "put": {
+        "tags": [
+          "TaskGroups"
+        ],
+        "parameters": [
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderTaskGroupsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderTaskGroupsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReorderTaskGroupsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "csrf": [ ],
+            "cookieAuth": [ ]
+          }
+        ]
+      }
+    },
     "/api/tasks": {
       "get": {
         "tags": [
@@ -5178,6 +5453,17 @@
           }
         }
       },
+      "CreateTaskGroupRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        }
+      },
       "CreateTaskLabelRequest": {
         "type": "object",
         "properties": {
@@ -5257,6 +5543,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "primaryAssigneeId": {
             "type": [
@@ -5660,7 +5953,20 @@
               "string"
             ]
           },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "columnId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "groupId": {
             "type": [
               "null",
               "string"
@@ -5700,6 +6006,9 @@
             ],
             "format": "date-time"
           },
+          "clearSchedule": {
+            "type": "boolean"
+          },
           "estimatedHours": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -5724,6 +6033,15 @@
               "null",
               "string"
             ]
+          },
+          "assignedUserIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -5880,6 +6198,14 @@
             ],
             "format": "date-time"
           },
+          "anchorLocalDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Calendar date (yyyy-MM-dd) for the first work day — avoids UTC/local drift.",
+            "format": "date"
+          },
           "projectId": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -5888,6 +6214,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -5924,6 +6257,34 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ColumnOrderItem"
+            }
+          }
+        }
+      },
+      "ReorderTaskGroupItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ReorderTaskGroupsRequest": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReorderTaskGroupItem"
             }
           }
         }
@@ -6004,6 +6365,29 @@
             "type": "string"
           },
           "userEmail": {
+            "type": "string"
+          }
+        }
+      },
+      "TaskGroupResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "color": {
             "type": "string"
           }
         }
@@ -6149,7 +6533,20 @@
             ],
             "format": "int32"
           },
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupName": {
+            "type": "string"
+          },
+          "groupColor": {
+            "type": "string"
+          },
           "createdById": {
+            "type": "string"
+          },
+          "createdByEmail": {
             "type": "string"
           },
           "assignedUserIds": {
@@ -6307,6 +6704,14 @@
             ],
             "format": "double"
           },
+          "workStartHour": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
           "timeZone": {
             "type": "string"
           }
@@ -6452,6 +6857,17 @@
           }
         }
       },
+      "UpdateTaskGroupRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateTaskLabelRequest": {
         "type": "object",
         "properties": {
@@ -6483,6 +6899,10 @@
             "$ref": "#/components/schemas/TaskPriority"
           },
           "columnId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
             "type": "string",
             "format": "uuid"
           },
@@ -6570,6 +6990,14 @@
               "string"
             ],
             "format": "double"
+          },
+          "workStartHour": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           },
           "timeZone": {
             "type": "string"
