@@ -96,7 +96,7 @@ interface DocumentEditorProps {
 }
 
 export function DocumentEditor({ documentId }: DocumentEditorProps) {
-  const { providerFactory, username, cursorColor } = useDocument()
+  const { providerFactory, username, cursorColor, awarenessData } = useDocument()
 
   const initialConfig = {
     namespace: 'WMessDocumentEditor',
@@ -140,6 +140,7 @@ export function DocumentEditor({ documentId }: DocumentEditorProps) {
             shouldBootstrap={true}
             username={username}
             cursorColor={cursorColor}
+            awarenessData={awarenessData}
           />
         </div>
       </LexicalCollaboration>

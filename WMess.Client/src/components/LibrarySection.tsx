@@ -8,6 +8,7 @@ import { BoardEditor } from './BoardEditor'
 import { TableEditor } from './TableEditor'
 import { LibrarySidebar } from './LibrarySidebar'
 import { LibraryExplorer } from './LibraryExplorer'
+import { Avatar } from './Avatar'
 import { useLibraryLive } from '../providers/useLibraryLive'
 import { apiClient } from '../api'
 import { toast } from '../store/toastStore'
@@ -32,14 +33,16 @@ function ConnectedUsers() {
   return (
     <div className="flex items-center -space-x-2">
       {unique.slice(0, 6).map((u, idx) => (
-        <div
-          key={idx}
-          title={u.name}
-          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold border-2 border-panel"
-          style={{ backgroundColor: u.color }}
-        >
-          {u.name.charAt(0).toUpperCase()}
-        </div>
+        <span key={idx} title={u.name}>
+          <Avatar
+            userId={u.userId}
+            name={u.name}
+            hasAvatar={u.hasAvatar}
+            version={u.avatarVersion}
+            size={28}
+            className="border-2 border-panel"
+          />
+        </span>
       ))}
     </div>
   )
@@ -264,14 +267,16 @@ function BoardWorkspace({
           {uniqueUsers.length > 0 && (
             <div className="flex items-center -space-x-2">
               {uniqueUsers.slice(0, 6).map((u, idx) => (
-                <div
-                  key={idx}
-                  title={u.name}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold border-2 border-panel"
-                  style={{ backgroundColor: u.color }}
-                >
-                  {u.name.charAt(0).toUpperCase()}
-                </div>
+                <span key={idx} title={u.name}>
+                  <Avatar
+                    userId={u.userId}
+                    name={u.name}
+                    hasAvatar={u.hasAvatar}
+                    version={u.avatarVersion}
+                    size={28}
+                    className="border-2 border-panel"
+                  />
+                </span>
               ))}
             </div>
           )}
@@ -393,14 +398,16 @@ function TableWorkspace({
           {uniqueUsers.length > 0 && (
             <div className="flex items-center -space-x-2">
               {uniqueUsers.slice(0, 6).map((u, idx) => (
-                <div
-                  key={idx}
-                  title={u.name}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold border-2 border-panel"
-                  style={{ backgroundColor: u.color }}
-                >
-                  {u.name.charAt(0).toUpperCase()}
-                </div>
+                <span key={idx} title={u.name}>
+                  <Avatar
+                    userId={u.userId}
+                    name={u.name}
+                    hasAvatar={u.hasAvatar}
+                    version={u.avatarVersion}
+                    size={28}
+                    className="border-2 border-panel"
+                  />
+                </span>
               ))}
             </div>
           )}

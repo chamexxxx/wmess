@@ -20,9 +20,12 @@ export function describeError(error: unknown, fallback: string): string {
     if (status === 401) {
       return 'Сессия истекла. Войдите заново.'
     }
-    const serverMessage = (error.response.data as { message?: string } | undefined)?.message
-    if (serverMessage) {
-      return serverMessage
+    const data = error.response.data as { message?: string; errors?: string[] } | undefined
+    if (data?.errors?.length) {
+      return data.errors.join('; ')
+    }
+    if (data?.message) {
+      return data.message
     }
   }
   return fallback

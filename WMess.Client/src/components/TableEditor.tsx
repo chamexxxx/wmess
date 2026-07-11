@@ -41,7 +41,7 @@ const MIN_COL_W = 56
 const genColId = () => `col_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
 
 export function TableEditor() {
-  const { doc, awareness, connect, disconnect, username, cursorColor } = useTable()
+  const { doc, awareness, connect, disconnect, username, cursorColor, userId, hasAvatar, avatarVersion } = useTable()
 
   // Колонки могут быть Y.Map (текущий формат) или plain-объектом {id,title}
   // (ранняя версия редактора). Тип — unknown, разбираем через readColumn().
@@ -106,9 +106,9 @@ export function TableEditor() {
   // Presence: транслируем имя/цвет, когда известен реальный аккаунт.
   useEffect(() => {
     if (username) {
-      awareness.setLocalStateField('user', { name: username, color: cursorColor })
+      awareness.setLocalStateField('user', { name: username, color: cursorColor, userId, hasAvatar, avatarVersion })
     }
-  }, [awareness, username, cursorColor])
+  }, [awareness, username, cursorColor, userId, hasAvatar, avatarVersion])
 
   // Замер контейнера, чтобы понять, сколько строк/колонок нужно для заполнения области.
   const scrollRef = useRef<HTMLDivElement>(null)

@@ -8,6 +8,9 @@ import { useAuth } from '../context/AuthContext'
 export interface CollabUser {
   name: string
   color: string
+  userId?: string
+  hasAvatar?: boolean
+  avatarVersion?: number
 }
 
 interface DocumentContextValue {
@@ -17,6 +20,8 @@ interface DocumentContextValue {
   users: CollabUser[]
   username: string
   cursorColor: string
+  // Данные аватарки текущего пользователя — передаются в CollaborationPlugin как awarenessData.
+  awarenessData: { userId?: string; hasAvatar?: boolean; avatarVersion?: number }
 }
 
 const DocumentContext = createContext<DocumentContextValue | null>(null)
@@ -78,11 +83,18 @@ export function DocumentProvider({ documentId, children }: DocumentProviderProps
         const states = Array.from(provider.awareness.getStates().values()) as Array<{
           name?: string
           color?: string
+          awarenessData?: { userId?: string; hasAvatar?: boolean; avatarVersion?: number }
         }>
         setUsers(
           states
             .filter((s) => typeof s.name === 'string')
-            .map((s) => ({ name: s.name as string, color: s.color ?? '#888' })),
+            .map((s) => ({
+              name: s.name as string,
+              color: s.color ?? '#888',
+              userId: s.awarenessData?.userId,
+              hasAvatar: s.awarenessData?.hasAvatar,
+              avatarVersion: s.awarenessData?.avatarVersion,
+            })),
         )
       }
       provider.awareness.on('change', updateUsers)
@@ -93,9 +105,14 @@ export function DocumentProvider({ documentId, children }: DocumentProviderProps
     [documentId],
   )
 
+  const awarenessData = useMemo(
+    () => ({ userId: user?.id, hasAvatar: user?.hasAvatar, avatarVersion: user?.avatarVersion }),
+    [user],
+  )
+
   const value = useMemo(
-    () => ({ providerFactory, isConnected, isSynced, users, username, cursorColor }),
-    [providerFactory, isConnected, isSynced, users, username, cursorColor],
+    () => ({ providerFactory, isConnected, isSynced, users, username, cursorColor, awarenessData }),
+    [providerFactory, isConnected, isSynced, users, username, cursorColor, awarenessData],
   )
 
   return <DocumentContext.Provider value={value}>{children}</DocumentContext.Provider>
