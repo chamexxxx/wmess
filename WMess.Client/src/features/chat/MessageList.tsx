@@ -18,6 +18,7 @@ interface Props {
   onPin: (messageId: number) => void
   onUnpin: (messageId: number) => void
   onEdit: (message: MessageResponse) => void
+  onDelete: (messageId: number) => void
 }
 
 export function MessageList({
@@ -36,6 +37,7 @@ export function MessageList({
   onPin,
   onUnpin,
   onEdit,
+  onDelete,
 }: Props) {
   const scrollTo = (id: number) => {
     document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -85,6 +87,7 @@ export function MessageList({
           onPin={() => onPin(msgId)}
           onUnpin={() => onUnpin(msgId)}
           onEdit={() => onEdit(m)}
+          onDelete={() => onDelete(msgId)}
           onScrollTo={scrollTo}
         />,
       )

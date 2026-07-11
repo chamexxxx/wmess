@@ -84,11 +84,14 @@ export function MessageInput({
   const editingVoice = isEditing && (editTarget.attachments ?? []).some((a) => a.contentType?.startsWith('audio/'))
 
   // Авто-высота как в Telegram: одна строка, растёт с текстом до предела, дальше — скролл.
+  // Скролл показываем только когда контент реально превысил предел, иначе он мигает при одной строке.
   const autoResize = () => {
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`
+    const next = Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)
+    el.style.height = `${next}px`
+    el.style.overflowY = el.scrollHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden'
   }
 
   useEffect(() => {
@@ -218,7 +221,7 @@ export function MessageInput({
           rows={1}
           disabled={disabled}
           style={{ maxHeight: MAX_INPUT_HEIGHT }}
-          className="flex-1 resize-none overflow-y-auto rounded-lg border border-line px-3 py-2 text-sm leading-5 bg-app text-ink focus:outline-none focus:border-accent"
+          className="flex-1 resize-none overflow-y-hidden rounded-lg border border-line px-3 py-2 text-sm leading-5 bg-app text-ink focus:outline-none focus:border-accent"
         />
         <button
           type="button"

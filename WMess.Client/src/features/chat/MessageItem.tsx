@@ -50,6 +50,7 @@ interface Props {
   onPin: () => void
   onUnpin: () => void
   onEdit: () => void
+  onDelete: () => void
   onScrollTo: (id: number) => void
   isPinned: boolean
 }
@@ -58,7 +59,7 @@ export function MessageItem({
   message,
   parent,
   currentUserId,
-  canManage: _canManage,
+  canManage,
   inThread = false,
   threadRootId,
   threadReplyCount = 0,
@@ -68,10 +69,12 @@ export function MessageItem({
   onPin,
   onUnpin,
   onEdit,
+  onDelete,
   onScrollTo,
   isPinned,
 }: Props) {
   const isOwn = message.authorId === currentUserId
+  const canDelete = isOwn || canManage
   const isCall = Boolean(message.callRoomId)
   const isVoiceMessage = hasAudioAttachment(message)
   const canOpenThread = !inThread && !parent
@@ -136,6 +139,15 @@ export function MessageItem({
         >
           {isPinned ? 'Открепить' : 'Закрепить'}
         </button>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="px-1.5 h-6 rounded-md text-[11px] text-muted hover:bg-danger/10 hover:text-danger cursor-pointer"
+          >
+            Удалить
+          </button>
+        )}
       </div>
 
       <div className="flex gap-3 min-w-0">

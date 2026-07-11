@@ -208,6 +208,13 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
     setReplyTarget(null)
   }
 
+  const handleDelete = async (messageId: number) => {
+    if (!window.confirm('Удалить сообщение? Это действие необратимо.')) return
+    await apiClient.chats.deleteMessage(chatId, messageId)
+    useChatStore.getState().removeMessage(chatId, messageId)
+    if (threadRootId === messageId) setThreadRootId(null)
+  }
+
   const handleSaveEdit = async (text: string) => {
     if (!editTarget) return
     await apiClient.chats.updateMessage(chatId, Number(editTarget.id), { content: text || null })
@@ -278,6 +285,7 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
           onPin={(id) => void handlePin(id)}
           onUnpin={(id) => void handleUnpin(id)}
           onEdit={handleEdit}
+          onDelete={(id) => void handleDelete(id)}
         />
 
         <MessageInput
@@ -303,6 +311,7 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
           onReaction={(id, emoji) => void handleReaction(id, emoji)}
           onPin={(id) => void handlePin(id)}
           onUnpin={(id) => void handleUnpin(id)}
+          onDelete={(id) => void handleDelete(id)}
         />
       )}
     </div>

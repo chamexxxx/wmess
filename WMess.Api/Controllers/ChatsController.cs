@@ -79,6 +79,68 @@ public class ChatsController : ControllerBase
     private static bool HasTextContent(string? content) =>
         !string.IsNullOrWhiteSpace(content);
 
+    // Подтягивает превью последнего сообщения для списка чатов (одним запросом на все чаты).
+    private async Task AttachLastMessagesAsync(List<ChatResponse> chats)
+    {
+        if (chats.Count == 0) return;
+
+        var chatIds = chats.Select(c => c.Id).ToList();
+        var lasts = await _context.Chats
+            .Where(c => chatIds.Contains(c.Id))
+            .Select(c => new
+            {
+                ChatId = c.Id,
+                Last = c.Messages
+                    .OrderByDescending(m => m.CreatedAt)
+                    .Select(m => new
+                    {
+                        m.Content,
+                        m.CreatedAt,
+                        AuthorName = m.Author!.DisplayName,
+                        AuthorEmail = m.Author!.Email,
+                        IsCall = m.CallRoomId != null,
+                        HasAudio = m.Attachments.Any(a => a.ContentType.StartsWith("audio/")),
+                        HasAttachment = m.Attachments.Any()
+                    })
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var byChat = lasts
+            .Where(x => x.Last != null)
+            .ToDictionary(x => x.ChatId, x => x.Last!);
+
+        foreach (var c in chats)
+        {
+            if (!byChat.TryGetValue(c.Id, out var last)) continue;
+            c.LastMessageAt = last.CreatedAt;
+            c.LastMessageAuthor = BuildAuthorName(last.AuthorName, last.AuthorEmail);
+            c.LastMessagePreview = BuildMessagePreview(
+                last.Content, last.IsCall, last.HasAudio, last.HasAttachment);
+        }
+    }
+
+    private static string BuildAuthorName(string? displayName, string? email)
+    {
+        var trimmed = displayName?.Trim();
+        if (!string.IsNullOrEmpty(trimmed)) return trimmed;
+        if (!string.IsNullOrEmpty(email)) return email.Split('@')[0];
+        return "Пользователь";
+    }
+
+    private static string BuildMessagePreview(string? content, bool isCall, bool hasAudio, bool hasAttachment)
+    {
+        if (HasTextContent(content))
+        {
+            var text = content!.Trim();
+            return text.Length > 80 ? text[..80] + "…" : text;
+        }
+        if (isCall) return "📞 Звонок";
+        if (hasAudio) return "🎤 Голосовое сообщение";
+        if (hasAttachment) return "📎 Вложение";
+        return "";
+    }
+
     private async Task<MessageResponse> MapMessageAsync(Message m)
     {
         var inline = await _taskResolver.ResolveAsync(m.Content);
@@ -401,6 +463,7 @@ public class ChatsController : ControllerBase
             .ToListAsync();
 
         foreach (var c in chats) c.CanManage = rights.CanManage;
+        await AttachLastMessagesAsync(chats);
         return Ok(chats);
     }
 
@@ -426,6 +489,7 @@ public class ChatsController : ControllerBase
             .ToListAsync();
 
         foreach (var c in chats) c.CanManage = rights.CanManage;
+        await AttachLastMessagesAsync(chats);
         return Ok(chats);
     }
 

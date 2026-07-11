@@ -5616,6 +5616,28 @@
           },
           "canManage": {
             "type": "boolean"
+          },
+          "lastMessagePreview": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Краткое превью последнего сообщения чата (для списка чатов). null — сообщений нет."
+          },
+          "lastMessageAuthor": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Имя автора последнего сообщения (для списка чатов). null — сообщений нет."
+          },
+          "lastMessageAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Время последнего сообщения чата. null — сообщений нет.",
+            "format": "date-time"
           }
         }
       },

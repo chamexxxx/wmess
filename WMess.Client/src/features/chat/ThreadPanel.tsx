@@ -18,6 +18,7 @@ interface Props {
   onReaction: (messageId: number, emoji: string) => void
   onPin: (messageId: number) => void
   onUnpin: (messageId: number) => void
+  onDelete: (messageId: number) => void
 }
 
 export function ThreadPanel({
@@ -31,6 +32,7 @@ export function ThreadPanel({
   onReaction,
   onPin,
   onUnpin,
+  onDelete,
 }: Props) {
   const { width, onResizeStart } = usePanelResize('wmess-thread-panel-width', 320, 260, 560)
   const messages = useChatStore((s) => s.threadMessagesByRoot[rootId] ?? EMPTY_ARRAY)
@@ -139,6 +141,7 @@ export function ThreadPanel({
                 onPin={() => onPin(rootId)}
                 onUnpin={() => onUnpin(rootId)}
                 onEdit={() => startEdit(rootMessage)}
+                onDelete={() => onDelete(rootId)}
                 onScrollTo={scrollTo}
               />
             </div>
@@ -168,6 +171,7 @@ export function ThreadPanel({
                     onPin={() => onPin(msgId)}
                     onUnpin={() => onUnpin(msgId)}
                     onEdit={() => startEdit(m)}
+                    onDelete={() => onDelete(msgId)}
                     onScrollTo={scrollTo}
                   />
                 </div>

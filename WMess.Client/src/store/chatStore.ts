@@ -190,12 +190,28 @@ export const useChatStore = create<ChatState>((set) => ({
     }),
 
   removeMessage: (chatId, messageId) =>
-    set((s) => ({
-      messagesByChat: {
-        ...s.messagesByChat,
-        [chatId]: (s.messagesByChat[chatId] ?? []).filter((m) => Number(m.id) !== messageId),
-      },
-    })),
+    set((s) => {
+      // Удаляем из основной ленты и из тредов (в т.ч. корректируем счётчики ответов).
+      const nextThread = { ...s.threadMessagesByRoot }
+      const nextCounts = { ...s.threadReplyCounts }
+      let threadChanged = false
+      for (const [rootIdStr, list] of Object.entries(s.threadMessagesByRoot)) {
+        if (!list.some((m) => Number(m.id) === messageId)) continue
+        const rootId = Number(rootIdStr)
+        nextThread[rootId] = list.filter((m) => Number(m.id) !== messageId)
+        nextCounts[rootId] = Math.max(0, (nextCounts[rootId] ?? list.length) - 1)
+        threadChanged = true
+      }
+      return {
+        messagesByChat: {
+          ...s.messagesByChat,
+          [chatId]: (s.messagesByChat[chatId] ?? []).filter((m) => Number(m.id) !== messageId),
+        },
+        ...(threadChanged
+          ? { threadMessagesByRoot: nextThread, threadReplyCounts: nextCounts }
+          : {}),
+      }
+    }),
 
   setPinnedIds: (chatId, ids) =>
     set((s) => ({ pinnedMessageIds: { ...s.pinnedMessageIds, [chatId]: ids } })),

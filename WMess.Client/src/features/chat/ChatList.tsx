@@ -38,9 +38,18 @@ export function ChatList({ chats, projectId, teamId, onCreate }: Props) {
               }
               className="w-full text-left px-4 py-3 rounded-lg hover:bg-hovered cursor-pointer mb-1"
             >
-              <div className="font-semibold text-sm text-ink">{c.name ?? `Чат #${c.id}`}</div>
-              <div className="text-xs text-faint mt-0.5">
-                {new Date(c.createdAt ?? '').toLocaleDateString('ru-RU')}
+              <div className="font-semibold text-sm text-ink truncate">{c.name ?? `Чат #${c.id}`}</div>
+              <div className="text-xs text-faint mt-0.5 truncate">
+                {c.lastMessagePreview ? (
+                  <>
+                    {c.lastMessageAuthor && (
+                      <span className="text-muted font-medium">{c.lastMessageAuthor}: </span>
+                    )}
+                    {c.lastMessagePreview}
+                  </>
+                ) : (
+                  'Нет сообщений'
+                )}
               </div>
             </button>
           ))
