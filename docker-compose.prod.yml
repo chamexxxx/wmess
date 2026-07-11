@@ -1,9 +1,10 @@
-# Полный запуск WMess в контейнерах: PostgreSQL + API + BFF/SPA.
-# Открывается на http://localhost:9080
+# Полный запуск WMess в контейнерах: nginx (HTTPS) + PostgreSQL + API + BFF/SPA.
+# Наружу торчит только nginx; открывается на https://localhost
 #
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
-# Секреты (пароль БД, JWT) можно переопределить через .env или переменные окружения.
+# Перед запуском положите сертификат в nginx/certs/ (server.crt + server.key).
+# Секреты (пароль БД, JWT), домен и порты можно переопределить через .env или переменные окружения.
 
 name: wmess-prod
 
@@ -53,8 +54,24 @@ services:
       # Куда BFF проксирует /api и /hubs и ходит за авторизацией (имя сервиса в сети compose).
       Api__BaseUrl: http://api:8080/
       ReverseProxy__Clusters__apiCluster__Destinations__api__Address: http://api:8080/
+    # Наружу не публикуется — доступен только внутри сети compose (nginx ходит по http://web:8080).
+    expose:
+      - '8080'
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      # Доменное имя (server_name / CN сертификата). Подставляется в конфиг через envsubst.
+      SERVER_NAME: ${SERVER_NAME:-localhost}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     ports:
-      - '${WEB_PORT:-9080}:8080'
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
 
 volumes:
   wmess_prod_pg:
