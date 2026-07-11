@@ -44,7 +44,7 @@ export function MessageAttachments({ attachments }: Props) {
               key={id}
               type="button"
               onClick={() => setPreviewIndex(galleryIndex)}
-              className="block max-w-full sm:max-w-sm mt-1 cursor-zoom-in"
+              className="w-fit max-w-full sm:max-w-sm mt-1 cursor-zoom-in"
             >
               <img
                 src={url}
@@ -79,7 +79,6 @@ export function MessageAttachments({ attachments }: Props) {
           </a>
         )
       })}
-
       {previewIndex !== null && gallery[previewIndex] && (
         <ImagePreview
           images={gallery}
