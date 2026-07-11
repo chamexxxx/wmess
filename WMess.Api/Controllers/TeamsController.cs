@@ -8,6 +8,7 @@ using WMess.Api.Data;
 using WMess.Api.Enums;
 using WMess.Api.Models;
 using WMess.Api.Models.DTO.Teams;
+using WMess.Api.Services;
 
 namespace WMess.Api.Controllers;
 
@@ -30,11 +31,8 @@ public class TeamsController : ControllerBase
         _userManager = userManager;
     }
 
-    private string GetCurrentUserId()
-    {
-        return User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? throw new UnauthorizedAccessException("User ID not found in token");
-    }
+    private string? GetCurrentUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier);
 
     private async Task<bool> IsLastOwnerAsync(int teamId)
     {
@@ -47,7 +45,8 @@ public class TeamsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TeamResponse>>> GetTeams()
     {
-        var userId = GetCurrentUserId();
+        if (GetCurrentUserId() is not { } userId)
+            return Unauthorized();
 
         // Возвращаем только команды, в которых пользователь является участником
         var teams = await _context.TeamUsers
@@ -79,8 +78,11 @@ public class TeamsController : ControllerBase
         }
 
         // Политика TeamMember пройдена — значит запись о членстве существует.
+        if (GetCurrentUserId() is not { } currentUserId)
+            return Unauthorized();
+
         var role = await _context.TeamUsers
-            .Where(tu => tu.TeamId == team.Id && tu.UserId == GetCurrentUserId())
+            .Where(tu => tu.TeamId == team.Id && tu.UserId == currentUserId)
             .Select(tu => (TeamRole?)tu.Role)
             .FirstOrDefaultAsync();
 
@@ -104,7 +106,8 @@ public class TeamsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<TeamResponse>> CreateTeam(CreateTeamRequest request)
     {
-        var userId = GetCurrentUserId();
+        if (GetCurrentUserId() is not { } userId)
+            return Unauthorized();
 
         // Создаём команду вместе с владельцем в одной транзакции
         var team = new Team
@@ -117,6 +120,7 @@ public class TeamsController : ControllerBase
             }
         };
 
+        TaskBoardSeed.AttachDefaults(team);
         _context.Teams.Add(team);
         await _context.SaveChangesAsync();
 
@@ -247,7 +251,8 @@ public class TeamsController : ControllerBase
     [HttpDelete("{id}/members/{memberId}")]
     public async Task<IActionResult> RemoveMember(int id, string memberId)
     {
-        var userId = GetCurrentUserId();
+        if (GetCurrentUserId() is not { } userId)
+            return Unauthorized();
 
         var team = await _context.Teams.FindAsync(id);
         if (team == null)
@@ -315,7 +320,8 @@ public class TeamsController : ControllerBase
             return Forbid();
         }
 
-        var userId = GetCurrentUserId();
+        if (GetCurrentUserId() is not { } userId)
+            return Unauthorized();
 
         // Свою роль менять нельзя. Владелец расстаётся с ролью только через передачу
         // владения — назначив владельцем другого участника (ниже).

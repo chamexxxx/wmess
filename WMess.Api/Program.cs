@@ -100,6 +100,9 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 
 // Register Library Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° СЌР»РµРјРµРЅС‚ Р±РёР±Р»РёРѕС‚РµРєРё)
 builder.Services.AddScoped<ILibraryAccessService, LibraryAccessService>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
+builder.Services.AddScoped<ITasksChangeNotifier, TasksChangeNotifier>();
+builder.Services.AddScoped<ICalendarChangeNotifier, CalendarChangeNotifier>();
 
 // Register Chat Access Service (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РІС‹С‡РёСЃР»РµРЅРёСЏ РїСЂР°РІ РЅР° С‡Р°С‚)
 builder.Services.AddScoped<IChatAccessService, ChatAccessService>();
@@ -151,6 +154,16 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 var app = builder.Build();
+
+if (builder.Configuration.GetValue("AutoMigrate", false)
+    || app.Environment.IsEnvironment("Docker")
+    || app.Environment.IsEnvironment("DockerLocal"))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    db.Database.Migrate();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -160,7 +173,10 @@ if (app.Environment.IsDevelopment())
         options.WithTitle("WMess API");
     });
 }
-app.UseHttpsRedirection();
+if (!app.Environment.IsEnvironment("Docker") && !app.Environment.IsEnvironment("DockerLocal"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -174,4 +190,6 @@ app.MapHub<WMess.Api.Hubs.BoardHub>("/hubs/board");
 app.MapHub<WMess.Api.Hubs.TableHub>("/hubs/table");
 app.MapHub<WMess.Api.Hubs.LibraryHub>("/hubs/library");
 app.MapHub<WMess.Api.Hubs.ChatHub>("/hubs/chat");
+app.MapHub<WMess.Api.Hubs.TasksHub>("/hubs/tasks");
+app.MapHub<WMess.Api.Hubs.CalendarHub>("/hubs/calendar");
 app.Run();

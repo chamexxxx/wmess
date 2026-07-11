@@ -1,0 +1,11 @@
+**/.git
+**/.idea
+**/.vs
+**/bin
+**/obj
+**/node_modules
+**/.wmess
+**/docker-out
+**/*.user
+**/*.suo
+WMess.Web/wwwroot/**

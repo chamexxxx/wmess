@@ -23,6 +23,7 @@ export const router = createBrowserRouter([
           { path: '/teams/:teamId/projects/:projectId/:section', element: <HomePage /> },
           { path: '/teams/:teamId/projects/:projectId/library/:itemId', element: <HomePage /> },
           { path: '/teams/:teamId/projects/:projectId/chats/:chatId', element: <HomePage /> },
+          { path: '/teams/:teamId/projects/:projectId/tasks/:taskId', element: <HomePage /> },
         ],
       },
       // Временный роут для тестирования Excalidraw (без каркаса рабочего пространства)

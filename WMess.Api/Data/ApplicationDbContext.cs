@@ -23,6 +23,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<FileContent> FileContents { get; set; }
     public DbSet<LinkContent> LinkContents { get; set; }
     public DbSet<LibraryFolder> LibraryFolders { get; set; }
+    public DbSet<TaskItem> Tasks { get; set; }
+    public DbSet<TaskGroup> TaskGroups { get; set; }
+    public DbSet<TaskBoardColumn> TaskBoardColumns { get; set; }
+    public DbSet<TaskComment> TaskComments { get; set; }
+    public DbSet<TaskLabelDefinition> TaskLabelDefinitions { get; set; }
+    public DbSet<TaskLabelAssignment> TaskLabelAssignments { get; set; }
+    public DbSet<TaskAssignment> TaskAssignments { get; set; }
+    public DbSet<TeamScheduleSettings> TeamScheduleSettings { get; set; }
+    public DbSet<TeamHoliday> TeamHolidays { get; set; }
+    public DbSet<CalendarEvent> CalendarEvents { get; set; }
+    public DbSet<CalendarEventAttendee> CalendarEventAttendees { get; set; }
 
     public DbSet<Chat> Chats { get; set; }
     public DbSet<Message> Messages { get; set; }
@@ -35,7 +46,6 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(builder);
 
-        // Конфигурация связи многие-ко-многим между Team и IdentityUser через TeamUser
         builder.Entity<TeamUser>()
             .HasKey(tu => new { tu.TeamId, tu.UserId });
 
@@ -51,63 +61,54 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(tu => tu.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация связи Project -> Team
         builder.Entity<Project>()
             .HasOne(p => p.Team)
             .WithMany(t => t.Projects)
             .HasForeignKey(p => p.TeamId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация связи LibraryFolder -> Project
         builder.Entity<LibraryFolder>()
             .HasOne(df => df.Project)
             .WithMany()
             .HasForeignKey(df => df.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация иерархии папок (самоссылающаяся связь)
         builder.Entity<LibraryFolder>()
             .HasOne(df => df.ParentFolder)
             .WithMany(df => df.SubFolders)
             .HasForeignKey(df => df.ParentFolderId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Конфигурация связи LibraryItem -> Project
         builder.Entity<LibraryItem>()
             .HasOne(d => d.Project)
             .WithMany()
             .HasForeignKey(d => d.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Конфигурация связи LibraryItem -> LibraryFolder
         builder.Entity<LibraryItem>()
             .HasOne(d => d.Folder)
             .WithMany(f => f.Items)
             .HasForeignKey(d => d.FolderId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // Конфигурация связи LibraryItem -> Creator (IdentityUser)
         builder.Entity<LibraryItem>()
             .HasOne(d => d.Creator)
             .WithMany()
             .HasForeignKey(d => d.CreatedBy)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Контент типа Document (1:1, PK = FK); удаляется вместе с элементом
         builder.Entity<DocumentContent>()
             .HasOne(c => c.Item)
             .WithOne(i => i.DocumentContent)
             .HasForeignKey<DocumentContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Контент типа Board (1:1, PK = FK); удаляется вместе с элементом
         builder.Entity<BoardContent>()
             .HasOne(c => c.Item)
             .WithOne(i => i.BoardContent)
             .HasForeignKey<BoardContent>(c => c.LibraryItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Контент типа Table (1:1, PK = FK); удаляется вместе с элементом
         builder.Entity<TableContent>()
             .HasOne(c => c.Item)
             .WithOne(i => i.TableContent)
@@ -151,7 +152,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(m => m.ChatId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Message -> Author (IdentityUser)
+        // Message -> Author (ApplicationUser)
         builder.Entity<Message>()
             .HasOne(m => m.Author)
             .WithMany()
@@ -242,5 +243,153 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<ChatMember>()
             .HasIndex(cm => new { cm.ChatId, cm.UserId })
             .IsUnique();
+
+        builder.Entity<TaskBoardColumn>()
+            .HasOne(c => c.Team)
+            .WithMany(t => t.TaskBoardColumns)
+            .HasForeignKey(c => c.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskGroup>()
+            .HasOne(g => g.Team)
+            .WithMany(t => t.TaskGroups)
+            .HasForeignKey(g => g.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskItem>()
+            .HasOne(t => t.Group)
+            .WithMany(g => g.Tasks)
+            .HasForeignKey(t => t.GroupId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<TaskItem>()
+            .HasOne(t => t.Column)
+            .WithMany(c => c.Tasks)
+            .HasForeignKey(t => t.ColumnId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<TaskItem>()
+            .HasOne(t => t.Project)
+            .WithMany()
+            .HasForeignKey(t => t.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskItem>()
+            .HasOne(t => t.Team)
+            .WithMany()
+            .HasForeignKey(t => t.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskItem>()
+            .HasOne(t => t.CreatedBy)
+            .WithMany()
+            .HasForeignKey(t => t.CreatedById)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<TaskItem>()
+            .HasOne(t => t.PrimaryAssignee)
+            .WithMany()
+            .HasForeignKey(t => t.PrimaryAssigneeId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Entity<TaskItem>()
+            .HasIndex(t => new { t.GroupId, t.ColumnId, t.SortOrder });
+
+        builder.Entity<TaskAssignment>()
+            .HasKey(ta => new { ta.TaskId, ta.UserId });
+
+        builder.Entity<TaskAssignment>()
+            .HasOne(ta => ta.Task)
+            .WithMany(t => t.Assignments)
+            .HasForeignKey(ta => ta.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskAssignment>()
+            .HasOne(ta => ta.User)
+            .WithMany()
+            .HasForeignKey(ta => ta.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskComment>()
+            .HasOne(tc => tc.Task)
+            .WithMany(t => t.Comments)
+            .HasForeignKey(tc => tc.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskComment>()
+            .HasOne(tc => tc.User)
+            .WithMany()
+            .HasForeignKey(tc => tc.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<TaskLabelDefinition>()
+            .HasOne(l => l.Team)
+            .WithMany()
+            .HasForeignKey(l => l.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskLabelAssignment>()
+            .HasKey(la => new { la.TaskId, la.LabelId });
+
+        builder.Entity<TaskLabelAssignment>()
+            .HasOne(la => la.Task)
+            .WithMany(t => t.LabelAssignments)
+            .HasForeignKey(la => la.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TaskLabelAssignment>()
+            .HasOne(la => la.Label)
+            .WithMany(l => l.Assignments)
+            .HasForeignKey(la => la.LabelId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TeamScheduleSettings>()
+            .HasKey(s => s.TeamId);
+
+        builder.Entity<TeamScheduleSettings>()
+            .HasOne(s => s.Team)
+            .WithOne(t => t.ScheduleSettings)
+            .HasForeignKey<TeamScheduleSettings>(s => s.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TeamHoliday>()
+            .HasOne(h => h.Team)
+            .WithMany()
+            .HasForeignKey(h => h.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<TeamHoliday>()
+            .HasIndex(h => new { h.TeamId, h.Date })
+            .IsUnique();
+
+        builder.Entity<CalendarEvent>()
+            .HasOne(e => e.Project)
+            .WithMany()
+            .HasForeignKey(e => e.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CalendarEvent>()
+            .HasOne(e => e.CreatedBy)
+            .WithMany()
+            .HasForeignKey(e => e.CreatedById)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CalendarEvent>()
+            .HasIndex(e => new { e.ProjectId, e.StartUtc });
+
+        builder.Entity<CalendarEventAttendee>()
+            .HasKey(a => new { a.EventId, a.UserId });
+
+        builder.Entity<CalendarEventAttendee>()
+            .HasOne(a => a.Event)
+            .WithMany(e => e.Attendees)
+            .HasForeignKey(a => a.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CalendarEventAttendee>()
+            .HasOne(a => a.User)
+            .WithMany()
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
