@@ -40,7 +40,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 
     // Р›РѕРіРёРЅ (UserName) СѓРЅРёРєР°Р»РµРЅ Рё РѕРіСЂР°РЅРёС‡РµРЅ Р»Р°С‚РёРЅРёС†РµР№, С†РёС„СЂР°РјРё, РґРµС„РёСЃРѕРј Рё РїРѕРґС‡С‘СЂРєРёРІР°РЅРёРµРј.
     options.User.RequireUniqueEmail = true;
-    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@.";
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
