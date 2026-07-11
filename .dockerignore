@@ -8,4 +8,6 @@
 **/docker-out
 **/*.user
 **/*.suo
+**/.env
 WMess.Web/wwwroot/**
+WMess.Client/dist/**

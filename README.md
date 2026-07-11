@@ -4,6 +4,34 @@
 
 ---
 
+## Запуск в продакшене через Docker
+
+Всё приложение (PostgreSQL + API + BFF со встроенным SPA) поднимается одной командой.
+
+**Требуется:** Docker с Docker Compose v2.
+
+1. (Необязательно, но рекомендуется) задать секреты — скопируйте `.env.example` в `.env` и поменяйте `JWT_SECRET` (минимум 32 символа) и `DB_PASSWORD`:
+   ```bash
+   cp .env.example .env
+   ```
+2. Собрать и запустить:
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d --build
+   ```
+3. Открыть **http://localhost:9080** (порт меняется через `WEB_PORT`).
+
+Миграции БД применяются автоматически при старте. Данные сохраняются в volume'ах (`wmess_prod_pg` — база, `wmess_prod_uploads` — вложения чата).
+
+**Остановить:**
+```bash
+docker compose -f docker-compose.prod.yml down        # оставить данные
+docker compose -f docker-compose.prod.yml down -v      # удалить и данные
+```
+
+> Приложение слушает по HTTP (куки в этом режиме — `SameSite=Lax`, без `Secure`). Для реального прод-деплоя поставьте перед ним обратный прокси с TLS (nginx / Caddy / Traefik) и терминируйте HTTPS на нём.
+
+---
+
 ## Roadmap
 
 > Статус проверен ревью 2026-07-11. Обозначения: `[x]` — сделано, `[ ]` — не сделано (частично выполненные помечены пояснением курсивом). Подробный разбор: [чаты](docs/chat-spec.md#статус-реализации-ревью-от-2026-07-11), [задачи и календарь](docs/tasks-calendar-review.md).

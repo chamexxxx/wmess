@@ -1,0 +1,61 @@
+# Полный запуск WMess в контейнерах: PostgreSQL + API + BFF/SPA.
+# Открывается на http://localhost:9080
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Секреты (пароль БД, JWT) можно переопределить через .env или переменные окружения.
+
+name: wmess-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wmess
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wmess}
+      POSTGRES_DB: wmess
+    volumes:
+      - wmess_prod_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U wmess -d wmess']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: WMess.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+      # Миграции применяются автоматически при старте (AutoMigrate в среде Docker).
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=wmess;Username=wmess;Password=${DB_PASSWORD:-wmess}
+      JwtSettings__Secret: ${JWT_SECRET:-ChangeThisProductionJwtSecret_MinimumOf32Chars}
+    volumes:
+      - wmess_prod_uploads:/app/uploads
+
+  web:
+    build:
+      context: .
+      dockerfile: WMess.Web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+      # Куда BFF проксирует /api и /hubs и ходит за авторизацией (имя сервиса в сети compose).
+      Api__BaseUrl: http://api:8080/
+      ReverseProxy__Clusters__apiCluster__Destinations__api__Address: http://api:8080/
+    ports:
+      - '${WEB_PORT:-9080}:8080'
+
+volumes:
+  wmess_prod_pg:
+  wmess_prod_uploads:
