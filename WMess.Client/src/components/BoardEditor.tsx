@@ -6,8 +6,8 @@
  * 2. Локальные изменения → Yjs: onChange записывает новые/изменённые элементы
  * 3. Yjs → локальные: yMap.observe обновляет сцену через reconcileElements
  * 4. Курсоры: onPointerUpdate → awareness; awareness.change → collaborators
- *
- * Важно: бинарные файлы (картинки) в v1 НЕ синхронизируются (TODO)
+ * 5. Бинарные файлы (картинки) хранятся в отдельном Y.Map('files') по file.id,
+ *    тем же путём, что и элементы — единым Yjs-снапшотом, без отдельного бэкенда
  *
  * Использование:
  * <BoardProvider boardId={1}>
@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import { Excalidraw, MainMenu, reconcileElements } from '@excalidraw/excalidraw'
-import type { ExcalidrawImperativeAPI, AppState } from '@excalidraw/excalidraw/types'
+import type { ExcalidrawImperativeAPI, AppState, BinaryFileData, BinaryFiles } from '@excalidraw/excalidraw/types'
 import type { ExcalidrawElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import type { RemoteExcalidrawElement } from '@excalidraw/excalidraw/data/reconcile'
 import * as Y from 'yjs'
@@ -34,6 +34,28 @@ export function BoardEditor() {
 
   // Y.Map для хранения элементов сцены по element.id
   const yMapRef = useRef<Y.Map<Record<string, unknown>> | null>(null)
+
+  // Y.Map для хранения бинарных файлов (картинок) по file.id — синхронизируется
+  // и сохраняется тем же Yjs-снапшотом, что и элементы, без отдельного бэкенда
+  const yFilesMapRef = useRef<Y.Map<BinaryFileData> | null>(null)
+
+  // Догружает в Excalidraw файлы, которые есть в Y.Map, но ещё не загружены в сцену
+  // (addFiles идемпотентен, но пробегать по всем файлам на каждый чужой апдейт лишнее —
+  // сверяемся с api.getFiles(), чтобы не перезаписывать уже загруженные без надобности)
+  const applyRemoteFiles = useCallback(
+    (api: ExcalidrawImperativeAPI) => {
+      const yFilesMap = doc.getMap<BinaryFileData>('files')
+      const loadedFiles = api.getFiles()
+      const filesToAdd: BinaryFileData[] = []
+
+      yFilesMap.forEach((file) => {
+        if (!loadedFiles[file.id]) filesToAdd.push(file)
+      })
+
+      if (filesToAdd.length > 0) api.addFiles(filesToAdd)
+    },
+    [doc],
+  )
 
   // Применяет текущее содержимое Y.Map к сцене Excalidraw (reconcile с локальными).
   // Вызывается и из observe (внешние апдейты), и при готовности API — иначе элементы,
@@ -80,6 +102,9 @@ export function BoardEditor() {
     const yMap = doc.getMap<Record<string, unknown>>('elements')
     yMapRef.current = yMap
 
+    const yFilesMap = doc.getMap<BinaryFileData>('files')
+    yFilesMapRef.current = yFilesMap
+
     // Пересборка сцены (reconcile + updateScene) — тяжёлая; при быстрой серии чужих апдейтов
     // делать её на каждый апдейт нельзя: получатель захлёбывается, его приёмный буфер тормозит
     // сервер (backpressure), и апдейты выливаются пачкой. Коалесим серию апдейтов за один кадр
@@ -88,7 +113,9 @@ export function BoardEditor() {
     const flush = () => {
       rafId = null
       const api = excalidrawAPIRef.current
-      if (api) applyRemoteToScene(api)
+      if (!api) return
+      applyRemoteToScene(api)
+      applyRemoteFiles(api)
     }
 
     // Подписка на изменения из Yjs → обновление сцены Excalidraw
@@ -99,7 +126,16 @@ export function BoardEditor() {
       if (rafId == null) rafId = requestAnimationFrame(flush)
     }
 
+    // Файлы дописываются в сцену той же пересборкой — им не нужен reconcile, но проще
+    // переиспользовать один и тот же коалесирующий flush, чем городить второй rAF
+    const filesObserveHandler = (event: Y.YMapEvent<BinaryFileData>) => {
+      if (event.transaction.origin === EXCALIDRAW_ORIGIN) return
+      if (!excalidrawAPIRef.current) return
+      if (rafId == null) rafId = requestAnimationFrame(flush)
+    }
+
     yMap.observe(observeHandler)
+    yFilesMap.observe(filesObserveHandler)
 
     // Подключение к серверу
     connect()
@@ -107,9 +143,10 @@ export function BoardEditor() {
     return () => {
       if (rafId != null) cancelAnimationFrame(rafId)
       yMap.unobserve(observeHandler)
+      yFilesMap.unobserve(filesObserveHandler)
       disconnect()
     }
-  }, [doc, connect, disconnect, applyRemoteToScene])
+  }, [doc, connect, disconnect, applyRemoteToScene, applyRemoteFiles])
 
   // Подписка на awareness (курсоры)
   useEffect(() => {
@@ -163,14 +200,22 @@ export function BoardEditor() {
 
   // Обработчик изменений сцены Excalidraw → Yjs
   const handleChange = useCallback(
-    (elements: readonly ExcalidrawElement[]) => {
+    (elements: readonly ExcalidrawElement[], _appState: AppState, files: BinaryFiles) => {
       if (!yMapRef.current) return
 
-      // TODO: v2 - синхронизация бинарных файлов (вставленные картинки)
-      // Нужно использовать Y.Map для files и обрабатывать BinaryFiles из onChange
-      // Также потребуется загрузка файлов при инициализации из Y.Map
-
       doc.transact(() => {
+        const yFilesMap = yFilesMapRef.current
+        if (yFilesMap) {
+          // Пишем только новые файлы: dataURL не меняется задним числом, а files здесь —
+          // это ВСЕ файлы, когда-либо загруженные в сцену (включая уже расшаренные другими),
+          // так что затирать существующие записи незачем — это лишний трафик по сети.
+          for (const file of Object.values(files)) {
+            if (!yFilesMap.has(file.id)) {
+              yFilesMap.set(file.id, structuredClone(file))
+            }
+          }
+        }
+
         const yMap = yMapRef.current!
 
         // Обновляем/добавляем элементы. Excalidraw отдаёт в onChange элементы ВКЛЮЧАЯ удалённые
@@ -223,8 +268,9 @@ export function BoardEditor() {
       <Excalidraw
         excalidrawAPI={(api) => {
           excalidrawAPIRef.current = api
-          // Красим сцену тем, что уже успело прийти по сети до готовности API.
+          // Подтягиваем то, что уже успело прийти по сети до готовности API.
           applyRemoteToScene(api)
+          applyRemoteFiles(api)
         }}
         onChange={handleChange}
         onPointerUpdate={handlePointerUpdate}
