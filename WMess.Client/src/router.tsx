@@ -4,6 +4,7 @@ import { WorkspaceLayout } from './components/WorkspaceLayout'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { PrivacyPage } from './pages/PrivacyPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ExcalidrawTestPage } from './pages/ExcalidrawTestPage'
 
@@ -37,5 +38,9 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     element: <RegisterPage />,
+  },
+  {
+    path: '/privacy',
+    element: <PrivacyPage />,
   },
 ])

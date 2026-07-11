@@ -9,6 +9,7 @@ export function RegisterPage() {
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,6 +77,21 @@ export function RegisterPage() {
             Минимум 6 символов, заглавная буква, цифра и спецсимвол (!@#$…)
           </p>
         </div>
+        <label className="flex items-start gap-2 text-[12.5px] text-faint leading-[1.5] cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-[2px] shrink-0 accent-accent cursor-pointer"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            required
+          />
+          <span>
+            Я согласен на обработку моих персональных данных в соответствии с{' '}
+            <Link to="/privacy" target="_blank" className={authLink}>
+              Политикой конфиденциальности
+            </Link>
+          </span>
+        </label>
         {error && <div className={authError}>{error}</div>}
         <button type="submit" className={authPrimaryBtn}>
           Зарегистрироваться

@@ -68,3 +68,6 @@ WMess.Web/wwwroot/*
 
 # Self-contained publish output (not for git)
 docker-out/
+
+# Юридические документы (политика конфиденциальности и т.п.) — грузятся в рантайме, опциональны для сборки.
+WMess.Client/public/legal/
