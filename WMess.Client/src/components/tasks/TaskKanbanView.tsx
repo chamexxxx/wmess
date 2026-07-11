@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { tasksApi, type TaskBoardColumn, type TaskGroup, type TaskItem } from '../../api/tasksApi'
 import { TaskPriorityIcon } from './TaskPriorityIcon'
-import { initials, colorFor } from '../../workspace/theme'
+import { Avatar } from '../Avatar'
 
 interface TaskKanbanViewProps {
   tasks: TaskItem[]
@@ -109,11 +109,15 @@ export function TaskKanbanView({ tasks, columns, groups, onSelect, onTaskUpdated
                               {task.assignees.slice(0, 3).map((a) => (
                                 <div
                                   key={a.userId}
-                                  title={a.email}
-                                  className="w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center border border-white"
-                                  style={{ backgroundColor: colorFor(a.userId) }}
+                                  title={a.name || a.email}
+                                  className="rounded-full border border-white"
                                 >
-                                  {initials(a.email)}
+                                  <Avatar
+                                    userId={a.userId}
+                                    name={a.name || a.email}
+                                    hasAvatar={a.hasAvatar}
+                                    size={20}
+                                  />
                                 </div>
                               ))}
                             </div>

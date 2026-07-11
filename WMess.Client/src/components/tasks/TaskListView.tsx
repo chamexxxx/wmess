@@ -1,7 +1,7 @@
 import type { TaskGroup, TaskItem } from '../../api/tasksApi'
 import { PRIORITY_LABELS } from '../../api/tasksApi'
 import { TaskPriorityIcon } from './TaskPriorityIcon'
-import { initials, colorFor } from '../../workspace/theme'
+import { Avatar } from '../Avatar'
 
 interface TaskListViewProps {
   tasks: TaskItem[]
@@ -73,11 +73,15 @@ export function TaskListView({ tasks, groups, onSelect }: TaskListViewProps) {
                           {task.assignees.slice(0, 4).map((a) => (
                             <div
                               key={a.userId}
-                              title={a.email}
-                              className="w-6 h-6 rounded-full text-[10px] font-bold text-white flex items-center justify-center border border-white"
-                              style={{ backgroundColor: colorFor(a.userId) }}
+                              title={a.name || a.email}
+                              className="rounded-full border border-white"
                             >
-                              {initials(a.email)}
+                              <Avatar
+                                userId={a.userId}
+                                name={a.name || a.email}
+                                hasAvatar={a.hasAvatar}
+                                size={24}
+                              />
                             </div>
                           ))}
                         </div>

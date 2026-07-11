@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { PaperclipIcon } from '../../workspace/icons'
 
 interface Props {
   onFiles: (files: File[]) => void
@@ -25,10 +26,10 @@ export function AttachmentUpload({ onFiles, disabled }: Props) {
         type="button"
         disabled={disabled}
         onClick={() => inputRef.current?.click()}
-        className="w-9 h-9 rounded-lg text-muted hover:bg-hovered disabled:opacity-40 cursor-pointer"
+        className="w-9 h-9 rounded-lg flex items-center justify-center text-muted hover:bg-hovered hover:text-ink disabled:opacity-40 cursor-pointer"
         title="Прикрепить файл"
       >
-        📎
+        <PaperclipIcon size={20} />
       </button>
     </>
   )

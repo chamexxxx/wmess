@@ -1,6 +1,6 @@
 import type { MessageResponse } from '../../api/generated/data-contracts'
 
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
+export const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 
 interface Props {
   message: MessageResponse
@@ -8,6 +8,7 @@ interface Props {
   onToggle: (emoji: string) => void
 }
 
+/** Показывает только уже проставленные реакции; ничего не рендерит, если их нет. */
 export function ReactionBar({ message, currentUserId, onToggle }: Props) {
   const reactions = message.reactions ?? []
   const grouped = new Map<string, { count: number; mine: boolean }>()
@@ -18,6 +19,8 @@ export function ReactionBar({ message, currentUserId, onToggle }: Props) {
     if (r.userId === currentUserId) cur.mine = true
     grouped.set(emoji, cur)
   }
+
+  if (grouped.size === 0) return null
 
   return (
     <div className="flex flex-wrap items-center gap-1 mt-1">
@@ -33,18 +36,6 @@ export function ReactionBar({ message, currentUserId, onToggle }: Props) {
           {emoji} {count}
         </button>
       ))}
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        {QUICK_EMOJIS.filter((e) => !grouped.has(e)).map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            onClick={() => onToggle(emoji)}
-            className="text-sm hover:scale-110 cursor-pointer"
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
     </div>
   )
 }

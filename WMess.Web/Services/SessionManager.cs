@@ -10,7 +10,6 @@ public class SessionManager : ISessionManager
 {
     public const string AccessTokenName = "access_token";
     public const string RefreshTokenName = "refresh_token";
-    public const string LoginClaim = "login";
     public const string DisplayNameClaim = "display_name";
 
     private readonly IAuthApiClient _authApiClient;
@@ -25,9 +24,8 @@ public class SessionManager : ISessionManager
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, auth.UserId),
-            new(ClaimTypes.Name, auth.Login),
+            new(ClaimTypes.Name, auth.Email),
             new(ClaimTypes.Email, auth.Email),
-            new(LoginClaim, auth.Login),
             new(DisplayNameClaim, auth.DisplayName)
         };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

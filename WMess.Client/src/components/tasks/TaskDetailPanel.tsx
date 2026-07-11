@@ -20,6 +20,8 @@ import { ConfirmDialog } from '../WorkspaceModals'
 
 import { SettingsIcon } from '../../workspace/icons'
 
+import { Avatar } from '../Avatar'
+
 import { TaskPriorityIcon } from './TaskPriorityIcon'
 
 
@@ -777,7 +779,20 @@ export function TaskDetailPanel({
 
             <label className="text-[11px] font-bold text-faint uppercase">Автор</label>
 
-            <div className="mt-1 text-[13px] text-muted">{task.createdByEmail || '—'}</div>
+            {(() => {
+              const author = members.find((x) => x.userId === task.createdById)
+              const name = author?.displayName?.trim() || task.createdByEmail || '—'
+              const showEmail = Boolean(task.createdByEmail && author?.displayName?.trim())
+              return (
+                <div className="mt-1 flex items-center gap-2 min-w-0">
+                  <Avatar userId={task.createdById} name={name} hasAvatar={author?.hasAvatar} size={24} className="shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-[13px] text-ink truncate">{name}</div>
+                    {showEmail && <div className="text-[11px] text-faint truncate">{task.createdByEmail}</div>}
+                  </div>
+                </div>
+              )
+            })()}
 
           </div>
 
@@ -793,17 +808,23 @@ export function TaskDetailPanel({
 
                 const m = members.find((x) => x.userId === id)
 
+                const name = m?.displayName?.trim() || m?.email || id
+
                 return (
 
                   <span
 
                     key={id}
 
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-accent-soft text-accent text-[12px] font-semibold"
+                    title={m?.email}
+
+                    className="inline-flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg bg-accent-soft text-accent text-[12px] font-semibold"
 
                   >
 
-                    {m?.email ?? id}
+                    <Avatar userId={id} name={name} hasAvatar={m?.hasAvatar} size={18} className="shrink-0" />
+
+                    {name}
 
                     <button
 
@@ -857,11 +878,19 @@ export function TaskDetailPanel({
 
                       onClick={() => addAssignee(m.userId!)}
 
-                      className="block w-full text-left px-3 py-2 text-[13px] hover:bg-sidebar"
+                      className="flex items-center gap-2 w-full text-left px-3 py-2 text-[13px] hover:bg-sidebar"
 
                     >
 
-                      {m.email}
+                      <Avatar userId={m.userId} name={m.displayName?.trim() || m.email} hasAvatar={m.hasAvatar} size={22} className="shrink-0" />
+
+                      <span className="min-w-0 flex-1">
+
+                        <span className="block truncate text-ink">{m.displayName?.trim() || m.email}</span>
+
+                        {m.displayName?.trim() && <span className="block truncate text-[11px] text-faint">{m.email}</span>}
+
+                      </span>
 
                     </button>
 

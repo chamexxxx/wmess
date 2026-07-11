@@ -20,14 +20,22 @@ interface ImagePreviewProps {
   images: PreviewImage[]
   index: number
   onClose: () => void
+  // Источник байтов изображения (по умолчанию — файл библиотеки). Позволяет переиспользовать
+  // просмотрщик и для вложений чата.
+  fetchBlob?: (id: number) => Promise<Blob>
+  // Обработчик кнопки «Скачать» (по умолчанию — скачивание файла библиотеки).
+  onDownload?: (image: PreviewImage) => void
 }
 
 /**
- * Модалка-галерея для просмотра изображений папки. Тянет байты через axios (blob → object URL),
+ * Модалка-галерея для просмотра изображений. Тянет байты через axios (blob → object URL),
  * чтобы работали авторизация и refresh. Навигация: стрелки по бокам, клавиши ←/→ (по кругу).
  * Закрытие — клик по фону, крестик или Esc.
  */
-export function ImagePreview({ images, index, onClose }: ImagePreviewProps) {
+export function ImagePreview({ images, index, onClose, fetchBlob, onDownload }: ImagePreviewProps) {
+  const loadBlob = fetchBlob ?? ((id: number) => apiClient.fetchLibraryFile(id))
+  const downloadImage =
+    onDownload ?? ((img: PreviewImage) => apiClient.downloadLibraryFile(img.id, img.title))
   const [current, setCurrent] = useState(index)
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
@@ -47,8 +55,7 @@ export function ImagePreview({ images, index, onClose }: ImagePreviewProps) {
     if (!item) return
     let cancelled = false
     setFailed(false)
-    apiClient
-      .fetchLibraryFile(item.id)
+    loadBlob(item.id)
       .then((blob) => {
         if (cancelled) return
         const next = URL.createObjectURL(blob)
@@ -94,7 +101,7 @@ export function ImagePreview({ images, index, onClose }: ImagePreviewProps) {
       <div className="absolute top-4 right-4 flex gap-2" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          onClick={() => apiClient.downloadLibraryFile(item.id, item.title)}
+          onClick={() => downloadImage(item)}
           className="h-8 px-3 rounded-md bg-white/15 text-white text-[12.5px] font-medium hover:bg-white/25 cursor-pointer"
         >
           Скачать

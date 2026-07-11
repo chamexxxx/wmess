@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { AttachmentResponse } from '../../api/generated/data-contracts'
-import { attachmentUrl } from './chatApi'
+import { attachmentUrl, downloadAttachment, fetchAttachmentBlob } from './chatApi'
+import { ImagePreview, type PreviewImage } from '../../components/ImagePreview'
 
 function isImage(ct?: string) {
   return ct?.startsWith('image/') ?? false
@@ -19,7 +21,16 @@ interface Props {
 }
 
 export function MessageAttachments({ attachments }: Props) {
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+
   if (!attachments.length) return null
+
+  // Галерея изображений сообщения — для просмотрщика (навигация ←/→ по картинкам).
+  const imageAttachments = attachments.filter((a) => isImage(a.contentType))
+  const gallery: PreviewImage[] = imageAttachments.map((a) => ({
+    id: Number(a.id),
+    title: a.fileName ?? '',
+  }))
 
   return (
     <div className="flex flex-col gap-2 mt-2">
@@ -27,15 +38,21 @@ export function MessageAttachments({ attachments }: Props) {
         const id = Number(a.id)
         const url = attachmentUrl(id)
         if (isImage(a.contentType)) {
+          const galleryIndex = imageAttachments.findIndex((img) => Number(img.id) === id)
           return (
-            <a key={id} href={url} target="_blank" rel="noreferrer" className="block max-w-full sm:max-w-sm mt-1">
+            <button
+              key={id}
+              type="button"
+              onClick={() => setPreviewIndex(galleryIndex)}
+              className="block max-w-full sm:max-w-sm mt-1 cursor-zoom-in"
+            >
               <img
                 src={url}
                 alt={a.fileName}
                 className="rounded-lg max-h-64 max-w-full object-contain bg-tile"
                 loading="lazy"
               />
-            </a>
+            </button>
           )
         }
         if (isVideo(a.contentType)) {
@@ -62,6 +79,16 @@ export function MessageAttachments({ attachments }: Props) {
           </a>
         )
       })}
+
+      {previewIndex !== null && gallery[previewIndex] && (
+        <ImagePreview
+          images={gallery}
+          index={previewIndex}
+          onClose={() => setPreviewIndex(null)}
+          fetchBlob={fetchAttachmentBlob}
+          onDownload={(img) => downloadAttachment(img.id, img.title)}
+        />
+      )}
     </div>
   )
 }

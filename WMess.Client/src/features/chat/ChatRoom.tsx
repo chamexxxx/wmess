@@ -9,6 +9,7 @@ import { MessageInput } from './MessageInput'
 import { PinnedPanel } from './PinnedPanel'
 import { ThreadPanel } from './ThreadPanel'
 import { isThreadMessage, isFlatReply, type ChatMessage } from './types'
+import { ArrowLeftIcon } from '../../workspace/icons'
 import type { MessageResponse } from '../../api/generated/data-contracts'
 
 interface Props {
@@ -234,9 +235,10 @@ function ChatRoomInner({ chatId, projectId, teamId, chatName }: Props) {
           <button
             type="button"
             onClick={() => navigate(`/teams/${teamId}/projects/${projectId}/chats`)}
-            className="text-muted hover:text-ink cursor-pointer"
+            title="К списку чатов"
+            className="shrink-0 w-8 h-8 rounded-md flex items-center justify-center text-muted hover:bg-hovered cursor-pointer"
           >
-            ←
+            <ArrowLeftIcon size={18} />
           </button>
           <span className="font-semibold truncate">{chatName ?? `Чат #${chatId}`}</span>
           <div className="ml-auto">

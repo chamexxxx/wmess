@@ -6,9 +6,8 @@ import { AuthLayout, authError, authField, authLink, authPrimaryBtn } from '../c
 
 export function RegisterPage() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [login, setLogin] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
@@ -17,11 +16,11 @@ export function RegisterPage() {
     setError('')
 
     try {
-      await apiClient.register({ email, login, displayName, password })
+      await apiClient.register({ displayName, email, password })
       navigate('/login')
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 409) {
-        setError('Пользователь с таким email или логином уже существует')
+        setError('Пользователь с таким email уже существует')
       } else if (isAxiosError(err) && err.response?.status === 400) {
         const data = err.response.data as { errors?: string[]; message?: string } | undefined
         const details = data?.errors?.join(' ') ?? data?.message
@@ -47,35 +46,20 @@ export function RegisterPage() {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input
-          type="email"
-          placeholder="Email"
-          className={authField}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <div>
-          <input
-            type="text"
-            placeholder="Логин"
-            className={authField}
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
-            pattern="[a-zA-Z0-9_\-]{3,32}"
-            title="3–32 символа: латиница, цифры, «_» или «-»"
-            required
-          />
-          <p className="text-[11.5px] text-faint mt-[6px]">
-            3–32 символа: латиница, цифры, «_» или «-»
-          </p>
-        </div>
-        <input
           type="text"
           placeholder="Имя"
           className={authField}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           maxLength={100}
+          required
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          className={authField}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
         <div>

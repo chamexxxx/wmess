@@ -46,7 +46,7 @@ export interface TaskItem {
   projectId?: number | null
   teamId?: number | null
   assignedUserIds: string[]
-  assignees: { userId: string; email: string }[]
+  assignees: { userId: string; email: string; name: string; hasAvatar: boolean }[]
   labels: { id: string; name: string; color: string }[]
 }
 

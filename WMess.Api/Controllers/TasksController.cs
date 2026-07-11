@@ -454,7 +454,9 @@ public class TasksController : ControllerBase
         Assignees = t.Assignments.Select(a => new TaskAssigneeResponse
         {
             UserId = a.UserId,
-            Email = a.User?.Email ?? ""
+            Email = a.User?.Email ?? "",
+            Name = a.User?.DisplayName ?? "",
+            HasAvatar = a.User?.AvatarData != null
         }).ToList(),
         Labels = []
     };

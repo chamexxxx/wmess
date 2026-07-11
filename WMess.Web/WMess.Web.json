@@ -5087,7 +5087,7 @@
         "tags": [
           "User"
         ],
-        "summary": "Редактирование профиля текущего пользователя: email, логин и отображаемое имя.",
+        "summary": "Редактирование профиля текущего пользователя: имя и email.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -5420,9 +5420,6 @@
             "type": "string"
           },
           "email": {
-            "type": "string"
-          },
-          "login": {
             "type": "string"
           },
           "displayName": {
@@ -6228,12 +6225,12 @@
       },
       "LoginRequest": {
         "required": [
-          "emailOrLogin",
+          "email",
           "password"
         ],
         "type": "object",
         "properties": {
-          "emailOrLogin": {
+          "email": {
             "type": "string"
           },
           "password": {
@@ -6268,6 +6265,15 @@
               "null",
               "string"
             ]
+          },
+          "authorName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authorHasAvatar": {
+            "type": "boolean"
           },
           "content": {
             "type": [
@@ -6660,22 +6666,17 @@
       },
       "RegisterRequest": {
         "required": [
-          "email",
-          "login",
           "displayName",
+          "email",
           "password"
         ],
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string"
-          },
-          "login": {
-            "pattern": "^[a-zA-Z0-9_-]{3,32}$",
-            "type": "string"
-          },
           "displayName": {
             "maxLength": 100,
+            "type": "string"
+          },
+          "email": {
             "type": "string"
           },
           "password": {
@@ -6752,6 +6753,12 @@
           },
           "email": {
             "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hasAvatar": {
+            "type": "boolean"
           }
         }
       },
@@ -7055,6 +7062,12 @@
           "email": {
             "type": "string"
           },
+          "displayName": {
+            "type": "string"
+          },
+          "hasAvatar": {
+            "type": "boolean"
+          },
           "role": {
             "$ref": "#/components/schemas/TeamRole"
           }
@@ -7292,21 +7305,16 @@
       },
       "UpdateProfileRequest": {
         "required": [
-          "email",
-          "login",
-          "displayName"
+          "displayName",
+          "email"
         ],
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string"
-          },
-          "login": {
-            "pattern": "^[a-zA-Z0-9_-]{3,32}$",
-            "type": "string"
-          },
           "displayName": {
             "maxLength": 100,
+            "type": "string"
+          },
+          "email": {
             "type": "string"
           }
         }
@@ -7516,9 +7524,6 @@
             "type": "string"
           },
           "email": {
-            "type": "string"
-          },
-          "login": {
             "type": "string"
           },
           "displayName": {

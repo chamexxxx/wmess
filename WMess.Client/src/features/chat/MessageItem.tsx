@@ -1,9 +1,9 @@
 import type { MessageResponse } from '../../api/generated/data-contracts'
+import { Avatar } from '../../components/Avatar'
 import { MessageAttachments } from './MessageAttachments'
 import { VoicePlayer } from './VoicePlayer'
-import { ReactionBar } from './ReactionBar'
+import { QUICK_EMOJIS, ReactionBar } from './ReactionBar'
 import { CallInviteMessage } from './CallInviteMessage'
-import { UserAvatar } from './UserAvatar'
 
 function formatTime(iso?: string) {
   if (!iso) return ''
@@ -15,6 +15,13 @@ function formatTime(iso?: string) {
   if (isToday) return timeStr
 
   return `${date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} ${timeStr}`
+}
+
+function displayName(name?: string | null, email?: string | null): string {
+  const trimmed = name?.trim()
+  if (trimmed) return trimmed
+  if (email) return email.split('@')[0] || email
+  return 'Пользователь'
 }
 
 function hasAudioAttachment(message: MessageResponse): boolean {
@@ -68,6 +75,7 @@ export function MessageItem({
   const isCall = Boolean(message.callRoomId)
   const isVoiceMessage = hasAudioAttachment(message)
   const canOpenThread = !inThread && !parent
+  const authorLabel = displayName(message.authorName, message.authorEmail)
   const showParentReply =
     parent != null && (!inThread || (threadRootId != null && Number(parent.id) !== threadRootId))
 
@@ -81,19 +89,67 @@ export function MessageItem({
 
   return (
     <div
-      className={`group py-2 hover:bg-hovered/40 px-3 rounded-lg -mx-3 ${canOpenThread ? 'cursor-pointer' : ''}`}
+      className={`group relative py-1 hover:bg-hovered/40 px-3 rounded-lg -mx-3 ${canOpenThread ? 'cursor-pointer' : ''}`}
       id={`msg-${message.id}`}
       onClick={(e) => {
         if (!canOpenThread || isInteractiveTarget(e.target)) return
         onOpenThread()
       }}
     >
+      {/* Плавающая панель действий — не занимает высоту, появляется по наведению */}
+      <div
+        data-no-thread
+        className="absolute -top-2 right-3 z-10 hidden group-hover:flex items-center gap-0.5 rounded-lg border border-line bg-panel px-1 py-0.5 shadow-sm"
+      >
+        {QUICK_EMOJIS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => onReaction(emoji)}
+            className="w-6 h-6 rounded-md text-sm hover:bg-hovered cursor-pointer"
+            title={`Реакция ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+        <span className="mx-0.5 w-px h-4 bg-line" />
+        <button
+          type="button"
+          onClick={onReply}
+          className="px-1.5 h-6 rounded-md text-[11px] text-muted hover:bg-hovered hover:text-ink cursor-pointer"
+        >
+          Ответить
+        </button>
+        {isOwn && (message.content || isVoiceMessage) && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="px-1.5 h-6 rounded-md text-[11px] text-muted hover:bg-hovered hover:text-ink cursor-pointer"
+          >
+            {isVoiceMessage && !message.content ? 'Подпись' : 'Изменить'}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={isPinned ? onUnpin : onPin}
+          className="px-1.5 h-6 rounded-md text-[11px] text-muted hover:bg-hovered hover:text-ink cursor-pointer"
+        >
+          {isPinned ? 'Открепить' : 'Закрепить'}
+        </button>
+      </div>
+
       <div className="flex gap-3 min-w-0">
-        <UserAvatar name={message.authorEmail} userId={message.authorId} size={36} />
+        <Avatar
+          userId={message.authorId}
+          name={authorLabel}
+          hasAvatar={message.authorHasAvatar}
+          size={36}
+          className="shrink-0"
+        />
 
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-baseline gap-2">
-            <span className="font-semibold text-sm text-ink truncate">{message.authorEmail ?? 'Пользователь'}</span>
+            <span className="font-semibold text-sm text-ink truncate">{authorLabel}</span>
             <span className="text-[11px] text-faint shrink-0">{formatTime(message.createdAt)}</span>
             {message.editedAt && <span className="text-[10px] text-faint shrink-0">(ред.)</span>}
             {isPinned && <span className="text-[10px] text-accent shrink-0">📌</span>}
@@ -108,7 +164,7 @@ export function MessageItem({
               }}
               className="mt-1 mb-1 pl-3 border-l-2 border-accent text-xs text-muted text-left cursor-pointer hover:text-ink max-w-full truncate block"
             >
-              ↩ {parent.authorEmail}: {parent.content?.slice(0, 80) ?? '…'}
+              ↩ {displayName(parent.authorName, parent.authorEmail)}: {parent.content?.slice(0, 80) ?? '…'}
             </button>
           )}
 
@@ -137,27 +193,6 @@ export function MessageItem({
           )}
 
           <ReactionBar message={message} currentUserId={currentUserId} onToggle={onReaction} />
-
-          <div
-            className="flex flex-wrap gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px]"
-            data-no-thread
-          >
-            <button type="button" onClick={onReply} className="text-muted hover:text-accent cursor-pointer">
-              Ответить
-            </button>
-            {isOwn && (message.content || isVoiceMessage) && (
-              <button type="button" onClick={onEdit} className="text-muted hover:text-accent cursor-pointer">
-                {isVoiceMessage && !message.content ? 'Подпись' : 'Изменить'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={isPinned ? onUnpin : onPin}
-              className="text-muted hover:text-accent cursor-pointer"
-            >
-              {isPinned ? 'Открепить' : 'Закрепить'}
-            </button>
-          </div>
         </div>
       </div>
     </div>

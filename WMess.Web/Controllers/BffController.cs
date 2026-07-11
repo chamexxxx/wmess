@@ -38,7 +38,6 @@ public class BffController : ControllerBase
         {
             Id = auth.UserId,
             Email = auth.Email,
-            Login = auth.Login,
             DisplayName = auth.DisplayName,
             HasAvatar = auth.HasAvatar
         });
@@ -82,7 +81,6 @@ public class BffController : ControllerBase
         {
             Id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
             Email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty,
-            Login = User.FindFirstValue(SessionManager.LoginClaim) ?? string.Empty,
             DisplayName = User.FindFirstValue(SessionManager.DisplayNameClaim) ?? string.Empty
         });
     }

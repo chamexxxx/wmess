@@ -8,7 +8,7 @@ import { AuthLayout, authError, authField, authLink, authPrimaryBtn } from '../c
 export function LoginPage() {
   const { setUser } = useAuth()
   const navigate = useNavigate()
-  const [emailOrLogin, setEmailOrLogin] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
@@ -17,11 +17,11 @@ export function LoginPage() {
     setError('')
 
     try {
-      const res = await apiClient.login({ emailOrLogin, password })
+      const res = await apiClient.login({ email, password })
       setUser(toUser(res.data))
       navigate('/')
     } catch {
-      setError('Неверный email/логин или пароль')
+      setError('Неверный email или пароль')
     }
   }
 
@@ -40,11 +40,11 @@ export function LoginPage() {
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input
-          type="text"
-          placeholder="Email или логин"
+          type="email"
+          placeholder="Email"
           className={authField}
-          value={emailOrLogin}
-          onChange={(e) => setEmailOrLogin(e.target.value)}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           required
         />
         <input

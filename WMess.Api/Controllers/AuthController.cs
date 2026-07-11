@@ -29,17 +29,11 @@ public class AuthController : ControllerBase
             return Conflict(new { message = "User with this email already exists" });
         }
 
-        var existingByLogin = await _userManager.FindByNameAsync(request.Login);
-
-        if (existingByLogin != null)
-        {
-            return Conflict(new { message = "User with this login already exists" });
-        }
-
+        // Логина как отдельной сущности больше нет: UserName = email (уникален).
         var user = new ApplicationUser
         {
             Email = request.Email,
-            UserName = request.Login,
+            UserName = request.Email,
             DisplayName = request.DisplayName
         };
 
@@ -56,12 +50,10 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var identifier = request.EmailOrLogin.Trim();
+        var email = request.Email.Trim();
 
-        // Вход возможен как по email, так и по логину (UserName).
-        var user = identifier.Contains('@')
-            ? await _userManager.FindByEmailAsync(identifier) ?? await _userManager.FindByNameAsync(identifier)
-            : await _userManager.FindByNameAsync(identifier) ?? await _userManager.FindByEmailAsync(identifier);
+        // Вход только по email.
+        var user = await _userManager.FindByEmailAsync(email);
 
         if (user == null || user.IsDeleted)
         {
@@ -106,7 +98,6 @@ public class AuthController : ControllerBase
             RefreshToken = refreshToken,
             UserId = user.Id,
             Email = user.Email!,
-            Login = user.UserName!,
             DisplayName = user.DisplayName,
             HasAvatar = user.AvatarData != null && user.AvatarData.Length > 0
         };

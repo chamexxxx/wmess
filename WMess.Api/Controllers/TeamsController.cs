@@ -199,6 +199,8 @@ public class TeamsController : ControllerBase
             {
                 UserId = tu.UserId,
                 Email = tu.User.Email!,
+                DisplayName = tu.User.DisplayName,
+                HasAvatar = tu.User.AvatarData != null,
                 Role = tu.Role
             })
             .ToListAsync();

@@ -41,7 +41,7 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
-    /// Редактирование профиля текущего пользователя: email, логин и отображаемое имя.
+    /// Редактирование профиля текущего пользователя: имя и email.
     /// </summary>
     [HttpPut("me")]
     [ProducesResponseType<UserResponse>(StatusCodes.Status200OK)]
@@ -53,26 +53,10 @@ public class UserController : ControllerBase
             return Unauthorized();
         }
 
-        var login = request.Login.Trim();
         var email = request.Email.Trim();
 
-        // Логин уникален: если он изменился, проверяем, что не занят другим пользователем.
-        if (!string.Equals(login, user.UserName, StringComparison.OrdinalIgnoreCase))
-        {
-            var existing = await _userManager.FindByNameAsync(login);
-            if (existing != null && existing.Id != user.Id)
-            {
-                return Conflict(new { message = "User with this login already exists", code = "LoginTaken" });
-            }
-
-            var setName = await _userManager.SetUserNameAsync(user, login);
-            if (!setName.Succeeded)
-            {
-                return BadRequest(new { message = "Failed to update login", errors = setName.Errors.Select(e => e.Description) });
-            }
-        }
-
-        // Email тоже уникален (RequireUniqueEmail): проверяем занятость при изменении.
+        // Email уникален (RequireUniqueEmail): проверяем занятость при изменении.
+        // Логина как отдельной сущности нет — UserName держим в синхроне с email.
         if (!string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase))
         {
             var existingEmail = await _userManager.FindByEmailAsync(email);
@@ -85,6 +69,12 @@ public class UserController : ControllerBase
             if (!setEmail.Succeeded)
             {
                 return BadRequest(new { message = "Failed to update email", errors = setEmail.Errors.Select(e => e.Description) });
+            }
+
+            var setName = await _userManager.SetUserNameAsync(user, email);
+            if (!setName.Succeeded)
+            {
+                return BadRequest(new { message = "Failed to update user", errors = setName.Errors.Select(e => e.Description) });
             }
         }
 
@@ -257,7 +247,6 @@ public class UserController : ControllerBase
             {
                 Id = u.Id,
                 Email = u.Email!,
-                Login = u.UserName!,
                 DisplayName = u.DisplayName,
                 HasAvatar = u.AvatarData != null
             })
@@ -283,7 +272,6 @@ public class UserController : ControllerBase
     {
         Id = user.Id,
         Email = user.Email!,
-        Login = user.UserName!,
         DisplayName = user.DisplayName,
         HasAvatar = user.AvatarData != null && user.AvatarData.Length > 0
     };

@@ -11,6 +11,8 @@ export function normalizeMessageResponse(raw: Record<string, unknown>): ChatMess
     chatId: (raw.chatId ?? raw.ChatId) as MessageResponse['chatId'],
     authorId: (raw.authorId ?? raw.AuthorId) as string,
     authorEmail: (raw.authorEmail ?? raw.AuthorEmail) as string | null | undefined,
+    authorName: (raw.authorName ?? raw.AuthorName) as string | null | undefined,
+    authorHasAvatar: (raw.authorHasAvatar ?? raw.AuthorHasAvatar ?? false) as boolean,
     content: (raw.content ?? raw.Content) as string | null | undefined,
     parentMessageId: (raw.parentMessageId ?? raw.ParentMessageId) as MessageResponse['parentMessageId'],
     replyMode: (raw.replyMode ?? raw.ReplyMode) as ChatMessage['replyMode'],

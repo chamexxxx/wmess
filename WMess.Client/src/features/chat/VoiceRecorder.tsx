@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { computeWaveformPeaks } from './VoicePlayer'
+import { MicIcon } from '../../workspace/icons'
 
 interface Props {
   onRecorded: (file: File, waveformJson: string) => void
@@ -44,12 +45,12 @@ export function VoiceRecorder({ onRecorded, disabled }: Props) {
       type="button"
       disabled={disabled}
       onClick={recording ? stop : start}
-      className={`w-9 h-9 rounded-lg cursor-pointer disabled:opacity-40 ${
-        recording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted hover:bg-hovered'
+      className={`w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer disabled:opacity-40 ${
+        recording ? 'bg-red-100 text-red-600 animate-pulse' : 'text-muted hover:bg-hovered hover:text-ink'
       }`}
       title={recording ? 'Остановить запись' : 'Голосовое сообщение'}
     >
-      🎤
+      <MicIcon size={20} />
     </button>
   )
 }

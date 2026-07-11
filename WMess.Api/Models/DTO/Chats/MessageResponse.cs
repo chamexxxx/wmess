@@ -8,6 +8,8 @@ public class MessageResponse
     public int ChatId { get; set; }
     public string AuthorId { get; set; } = string.Empty;
     public string? AuthorEmail { get; set; }
+    public string? AuthorName { get; set; }
+    public bool AuthorHasAvatar { get; set; }
     public string? Content { get; set; }
     public int? ParentMessageId { get; set; }
     public ReplyMode? ReplyMode { get; set; }

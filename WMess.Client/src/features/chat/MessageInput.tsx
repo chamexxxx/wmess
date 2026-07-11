@@ -3,6 +3,9 @@ import type { MessageResponse } from '../../api/generated/data-contracts'
 import type { ReplyTarget } from '../../store/chatStore'
 import { AttachmentUpload } from './AttachmentUpload'
 import { VoiceRecorder } from './VoiceRecorder'
+import { CheckIcon, SendIcon } from '../../workspace/icons'
+
+const MAX_INPUT_HEIGHT = 160
 
 interface Props {
   replyTarget: ReplyTarget | null
@@ -79,6 +82,18 @@ export function MessageInput({
 
   const isEditing = editTarget != null
   const editingVoice = isEditing && (editTarget.attachments ?? []).some((a) => a.contentType?.startsWith('audio/'))
+
+  // Авто-высота как в Telegram: одна строка, растёт с текстом до предела, дальше — скролл.
+  const autoResize = () => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`
+  }
+
+  useEffect(() => {
+    autoResize()
+  }, [text])
 
   useEffect(() => {
     if (editTarget) {
@@ -200,17 +215,19 @@ export function MessageInput({
                 : 'Изменить сообщение…'
               : 'Написать сообщение…'
           }
-          rows={2}
+          rows={1}
           disabled={disabled}
-          className="flex-1 resize-none rounded-lg border border-line px-3 py-2 text-sm bg-app text-ink focus:outline-none focus:border-accent"
+          style={{ maxHeight: MAX_INPUT_HEIGHT }}
+          className="flex-1 resize-none overflow-y-auto rounded-lg border border-line px-3 py-2 text-sm leading-5 bg-app text-ink focus:outline-none focus:border-accent"
         />
         <button
           type="button"
           disabled={disabled || sending || (isEditing ? !editingVoice && !text.trim() : !text.trim() && files.length === 0)}
           onClick={() => void handleSubmit()}
-          className="h-10 px-4 rounded-lg bg-accent text-white text-sm font-semibold disabled:opacity-40 cursor-pointer hover:bg-accent-deep"
+          title={isEditing ? 'Сохранить' : 'Отправить'}
+          className="w-10 h-10 shrink-0 rounded-lg bg-accent text-white flex items-center justify-center disabled:opacity-40 cursor-pointer hover:bg-accent-deep"
         >
-          {isEditing ? '✓' : '→'}
+          {isEditing ? <CheckIcon size={18} /> : <SendIcon size={18} />}
         </button>
       </div>
     </div>

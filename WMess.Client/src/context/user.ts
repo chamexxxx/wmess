@@ -3,7 +3,6 @@ import type { UserResponse } from '../api/generated/data-contracts'
 export interface User {
   id: string
   email: string
-  login: string
   displayName: string
   hasAvatar: boolean
   // Меняется при загрузке/удалении аватарки — используется для сброса кэша <img>.
@@ -15,7 +14,6 @@ export function toUser(res: UserResponse, avatarVersion = 0): User {
   return {
     id: res.id ?? '',
     email: res.email ?? '',
-    login: res.login ?? '',
     displayName: res.displayName ?? '',
     hasAvatar: res.hasAvatar ?? false,
     avatarVersion,

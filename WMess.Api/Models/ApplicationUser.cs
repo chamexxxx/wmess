@@ -5,13 +5,13 @@ namespace WMess.Api.Models;
 
 /// <summary>
 /// Пользователь приложения. Расширяет <see cref="IdentityUser"/> отображаемым именем
-/// и аватаркой. Логин пользователя — это <see cref="IdentityUser.UserName"/>
-/// (уникальный, задаётся при регистрации). Вход возможен по логину или email.
+/// и аватаркой. Вход выполняется по email; <see cref="IdentityUser.UserName"/> держится
+/// в синхроне с email (отдельного логина у пользователя нет).
 /// </summary>
 public class ApplicationUser : IdentityUser
 {
     /// <summary>
-    /// Отображаемое имя (может повторяться у разных пользователей, в отличие от логина).
+    /// Отображаемое имя пользователя (может повторяться у разных пользователей).
     /// </summary>
     [MaxLength(100)]
     public string DisplayName { get; set; } = string.Empty;

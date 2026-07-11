@@ -24,7 +24,6 @@ export function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [email, setEmail] = useState(user?.email ?? '')
-  const [login, setLogin] = useState(user?.login ?? '')
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
   const [saving, setSaving] = useState(false)
   const [avatarBusy, setAvatarBusy] = useState(false)
@@ -41,13 +40,13 @@ export function ProfilePage() {
 
   if (!user) return null
 
-  const dirty = email !== user.email || login !== user.login || displayName !== user.displayName
+  const dirty = email !== user.email || displayName !== user.displayName
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     try {
-      const res = await apiClient.user.userMeUpdate({ email, login, displayName })
+      const res = await apiClient.user.userMeUpdate({ displayName, email })
       setUser(toUser(res.data, user.avatarVersion))
       toast.info('Профиль сохранён')
     } catch (err) {
@@ -56,10 +55,8 @@ export function ProfilePage() {
         : undefined
       if (code === 'EmailTaken') {
         toast.error('Email уже занят другим пользователем')
-      } else if (code === 'LoginTaken') {
-        toast.error('Логин уже занят другим пользователем')
       } else {
-        toast.error('Не удалось сохранить профиль. Проверьте email и логин')
+        toast.error('Не удалось сохранить профиль. Проверьте имя и email')
       }
     } finally {
       setSaving(false)
@@ -155,7 +152,7 @@ export function ProfilePage() {
             >
               <Avatar
                 userId={user.id}
-                name={user.displayName || user.login}
+                name={user.displayName || user.email}
                 hasAvatar={user.hasAvatar}
                 version={user.avatarVersion}
                 size={112}
@@ -166,7 +163,7 @@ export function ProfilePage() {
             </button>
 
             <div className="mt-4 text-[18px] font-bold tracking-[-.3px] leading-tight max-w-full truncate">
-              {user.displayName || user.login}
+              {user.displayName || user.email}
             </div>
             <div className="mt-0.5 text-[13px] text-faint max-w-full truncate">{user.email}</div>
             {user.hasAvatar && (
@@ -207,6 +204,18 @@ export function ProfilePage() {
           </h2>
 
           <label className="flex flex-col gap-1.5 mb-4">
+            <span className={label}>Имя</span>
+            <input
+              type="text"
+              className={authField}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              maxLength={100}
+              required
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5">
             <span className={label}>Email</span>
             <input
               type="email"
@@ -216,34 +225,6 @@ export function ProfilePage() {
               required
             />
           </label>
-
-          <div className="flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className={label}>Логин</span>
-              <input
-                type="text"
-                className={authField}
-                value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                pattern="[a-zA-Z0-9_\-]{3,32}"
-                title="3–32 символа: латиница, цифры, «_» или «-»"
-                required
-              />
-              <span className={hint}>3–32 символа: латиница, цифры, «_» или «-»</span>
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className={label}>Имя</span>
-              <input
-                type="text"
-                className={authField}
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                maxLength={100}
-                required
-              />
-            </label>
-          </div>
 
           <div className="flex justify-end mt-6">
             <button type="submit" className={primaryBtn} disabled={saving || !dirty}>

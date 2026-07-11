@@ -1,5 +1,12 @@
 import type { MessageResponse } from '../../api/generated/data-contracts'
 
+function displayName(name?: string | null, email?: string | null): string {
+  const trimmed = name?.trim()
+  if (trimmed) return trimmed
+  if (email) return email.split('@')[0] || email
+  return 'Пользователь'
+}
+
 interface Props {
   pinnedMessages: MessageResponse[]
   onSelect: (id: number) => void
@@ -21,7 +28,7 @@ export function PinnedPanel({ pinnedMessages, onSelect }: Props) {
             onClick={() => onSelect(Number(m.id))}
             className="text-left text-xs text-muted hover:text-ink truncate cursor-pointer shrink-0"
           >
-            📌 {m.authorEmail}: {m.content?.slice(0, 60) ?? 'вложение'}
+            📌 {displayName(m.authorName, m.authorEmail)}: {m.content?.slice(0, 60) ?? 'вложение'}
           </button>
         ))}
       </div>

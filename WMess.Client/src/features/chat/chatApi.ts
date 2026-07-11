@@ -55,3 +55,16 @@ export async function fetchAttachmentBlob(attachmentId: number): Promise<Blob> {
   })
   return res.data
 }
+
+// Скачивание вложения: тянем blob и сохраняем под исходным именем.
+export async function downloadAttachment(attachmentId: number, fileName: string): Promise<void> {
+  const blob = await fetchAttachmentBlob(attachmentId)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

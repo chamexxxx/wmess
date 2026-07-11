@@ -28,7 +28,7 @@ export function TeamRail({
   onLogout,
 }: TeamRailProps) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const displayName = user?.displayName || user?.login || user?.email
+  const displayName = user?.displayName || user?.email
 
   return (
     <div className="w-16 shrink-0 bg-rail border-r border-line flex flex-col items-center py-[14px] gap-2">
@@ -94,7 +94,7 @@ export function TeamRail({
                 />
                 <div className="min-w-0">
                   <div className="text-[13px] font-semibold text-ink truncate">
-                    {user?.displayName || user?.login}
+                    {user?.displayName || user?.email}
                   </div>
                   <div className="text-[11.5px] text-faint truncate">{user?.email}</div>
                 </div>

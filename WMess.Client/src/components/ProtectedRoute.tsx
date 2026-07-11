@@ -11,7 +11,7 @@ export function ProtectedRoute() {
   useEffect(() => {
     if (user) return
 
-    // Тянем профиль напрямую из API (/api/user/me) — всегда свежие имя, логин и флаг
+    // Тянем профиль напрямую из API (/api/user/me) — всегда свежие имя, email и флаг
     // аватарки (в отличие от данных в cookie-сессии BFF, которые не обновляются при
     // редактировании профиля).
     apiClient.user
