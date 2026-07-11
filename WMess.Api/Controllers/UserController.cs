@@ -133,11 +133,11 @@ public class UserController : ControllerBase
         user.AvatarData = memory.ToArray();
         user.AvatarContentType = file.ContentType;
 
-        var update = await _userManager.UpdateAsync(user);
-        if (!update.Succeeded)
-        {
-            return BadRequest(new { message = "Failed to save avatar" });
-        }
+        // Не через _userManager.UpdateAsync: он ревалидирует ВЕСЬ пользователь (включая
+        // UserName/Email по текущим правилам Identity), а аватарка с логином не связана —
+        // легаси-аккаунт с невалидным по текущим правилам UserName не должен блокировать
+        // сохранение аватарки. Пишем поле напрямую через EF.
+        await _context.SaveChangesAsync();
 
         return Ok(ToResponse(user));
     }
@@ -158,11 +158,8 @@ public class UserController : ControllerBase
         user.AvatarData = null;
         user.AvatarContentType = null;
 
-        var update = await _userManager.UpdateAsync(user);
-        if (!update.Succeeded)
-        {
-            return BadRequest(new { message = "Failed to remove avatar" });
-        }
+        // См. комментарий в UploadAvatar — намеренно не через _userManager.UpdateAsync.
+        await _context.SaveChangesAsync();
 
         return Ok(ToResponse(user));
     }

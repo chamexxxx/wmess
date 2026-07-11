@@ -10,6 +10,7 @@ import { ConfirmDialog } from '../components/WorkspaceModals'
 import { authField } from '../components/AuthLayout'
 import { CameraIcon } from '../workspace/icons'
 import { toast } from '../store/toastStore'
+import { describeError } from '../api/errorMessage'
 
 const card = 'bg-white border border-line rounded-2xl shadow-[0_10px_30px_rgba(43,42,38,.05)]'
 const label = 'text-[12.5px] font-semibold text-muted'
@@ -77,8 +78,8 @@ export function ProfilePage() {
       const res = await apiClient.uploadAvatar(blob)
       setUser(toUser(res, user.avatarVersion + 1))
       setPendingFile(null)
-    } catch {
-      toast.error('Не удалось загрузить аватарку (нужна картинка до 2 МБ)')
+    } catch (err) {
+      toast.error(describeError(err, 'Не удалось загрузить аватарку (нужна картинка до 2 МБ)'))
     } finally {
       setAvatarBusy(false)
     }
