@@ -5,6 +5,7 @@ import type { ProjectResponse, TeamResponse, TeamDetailResponse } from '../api/g
 import { ProjectSidebar } from '../components/ProjectSidebar'
 import { LibrarySection } from '../components/LibrarySection'
 import { TasksSection } from '../components/tasks/TasksSection'
+import { CalendarSection } from '../components/calendar/CalendarSection'
 import { ProjectSettings } from '../components/ProjectSettings'
 import { TeamSettings } from '../components/TeamSettings'
 import { ConfirmDialog, FormModal } from '../components/WorkspaceModals'
@@ -281,6 +282,8 @@ export function HomePage() {
               canManage={canManage}
               taskId={taskIdParam}
             />
+          ) : section?.id === 'calendar' ? (
+            <CalendarSection projectId={selectedProjectId!} />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}

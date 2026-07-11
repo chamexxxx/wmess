@@ -1,0 +1,91 @@
+/* FullCalendar v6 injects its own base styles; we only override tokens here. */
+.wmess-calendar {
+  --fc-border-color: #e4e2da;
+  --fc-page-bg-color: #fbfaf7;
+  --fc-neutral-bg-color: #f2f1ec;
+  --fc-neutral-text-color: #6e6b62;
+  --fc-today-bg-color: #e6f4ec;
+  --fc-event-bg-color: #4fa47a;
+  --fc-event-border-color: #3c8a63;
+  --fc-event-text-color: #ffffff;
+  --fc-button-bg-color: #ffffff;
+  --fc-button-border-color: #e4e2da;
+  --fc-button-text-color: #6e6b62;
+  --fc-button-hover-bg-color: #f2f1ec;
+  --fc-button-hover-border-color: #e4e2da;
+  --fc-button-active-bg-color: #4fa47a;
+  --fc-button-active-border-color: #3c8a63;
+  --fc-button-active-text-color: #ffffff;
+  font-family: "Onest", sans-serif;
+}
+
+.wmess-calendar .fc {
+  height: 100%;
+}
+
+.wmess-calendar .fc-toolbar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #2b2a26;
+}
+
+.wmess-calendar .fc-col-header-cell-cushion,
+.wmess-calendar .fc-daygrid-day-number,
+.wmess-calendar .fc-timegrid-slot-label-cushion {
+  color: #6e6b62;
+  font-size: 12px;
+}
+
+.wmess-calendar .fc-daygrid-day-number {
+  padding: 6px 8px;
+}
+
+.wmess-calendar .fc-event {
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 2px rgba(43, 42, 38, 0.08);
+}
+
+.wmess-calendar .fc-event:hover {
+  filter: brightness(0.95);
+}
+
+.wmess-calendar .fc-timegrid-event .fc-event-main {
+  padding: 2px 4px;
+}
+
+.wmess-calendar .fc-button {
+  border-radius: 8px !important;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px !important;
+  box-shadow: none !important;
+}
+
+.wmess-calendar .fc-button-group > .fc-button {
+  border-radius: 0 !important;
+}
+
+.wmess-calendar .fc-button-group > .fc-button:first-child {
+  border-radius: 8px 0 0 8px !important;
+}
+
+.wmess-calendar .fc-button-group > .fc-button:last-child {
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.wmess-calendar .fc-scrollgrid {
+  border-color: #e4e2da;
+}
+
+.wmess-calendar .fc-timegrid-now-indicator-line {
+  border-color: #b5466b;
+}
+
+.wmess-calendar .fc-timegrid-now-indicator-arrow {
+  border-color: #b5466b;
+  color: #b5466b;
+}

@@ -32,6 +32,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TaskAssignment> TaskAssignments { get; set; }
     public DbSet<TeamScheduleSettings> TeamScheduleSettings { get; set; }
     public DbSet<TeamHoliday> TeamHolidays { get; set; }
+    public DbSet<CalendarEvent> CalendarEvents { get; set; }
 
     public DbSet<Chat> Chats { get; set; }
     public DbSet<Message> Messages { get; set; }
@@ -359,5 +360,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<TeamHoliday>()
             .HasIndex(h => new { h.TeamId, h.Date })
             .IsUnique();
+
+        builder.Entity<CalendarEvent>()
+            .HasOne(e => e.Project)
+            .WithMany()
+            .HasForeignKey(e => e.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CalendarEvent>()
+            .HasOne(e => e.CreatedBy)
+            .WithMany()
+            .HasForeignKey(e => e.CreatedById)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<CalendarEvent>()
+            .HasIndex(e => new { e.ProjectId, e.StartUtc });
     }
 }
