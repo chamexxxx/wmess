@@ -33,6 +33,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TeamScheduleSettings> TeamScheduleSettings { get; set; }
     public DbSet<TeamHoliday> TeamHolidays { get; set; }
     public DbSet<CalendarEvent> CalendarEvents { get; set; }
+    public DbSet<CalendarEventAttendee> CalendarEventAttendees { get; set; }
 
     public DbSet<Chat> Chats { get; set; }
     public DbSet<Message> Messages { get; set; }
@@ -375,5 +376,20 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
         builder.Entity<CalendarEvent>()
             .HasIndex(e => new { e.ProjectId, e.StartUtc });
+
+        builder.Entity<CalendarEventAttendee>()
+            .HasKey(a => new { a.EventId, a.UserId });
+
+        builder.Entity<CalendarEventAttendee>()
+            .HasOne(a => a.Event)
+            .WithMany(e => e.Attendees)
+            .HasForeignKey(a => a.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<CalendarEventAttendee>()
+            .HasOne(a => a.User)
+            .WithMany()
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

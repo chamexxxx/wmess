@@ -283,7 +283,7 @@ export function HomePage() {
               taskId={taskIdParam}
             />
           ) : section?.id === 'calendar' ? (
-            <CalendarSection projectId={selectedProjectId!} />
+            <CalendarSection teamId={selectedTeamId!} projectId={selectedProjectId!} />
           ) : section ? (
             <SectionPlaceholder section={section} />
           ) : null}

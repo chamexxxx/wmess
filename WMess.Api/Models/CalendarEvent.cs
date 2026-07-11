@@ -12,9 +12,14 @@ public class CalendarEvent
 
     public string? Description { get; set; }
 
-    /// <summary>Meeting link, room, or call info.</summary>
+    /// <summary>Meeting link, room, or location.</summary>
     [MaxLength(500)]
     public string? Location { get; set; }
+
+    [MaxLength(7)]
+    public string Color { get; set; } = "#4FA47A";
+
+    public bool IsWholeTeam { get; set; }
 
     public DateTime StartUtc { get; set; }
     public DateTime EndUtc { get; set; }
@@ -28,4 +33,6 @@ public class CalendarEvent
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    public ICollection<CalendarEventAttendee> Attendees { get; set; } = new List<CalendarEventAttendee>();
 }

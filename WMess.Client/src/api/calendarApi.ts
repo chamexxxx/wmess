@@ -2,11 +2,18 @@ import { apiClient } from './index'
 
 const http = apiClient.teams.instance
 
+export interface CalendarEventAttendee {
+  userId: string
+  email: string
+}
+
 export interface CalendarEvent {
   id: string
   title: string
   description?: string | null
   location?: string | null
+  color: string
+  isWholeTeam: boolean
   startUtc: string
   endUtc: string
   allDay: boolean
@@ -15,12 +22,16 @@ export interface CalendarEvent {
   createdByEmail: string
   createdAt: string
   updatedAt: string
+  attendees: CalendarEventAttendee[]
 }
 
 export interface CreateCalendarEventBody {
   title: string
   description?: string
   location?: string
+  color?: string
+  isWholeTeam: boolean
+  attendeeUserIds?: string[]
   startUtc: string
   endUtc: string
   allDay: boolean
@@ -31,6 +42,9 @@ export interface UpdateCalendarEventBody {
   title: string
   description?: string
   location?: string
+  color?: string
+  isWholeTeam: boolean
+  attendeeUserIds?: string[]
   startUtc: string
   endUtc: string
   allDay: boolean

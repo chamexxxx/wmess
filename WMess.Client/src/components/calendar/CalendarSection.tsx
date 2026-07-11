@@ -6,9 +6,12 @@ import interactionPlugin from '@fullcalendar/interaction'
 import ruLocale from '@fullcalendar/core/locales/ru'
 import type { DateSelectArg, EventClickArg, EventDropArg, EventInput } from '@fullcalendar/core'
 import type { EventResizeDoneArg } from '@fullcalendar/interaction'
+import { apiClient } from '../../api'
 import { calendarApi, type CalendarEvent } from '../../api/calendarApi'
+import type { TeamMemberResponse } from '../../api/generated/data-contracts'
 import { useCalendarLive } from '../../providers/useCalendarLive'
 import { PlusIcon } from '../../workspace/icons'
+import { eventTextColor, normalizeEventColor } from './calendarConstants'
 import {
   defaultEventValues,
   eventToFormValues,
@@ -22,13 +25,44 @@ import './calendar.css'
 type CalendarView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay'
 
 interface CalendarSectionProps {
+  teamId: number
   projectId: number
 }
 
-export function CalendarSection({ projectId }: CalendarSectionProps) {
+function toApiBody(values: EventFormValues, projectId: number) {
+  const range = formValuesToUtcRange(values)
+  return {
+    title: values.title.trim(),
+    description: values.description.trim() || undefined,
+    location: values.location.trim() || undefined,
+    color: normalizeEventColor(values.color),
+    isWholeTeam: values.isWholeTeam,
+    attendeeUserIds: values.isWholeTeam ? [] : values.attendeeIds,
+    ...range,
+    allDay: values.allDay,
+    projectId,
+  }
+}
+
+function toUpdateBody(values: EventFormValues) {
+  const range = formValuesToUtcRange(values)
+  return {
+    title: values.title.trim(),
+    description: values.description.trim() || undefined,
+    location: values.location.trim() || undefined,
+    color: normalizeEventColor(values.color),
+    isWholeTeam: values.isWholeTeam,
+    attendeeUserIds: values.isWholeTeam ? [] : values.attendeeIds,
+    ...range,
+    allDay: values.allDay,
+  }
+}
+
+export function CalendarSection({ teamId, projectId }: CalendarSectionProps) {
   const liveSignal = useCalendarLive(projectId)
   const calendarRef = useRef<FullCalendar>(null)
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [members, setMembers] = useState<TeamMemberResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<CalendarView>(
@@ -48,19 +82,23 @@ export function CalendarSection({ projectId }: CalendarSectionProps) {
       if (!opts?.silent) setLoading(true)
       setError(null)
       try {
-        const res = await calendarApi.list({
-          projectId,
-          from: rangeRef.current.from,
-          to: rangeRef.current.to,
-        })
-        setEvents(res.data)
+        const [eventsRes, membersRes] = await Promise.all([
+          calendarApi.list({
+            projectId,
+            from: rangeRef.current.from,
+            to: rangeRef.current.to,
+          }),
+          apiClient.teams.teamsMembersList(teamId),
+        ])
+        setEvents(eventsRes.data)
+        setMembers(membersRes.data ?? [])
       } catch {
         setError('Не удалось загрузить события')
       } finally {
         if (!opts?.silent) setLoading(false)
       }
     },
-    [projectId],
+    [teamId, projectId],
   )
 
   useEffect(() => {
@@ -79,14 +117,20 @@ export function CalendarSection({ projectId }: CalendarSectionProps) {
 
   const fcEvents: EventInput[] = useMemo(
     () =>
-      events.map((ev) => ({
-        id: ev.id,
-        title: ev.title,
-        start: ev.startUtc,
-        end: ev.endUtc,
-        allDay: ev.allDay,
-        extendedProps: { raw: ev },
-      })),
+      events.map((ev) => {
+        const bg = normalizeEventColor(ev.color)
+        return {
+          id: ev.id,
+          title: ev.title,
+          start: ev.startUtc,
+          end: ev.endUtc,
+          allDay: ev.allDay,
+          backgroundColor: bg,
+          borderColor: bg,
+          textColor: eventTextColor(bg),
+          extendedProps: { raw: ev },
+        }
+      }),
     [events],
   )
 
@@ -120,6 +164,9 @@ export function CalendarSection({ projectId }: CalendarSectionProps) {
         title: ev.title,
         description: ev.description ?? undefined,
         location: ev.location ?? undefined,
+        color: normalizeEventColor(ev.color),
+        isWholeTeam: ev.isWholeTeam,
+        attendeeUserIds: ev.isWholeTeam ? [] : ev.attendees.map((a) => a.userId),
         startUtc: start.toISOString(),
         endUtc: end.toISOString(),
         allDay,
@@ -146,27 +193,12 @@ export function CalendarSection({ projectId }: CalendarSectionProps) {
   }
 
   async function handleCreate(values: EventFormValues) {
-    const range = formValuesToUtcRange(values)
-    await calendarApi.create({
-      title: values.title.trim(),
-      description: values.description.trim() || undefined,
-      location: values.location.trim() || undefined,
-      ...range,
-      allDay: values.allDay,
-      projectId,
-    })
+    await calendarApi.create(toApiBody(values, projectId))
     await load({ silent: true })
   }
 
   async function handleUpdate(eventId: string, values: EventFormValues) {
-    const range = formValuesToUtcRange(values)
-    await calendarApi.update(eventId, {
-      title: values.title.trim(),
-      description: values.description.trim() || undefined,
-      location: values.location.trim() || undefined,
-      ...range,
-      allDay: values.allDay,
-    })
+    await calendarApi.update(eventId, toUpdateBody(values))
     await load({ silent: true })
     setSelected(null)
   }
@@ -279,6 +311,7 @@ export function CalendarSection({ projectId }: CalendarSectionProps) {
           title="Новое событие"
           submitLabel="Создать"
           initial={modal.initial}
+          members={members}
           onClose={() => setModal(null)}
           onSubmit={handleCreate}
         />
@@ -289,6 +322,7 @@ export function CalendarSection({ projectId }: CalendarSectionProps) {
           title="Редактировать событие"
           submitLabel="Сохранить"
           initial={modal.initial}
+          members={members}
           onClose={() => setModal(null)}
           onSubmit={(values) => handleUpdate(modal.event.id, values)}
         />

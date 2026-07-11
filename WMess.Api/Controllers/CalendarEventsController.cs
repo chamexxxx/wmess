@@ -15,6 +15,8 @@ namespace WMess.Api.Controllers;
 [Route("api/calendar-events")]
 public class CalendarEventsController : ControllerBase
 {
+    private const string DefaultColor = "#4FA47A";
+
     private readonly ApplicationDbContext _context;
     private readonly IAuthorizationService _authorizationService;
     private readonly ICalendarChangeNotifier _calendarNotifier;
@@ -47,17 +49,14 @@ public class CalendarEventsController : ControllerBase
 
         var query = _context.CalendarEvents
             .Include(e => e.CreatedBy)
+            .Include(e => e.Attendees).ThenInclude(a => a.User)
             .Where(e => e.ProjectId == projectId);
 
         if (from.HasValue)
-        {
             query = query.Where(e => e.EndUtc >= from.Value);
-        }
 
         if (to.HasValue)
-        {
             query = query.Where(e => e.StartUtc <= to.Value);
-        }
 
         var events = await query
             .OrderBy(e => e.StartUtc)
@@ -84,11 +83,8 @@ public class CalendarEventsController : ControllerBase
         var auth = await _authorizationService.AuthorizeAsync(User, project, Policies.ProjectAccess);
         if (!auth.Succeeded) return Forbid();
 
-        if (string.IsNullOrWhiteSpace(request.Title))
-            return BadRequest(new { message = "Title is required" });
-
-        if (request.EndUtc <= request.StartUtc)
-            return BadRequest(new { message = "End time must be after start time" });
+        var validation = await ValidateEventRequestAsync(project.TeamId, request.Title, request.StartUtc, request.EndUtc, request.IsWholeTeam, request.AttendeeUserIds);
+        if (validation != null) return validation;
 
         var ev = new CalendarEvent
         {
@@ -96,6 +92,8 @@ public class CalendarEventsController : ControllerBase
             Title = request.Title.Trim(),
             Description = request.Description?.Trim(),
             Location = request.Location?.Trim(),
+            Color = NormalizeColor(request.Color),
+            IsWholeTeam = request.IsWholeTeam,
             StartUtc = request.StartUtc,
             EndUtc = request.EndUtc,
             AllDay = request.AllDay,
@@ -104,6 +102,8 @@ public class CalendarEventsController : ControllerBase
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
+
+        ApplyAttendees(ev, request.IsWholeTeam, request.AttendeeUserIds);
 
         _context.CalendarEvents.Add(ev);
         await _context.SaveChangesAsync();
@@ -117,23 +117,31 @@ public class CalendarEventsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<CalendarEventResponse>> UpdateEvent(Guid id, UpdateCalendarEventRequest request)
     {
-        var ev = await _context.CalendarEvents.FindAsync(id);
+        var ev = await _context.CalendarEvents
+            .Include(e => e.Attendees)
+            .FirstOrDefaultAsync(e => e.Id == id);
         if (ev == null) return NotFound();
         if (!await HasProjectAccessAsync(ev.ProjectId)) return Forbid();
 
-        if (string.IsNullOrWhiteSpace(request.Title))
-            return BadRequest(new { message = "Title is required" });
+        var project = await _context.Projects.FindAsync(ev.ProjectId);
+        if (project == null) return NotFound();
 
-        if (request.EndUtc <= request.StartUtc)
-            return BadRequest(new { message = "End time must be after start time" });
+        var validation = await ValidateEventRequestAsync(project.TeamId, request.Title, request.StartUtc, request.EndUtc, request.IsWholeTeam, request.AttendeeUserIds);
+        if (validation != null) return validation;
 
         ev.Title = request.Title.Trim();
         ev.Description = request.Description?.Trim();
         ev.Location = request.Location?.Trim();
+        ev.Color = NormalizeColor(request.Color);
+        ev.IsWholeTeam = request.IsWholeTeam;
         ev.StartUtc = request.StartUtc;
         ev.EndUtc = request.EndUtc;
         ev.AllDay = request.AllDay;
         ev.UpdatedAt = DateTime.UtcNow;
+
+        _context.CalendarEventAttendees.RemoveRange(ev.Attendees);
+        ev.Attendees.Clear();
+        ApplyAttendees(ev, request.IsWholeTeam, request.AttendeeUserIds);
 
         await _context.SaveChangesAsync();
 
@@ -161,6 +169,7 @@ public class CalendarEventsController : ControllerBase
     private async Task<CalendarEvent?> LoadEventAsync(Guid id) =>
         await _context.CalendarEvents
             .Include(e => e.CreatedBy)
+            .Include(e => e.Attendees).ThenInclude(a => a.User)
             .FirstOrDefaultAsync(e => e.Id == id);
 
     private async Task<bool> HasProjectAccessAsync(int projectId)
@@ -171,12 +180,58 @@ public class CalendarEventsController : ControllerBase
         return auth.Succeeded;
     }
 
+    private async Task<ActionResult?> ValidateEventRequestAsync(
+        int teamId,
+        string title,
+        DateTime startUtc,
+        DateTime endUtc,
+        bool isWholeTeam,
+        IReadOnlyList<string>? attendeeUserIds)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return BadRequest(new { message = "Title is required" });
+
+        if (endUtc <= startUtc)
+            return BadRequest(new { message = "End time must be after start time" });
+
+        if (!isWholeTeam && attendeeUserIds is { Count: > 0 })
+        {
+            if (!await ValidateAttendeesAsync(teamId, attendeeUserIds))
+                return BadRequest(new { message = "One or more attendees are not team members" });
+        }
+
+        return null;
+    }
+
+    private async Task<bool> ValidateAttendeesAsync(int teamId, IEnumerable<string> userIds)
+    {
+        var ids = userIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        if (ids.Count == 0) return true;
+        var count = await _context.TeamUsers.CountAsync(tu => tu.TeamId == teamId && ids.Contains(tu.UserId));
+        return count == ids.Count;
+    }
+
+    private static void ApplyAttendees(CalendarEvent ev, bool isWholeTeam, IReadOnlyList<string>? attendeeUserIds)
+    {
+        if (isWholeTeam || attendeeUserIds == null) return;
+
+        foreach (var userId in attendeeUserIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct())
+        {
+            ev.Attendees.Add(new CalendarEventAttendee { EventId = ev.Id, UserId = userId });
+        }
+    }
+
+    private static string NormalizeColor(string? color) =>
+        string.IsNullOrWhiteSpace(color) ? DefaultColor : color.Trim();
+
     private static CalendarEventResponse MapToResponse(CalendarEvent ev) =>
         new(
             ev.Id,
             ev.Title,
             ev.Description,
             ev.Location,
+            ev.Color,
+            ev.IsWholeTeam,
             ev.StartUtc,
             ev.EndUtc,
             ev.AllDay,
@@ -184,5 +239,8 @@ public class CalendarEventsController : ControllerBase
             ev.CreatedById,
             ev.CreatedBy?.Email ?? string.Empty,
             ev.CreatedAt,
-            ev.UpdatedAt);
+            ev.UpdatedAt,
+            ev.Attendees
+                .Select(a => new CalendarEventAttendeeResponse(a.UserId, a.User?.Email ?? string.Empty))
+                .ToList());
 }

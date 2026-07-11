@@ -926,6 +926,11 @@ namespace WMess.Api.Migrations
                     b.Property<bool>("AllDay")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -938,6 +943,9 @@ namespace WMess.Api.Migrations
 
                     b.Property<DateTime>("EndUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsWholeTeam")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Location")
                         .HasMaxLength(500)
@@ -964,6 +972,21 @@ namespace WMess.Api.Migrations
                     b.HasIndex("ProjectId", "StartUtc");
 
                     b.ToTable("CalendarEvents");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.CalendarEventAttendee", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("EventId", "UserId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("CalendarEventAttendees");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.TeamHoliday", b =>
@@ -1480,6 +1503,25 @@ namespace WMess.Api.Migrations
                     b.Navigation("Project");
                 });
 
+            modelBuilder.Entity("WMess.Api.Models.CalendarEventAttendee", b =>
+                {
+                    b.HasOne("WMess.Api.Models.CalendarEvent", "Event")
+                        .WithMany("Attendees")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("WMess.Api.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("WMess.Api.Models.TeamHoliday", b =>
                 {
                     b.HasOne("WMess.Api.Models.Team", "Team")
@@ -1528,6 +1570,11 @@ namespace WMess.Api.Migrations
                     b.Navigation("Messages");
 
                     b.Navigation("PinnedMessages");
+                });
+
+            modelBuilder.Entity("WMess.Api.Models.CalendarEvent", b =>
+                {
+                    b.Navigation("Attendees");
                 });
 
             modelBuilder.Entity("WMess.Api.Models.LibraryFolder", b =>

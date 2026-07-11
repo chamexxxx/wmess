@@ -5227,12 +5227,29 @@
         },
         "description": "Элемент пути (хлебных крошек) до текущей папки."
       },
+      "CalendarEventAttendeeResponse": {
+        "required": [
+          "userId",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        }
+      },
       "CalendarEventResponse": {
         "required": [
           "id",
           "title",
           "description",
           "location",
+          "color",
+          "isWholeTeam",
           "startUtc",
           "endUtc",
           "allDay",
@@ -5240,7 +5257,8 @@
           "createdById",
           "createdByEmail",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "attendees"
         ],
         "type": "object",
         "properties": {
@@ -5262,6 +5280,12 @@
               "null",
               "string"
             ]
+          },
+          "color": {
+            "type": "string"
+          },
+          "isWholeTeam": {
+            "type": "boolean"
           },
           "startUtc": {
             "type": "string",
@@ -5295,6 +5319,12 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "attendees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarEventAttendeeResponse"
+            }
           }
         }
       },
@@ -5399,6 +5429,9 @@
           "title",
           "description",
           "location",
+          "color",
+          "isWholeTeam",
+          "attendeeUserIds",
           "startUtc",
           "endUtc",
           "allDay",
@@ -5420,6 +5453,24 @@
               "null",
               "string"
             ]
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isWholeTeam": {
+            "type": "boolean"
+          },
+          "attendeeUserIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           },
           "startUtc": {
             "type": "string",
@@ -6894,6 +6945,9 @@
           "title",
           "description",
           "location",
+          "color",
+          "isWholeTeam",
+          "attendeeUserIds",
           "startUtc",
           "endUtc",
           "allDay"
@@ -6914,6 +6968,24 @@
               "null",
               "string"
             ]
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isWholeTeam": {
+            "type": "boolean"
+          },
+          "attendeeUserIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           },
           "startUtc": {
             "type": "string",
