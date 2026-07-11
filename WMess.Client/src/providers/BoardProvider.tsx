@@ -7,6 +7,9 @@ import { useAuth } from '../context/AuthContext'
 export interface CollabUser {
   name: string
   color: string
+  userId?: string
+  hasAvatar?: boolean
+  avatarVersion?: number
 }
 
 interface BoardContextValue {
@@ -20,6 +23,10 @@ interface BoardContextValue {
   // email пользователя; undefined, пока авторизация не загрузилась (в presence не транслируем).
   username: string | undefined
   cursorColor: string
+  // Данные аватарки текущего пользователя — транслируются в awareness (см. BoardEditor).
+  userId: string | undefined
+  hasAvatar: boolean | undefined
+  avatarVersion: number | undefined
 }
 
 const BoardContext = createContext<BoardContextValue | null>(null)
@@ -78,13 +85,19 @@ export function BoardProvider({ boardId, children }: BoardProviderProps) {
       // BoardEditor кладёт имя/цвет во вложенное поле `user` (конвенция Excalidraw-коллабораторов),
       // поэтому читаем оттуда, а не с верхнего уровня awareness-состояния.
       const states = Array.from(provider.awareness.getStates().values()) as Array<{
-        user?: { name?: string; color?: string }
+        user?: { name?: string; color?: string; userId?: string; hasAvatar?: boolean; avatarVersion?: number }
       }>
       setUsers(
         states
           .map((s) => s.user)
-          .filter((u): u is { name: string; color?: string } => typeof u?.name === 'string')
-          .map((u) => ({ name: u.name, color: u.color ?? '#888' })),
+          .filter((u): u is NonNullable<typeof u> & { name: string } => typeof u?.name === 'string')
+          .map((u) => ({
+            name: u.name,
+            color: u.color ?? '#888',
+            userId: u.userId,
+            hasAvatar: u.hasAvatar,
+            avatarVersion: u.avatarVersion,
+          })),
       )
     }
 
@@ -113,8 +126,11 @@ export function BoardProvider({ boardId, children }: BoardProviderProps) {
       users,
       username,
       cursorColor,
+      userId: user?.id,
+      hasAvatar: user?.hasAvatar,
+      avatarVersion: user?.avatarVersion,
     }),
-    [provider, connect, disconnect, isConnected, isSynced, users, username, cursorColor],
+    [provider, connect, disconnect, isConnected, isSynced, users, username, cursorColor, user],
   )
 
   return <BoardContext.Provider value={value}>{children}</BoardContext.Provider>

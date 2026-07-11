@@ -29,7 +29,7 @@ import '@excalidraw/excalidraw/index.css'
 const EXCALIDRAW_ORIGIN = { origin: 'excalidraw-binding' }
 
 export function BoardEditor() {
-  const { doc, awareness, connect, disconnect, username, cursorColor } = useBoard()
+  const { doc, awareness, connect, disconnect, username, cursorColor, userId, hasAvatar, avatarVersion } = useBoard()
   const excalidrawAPIRef = useRef<ExcalidrawImperativeAPI | null>(null)
 
   // Y.Map для хранения элементов сцены по element.id
@@ -120,6 +120,9 @@ export function BoardEditor() {
       awareness.setLocalStateField('user', {
         name: username,
         color: cursorColor,
+        userId,
+        hasAvatar,
+        avatarVersion,
       })
     }
 
@@ -156,7 +159,7 @@ export function BoardEditor() {
     return () => {
       awareness.off('change', changeHandler)
     }
-  }, [awareness, doc.clientID, username, cursorColor])
+  }, [awareness, doc.clientID, username, cursorColor, userId, hasAvatar, avatarVersion])
 
   // Обработчик изменений сцены Excalidraw → Yjs
   const handleChange = useCallback(
